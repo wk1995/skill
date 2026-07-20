@@ -56,6 +56,18 @@ metadata:
 
 When a group is synchronized, copy the selected source version to all targets. If target versions differ before sync, record them in the pre-sync snapshot and report the difference.
 
+## Branch-Aware Repository/Local Policy
+
+Use this policy for a machine-wide local Skill that is linked to this repository's Skill copy:
+
+1. Resolve the repository role path and detect its current Git branch.
+2. If the repository role is on `master` and the repository/local versions differ, synchronize from the higher version to the lower version.
+3. If versions are equal, do not synchronize only because timestamps or digests differ; report status and let the user choose.
+4. If the repository role is on any branch other than `master`, skip synchronization unless the user explicitly requests it with `--force`.
+5. Always snapshot both copies before overwriting either one.
+
+Use `policy-sync` for this behavior. Use plain `sync --source <role>` only when the user has explicitly chosen a source.
+
 ## Conflict Policy
 
 Use content digests, not timestamps alone, to detect divergence. A conflict exists when multiple roles have different current digests and no explicit source role is provided.

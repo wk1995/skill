@@ -80,6 +80,12 @@ Synchronize from an explicit source role:
 python skills/sync-skills/scripts/skill_sync.py sync my-skill --source repo
 ```
 
+Apply the branch-aware version policy between this repository copy and a local copy:
+
+```bash
+python skills/sync-skills/scripts/skill_sync.py policy-sync sync-skills --repo-role repo --local-role local
+```
+
 Rollback every linked copy to a recorded snapshot:
 
 ```bash
@@ -106,6 +112,7 @@ python skills/sync-skills/scripts/skill_sync.py diff my-skill --role local --fro
 - Exclude transient directories and files such as `.git`, `node_modules`, `dist`, `.DS_Store`, `__pycache__`, and Python bytecode.
 - If two or more copies changed since the previous snapshot and no source was specified, stop and report the conflict instead of choosing silently.
 - Keep the logical Skill version in `metadata.version` in `SKILL.md`. Use this skill's own version as `0.0.1`.
+- For repository/local Skill synchronization, use `policy-sync`: when the repository role is on `master` and versions differ, synchronize from the higher version to the lower version; when the repository role is on any other branch, skip unless the user explicitly requests synchronization with `--force`.
 - Record Skill addresses in the registry: `skill_urls` for canonical repository/documentation/registry/source URLs, and `role_urls` for role-specific remote/source URLs.
 - If a role URL is not provided, infer it from `git remote get-url origin` when available.
 - Record audit times in the registry: group `created_at`, group `updated_at`, per-role `content_updated_at`, per-version `created_at` and `updated_at`, and operation records such as `last_sync`, `last_convert`, and `last_rollback`.
