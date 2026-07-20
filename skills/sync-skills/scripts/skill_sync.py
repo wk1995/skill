@@ -215,28 +215,26 @@ def git_current_branch(path: Path) -> str | None:
     return branch or None
 
 
-def compare_versions(left: str | None, right: str | None) -> int | None:
-    left_parts = parse_version_parts(left)
-    right_parts = parse_version_parts(right)
-    if left_parts is None or right_parts is None:
+def git_default_branch(path: Path) -> str | None:
+    if not shutil.which("git"):
         return None
-    length = max(len(left_parts), len(right_parts))
-    left_parts += [0] * (length - len(left_parts))
-    right_parts += [0] * (length - len(right_parts))
-    if left_parts > right_parts:
-        return 1
-    if left_parts < right_parts:
-        return -1
-    return 0
-
-
-def parse_version_parts(version: str | None) -> list[int] | None:
-    if not version:
-        return None
-    match = re.match(r"^\s*v?(\d+(?:\.\d+)*)(?:[-+].*)?\s*$", version)
-    if not match:
-        return None
-    return [int(part) for part in match.group(1).split(".")]
+    commands = [
+        ["git", "-C", str(path), "symbolic-ref", "--quiet", "--short", "refs/remotes/origin/HEAD"],
+        ["git", "-C", str(path), "rev-parse", "--abbrev-ref", "origin/HEAD"],
+    ]
+    for command in commands:
+        try:
+            result = subprocess.run(command, check=False, capture_output=True, text=True, timeout=10)
+        except (OSError, subprocess.SubprocessError):
+            continue
+        if result.returncode != 0:
+            continue
+        branch = result.stdout.strip()
+        if branch.startswith("origin/"):
+            return branch.removeprefix("origin/")
+        if branch:
+            return branch
+    return None
 
 
 def read_skill_metadata(path: Path) -> dict[str, Any]:
@@ -577,95 +575,6 @@ def command_sync(args: argparse.Namespace) -> int:
     return 0
 
 
-def command_policy_sync(args: argparse.Namespace) -> int:
-    state_dir = Path(args.state_dir).resolve()
-    registry = load_registry(state_dir)
-    group = get_group(registry, args.group)
-    current = build_member_state(group)
-    repo_role = args.repo_role
-    local_role = args.local_role
-    if repo_role not in current:
-        raise SystemExit(f"repo role is not linked or does not exist: {repo_role}")
-    if local_role not in current:
-        raise SystemExit(f"local role is not linked or does not exist: {local_role}")
-
-    repo_path = Path(str(current[repo_role]["path"]))
-    repo_branch = git_current_branch(repo_path)
-    repo_version = current[repo_role].get("version")
-    local_version = current[local_role].get("version")
-    comparison = compare_versions(repo_version, local_version)
-
-    if repo_branch != "master" and not args.force:
-        print(json.dumps({
-            "group": args.group,
-            "action": "skipped",
-            "reason": "repo branch is not master",
-            "repo_branch": repo_branch,
-            "repo_role": repo_role,
-            "local_role": local_role,
-            "repo_version": repo_version,
-            "local_version": local_version,
-        }, indent=2, sort_keys=True))
-        return 0
-
-    if comparison is None:
-        raise SystemExit(f"cannot compare versions: {repo_role}={repo_version}, {local_role}={local_version}; rerun plain sync with --source if needed")
-    if comparison == 0 and not args.force:
-        print(json.dumps({
-            "group": args.group,
-            "action": "skipped",
-            "reason": "versions are equal",
-            "repo_branch": repo_branch,
-            "repo_role": repo_role,
-            "local_role": local_role,
-            "repo_version": repo_version,
-            "local_version": local_version,
-        }, indent=2, sort_keys=True))
-        return 0
-
-    source_role = repo_role if comparison >= 0 else local_role
-    source_path = Path(str(current[source_role]["path"]))
-    snapshot_id = create_snapshot(state_dir, args.group, group, "policy-sync", source_role)
-    snapshot_dir = state_dir / "snapshots" / args.group / snapshot_id
-    updated_roles = [role for role in (repo_role, local_role) if role != source_role]
-    differences_by_role = {}
-    for role in updated_roles:
-        differences_by_role[role] = summarize_diff(compare_skill_dirs(snapshot_dir / role, source_path))
-        copy_skill_tree(source_path, Path(str(current[role]["path"])))
-
-    operation_at = now_iso()
-    group.setdefault("snapshots", []).append(snapshot_id)
-    group["last_policy_sync"] = {
-        "at": operation_at,
-        "source": source_role,
-        "snapshot": snapshot_id,
-        "repo_branch": repo_branch,
-        "repo_role": repo_role,
-        "local_role": local_role,
-        "repo_version": repo_version,
-        "local_version": local_version,
-        "updated_roles": updated_roles,
-        "differences_by_role": differences_by_role,
-        "forced": args.force,
-    }
-    update_group_state(group)
-    save_registry(state_dir, registry)
-    print(json.dumps({
-        "group": args.group,
-        "action": "synchronized",
-        "source": source_role,
-        "snapshot": snapshot_id,
-        "repo_branch": repo_branch,
-        "repo_version": repo_version,
-        "local_version": local_version,
-        "updated_roles": updated_roles,
-        "updated_at": operation_at,
-        "differences_by_role": differences_by_role,
-        "forced": args.force,
-    }, indent=2, sort_keys=True))
-    return 0
-
-
 def command_diff(args: argparse.Namespace) -> int:
     state_dir = Path(args.state_dir).resolve()
     registry = load_registry(state_dir)
@@ -795,6 +704,10 @@ def summarize_diff(diff: dict[str, Any]) -> dict[str, Any]:
 
 
 def choose_source(group: dict[str, Any], current: dict[str, dict[str, str | None]]) -> str:
+    version_source = choose_source_by_version_on_mainline(group, current)
+    if version_source:
+        return version_source
+
     previous = group.get("last_state", {})
     changed = []
     for role, info in current.items():
@@ -809,6 +722,53 @@ def choose_source(group: dict[str, Any], current: dict[str, dict[str, str | None
 
     newest_role = max(current, key=lambda role: Path(str(current[role]["path"])).stat().st_mtime)
     return newest_role
+
+
+def choose_source_by_version_on_mainline(group: dict[str, Any], current: dict[str, dict[str, str | None]]) -> str | None:
+    repo_path = group.get("roles", {}).get("repo")
+    if not repo_path:
+        return None
+    repo_dir = Path(str(repo_path))
+    current_branch = git_current_branch(repo_dir)
+    default_branch = git_default_branch(repo_dir)
+    if current_branch not in {"master", default_branch}:
+        return None
+
+    versions_by_role = {role: parse_version(info.get("version")) for role, info in current.items() if info.get("version")}
+    comparable = {role: version for role, version in versions_by_role.items() if version is not None}
+    if len(comparable) < 2 or len(set(comparable.values())) <= 1:
+        return None
+
+    highest = max(comparable.values())
+    highest_roles = [role for role, version in comparable.items() if version == highest]
+    if len(highest_roles) == 1:
+        return highest_roles[0]
+
+    highest_digests = {current[role]["digest"] for role in highest_roles}
+    if len(highest_digests) == 1:
+        return sorted(highest_roles)[0]
+    raise SystemExit(
+        "conflict: multiple roles have the highest version with different digests: "
+        f"{', '.join(sorted(highest_roles))}; rerun with --source"
+    )
+
+
+def parse_version(value: str | None) -> tuple[int, int, int, int, tuple[str, ...]] | None:
+    if not value:
+        return None
+    match = re.match(r"^v?(\d+)(?:\.(\d+))?(?:\.(\d+))?(?:[-+.]?(.*))?$", value.strip())
+    if not match:
+        return None
+    major, minor, patch, suffix = match.groups()
+    suffix_parts = tuple(split_version_suffix(suffix or ""))
+    release_rank = 1 if not suffix_parts else 0
+    return (int(major), int(minor or 0), int(patch or 0), release_rank, suffix_parts)
+
+
+def split_version_suffix(value: str) -> list[str]:
+    if not value:
+        return []
+    return [part for part in re.split(r"[-+._]", value) if part]
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -847,13 +807,6 @@ def build_parser() -> argparse.ArgumentParser:
     sync.add_argument("group")
     sync.add_argument("--source", help="Role to use as source. Required when conflicts exist.")
     sync.set_defaults(func=command_sync)
-
-    policy_sync = subparsers.add_parser("policy-sync", help="Apply branch-aware version synchronization between repository and local roles.")
-    policy_sync.add_argument("group")
-    policy_sync.add_argument("--repo-role", default="repo")
-    policy_sync.add_argument("--local-role", default="local")
-    policy_sync.add_argument("--force", action="store_true", help="Allow synchronization even when the repository role is not on master.")
-    policy_sync.set_defaults(func=command_policy_sync)
 
     snapshots = subparsers.add_parser("snapshots", help="List snapshots for a group.")
     snapshots.add_argument("group")
