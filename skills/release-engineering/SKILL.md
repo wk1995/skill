@@ -3,6 +3,19 @@ name: release-engineering
 description: Use when planning, validating, automating, documenting, or troubleshooting release/publish/发布/发包 workflows for Android apps, Android libraries/components, Gradle plugins, publish branches, tags, artifacts, CI gates, or when extending release workflows beyond Android.
 metadata:
   version: "1.0.0"
+  urls:
+    - type: repository
+      value: https://github.com/wk1995/skill.git
+    - type: source
+      value: skills/release-engineering
+  triggering:
+    include:
+      - The user asks to plan, validate, automate, document, or troubleshoot a release workflow.
+      - The task involves Android app, Android component, Gradle plugin, artifact, tag, publish branch, or CI gate release work.
+      - The task needs release contracts, dry-runs, publishing safety checks, rollback planning, or aftercare.
+    exclude:
+      - The user is only asking about this skill-management repository's architecture or metadata conventions.
+      - The task is ordinary code editing and does not involve release, publishing, artifacts, tags, or release automation.
 ---
 
 # Release Engineering

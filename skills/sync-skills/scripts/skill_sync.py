@@ -196,7 +196,7 @@ def git_remote_url(path: Path) -> str | None:
     return remote or None
 
 
-def read_skill_metadata(path: Path) -> dict[str, str | None]:
+def read_skill_metadata(path: Path) -> dict[str, Any]:
     skill_md = path / "SKILL.md"
     text = skill_md.read_text(encoding="utf-8").lstrip("\ufeff")
     frontmatter = ""
@@ -206,7 +206,31 @@ def read_skill_metadata(path: Path) -> dict[str, str | None]:
             frontmatter = text[3:end]
     name = match_yaml_scalar(frontmatter, "name")
     version = match_yaml_scalar(frontmatter, "version")
-    return {"name": name, "version": version}
+    urls = parse_metadata_url_values(frontmatter)
+    return {"name": name, "version": version, "urls": urls}
+
+
+def parse_metadata_url_values(frontmatter: str) -> list[str]:
+    urls: list[str] = []
+    in_urls = False
+    urls_indent = 0
+    for line in frontmatter.splitlines():
+        if not in_urls:
+            match = re.match(r"^(\s*)urls\s*:\s*$", line)
+            if match:
+                in_urls = True
+                urls_indent = len(match.group(1))
+            continue
+
+        if line.strip() == "":
+            continue
+        indent = len(line) - len(line.lstrip(" "))
+        if indent <= urls_indent and not line.lstrip().startswith("-"):
+            break
+        value_match = re.match(r"^\s*value\s*:\s*[\"']?([^\"'\n]+)[\"']?\s*$", line)
+        if value_match:
+            urls.append(value_match.group(1).strip())
+    return urls
 
 
 def match_yaml_scalar(text: str, key: str) -> str | None:
@@ -251,8 +275,8 @@ def existing_members(group: dict[str, Any]) -> dict[str, str]:
     return {role: path for role, path in group.get("roles", {}).items() if Path(path).exists()}
 
 
-def build_member_state(group: dict[str, Any]) -> dict[str, dict[str, str | None]]:
-    state: dict[str, dict[str, str | None]] = {}
+def build_member_state(group: dict[str, Any]) -> dict[str, dict[str, Any]]:
+    state: dict[str, dict[str, Any]] = {}
     for role, path in existing_members(group).items():
         skill_dir = require_skill_dir(path, role)
         metadata = read_skill_metadata(skill_dir)
@@ -268,6 +292,7 @@ def build_member_state(group: dict[str, Any]) -> dict[str, dict[str, str | None]
             "content_updated_at_source": "git" if git_latest_commit_at else "filesystem",
             "git_first_commit_at": git_first_commit_at,
             "git_latest_commit_at": git_latest_commit_at,
+            "metadata_urls": metadata["urls"],
             "name": metadata["name"],
             "version": metadata["version"],
         }
@@ -303,6 +328,7 @@ def create_snapshot(state_dir: Path, group_name: str, group: dict[str, Any], ope
 def update_group_state(group: dict[str, Any]) -> None:
     current = build_member_state(group)
     operation_at = now_iso()
+    merge_metadata_urls(group, current)
     if not group.get("created_at"):
         group["created_at"] = infer_group_created_at(current) or operation_at
     group["last_state"] = current
@@ -310,11 +336,19 @@ def update_group_state(group: dict[str, Any]) -> None:
     update_version_history(group, current, operation_at)
 
 
-def infer_group_created_at(current: dict[str, dict[str, str | None]]) -> str | None:
+def infer_group_created_at(current: dict[str, dict[str, Any]]) -> str | None:
     return min_iso([info.get("git_first_commit_at") or info.get("content_updated_at") for info in current.values()])
 
 
-def update_version_history(group: dict[str, Any], current: dict[str, dict[str, str | None]], observed_at: str) -> None:
+def merge_metadata_urls(group: dict[str, Any], current: dict[str, dict[str, Any]]) -> None:
+    skill_urls = group.setdefault("skill_urls", [])
+    for info in current.values():
+        for url in info.get("metadata_urls", []) or []:
+            if url not in skill_urls:
+                skill_urls.append(url)
+
+
+def update_version_history(group: dict[str, Any], current: dict[str, dict[str, Any]], observed_at: str) -> None:
     history = group.setdefault("version_history", {})
     for role, info in current.items():
         version = info.get("version") or "unknown"

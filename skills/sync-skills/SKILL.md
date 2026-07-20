@@ -3,6 +3,19 @@ name: sync-skills
 description: Use when linking, converting, synchronizing, versioning, auditing, or rolling back multiple copies of the same Agent Skill across this repository, project-level skill folders, local Codex/user skill folders, or arbitrary external paths.
 metadata:
   version: "0.0.1"
+  urls:
+    - type: repository
+      value: https://github.com/wk1995/skill.git
+    - type: source
+      value: skills/sync-skills
+  triggering:
+    include:
+      - The user asks to link, convert, synchronize, audit, version, compare, or roll back Skill copies.
+      - The task involves local, project-level, repository-level, or external copies of the same Skill.
+      - The task needs Skill provenance URLs, version history, content digests, snapshots, or difference reports.
+    exclude:
+      - The user is only asking to use a Skill for its domain workflow rather than manage Skill copies.
+      - The task is ordinary code editing and does not involve Skill synchronization, conversion, auditing, or rollback.
 ---
 
 # Sync Skills
