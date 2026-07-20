@@ -2,7 +2,7 @@
 name: sync-skills
 description: Use when linking, converting, synchronizing, versioning, auditing, or rolling back multiple copies of the same Agent Skill across this repository, project-level skill folders, local Codex/user skill folders, or arbitrary external paths.
 metadata:
-  version: "0.0.1"
+  version: "0.0.2"
   urls:
     - type: repository
       value: https://github.com/wk1995/skill.git
@@ -104,8 +104,11 @@ python skills/sync-skills/scripts/skill_sync.py diff my-skill --role local --fro
 - Treat `SKILL.md` as required. A path without `SKILL.md` is not a valid source copy.
 - Preserve each Skill as a directory tree. Copy `SKILL.md`, `agents/`, `scripts/`, `references/`, `assets/`, `extensions.yaml`, `src/`, and `tests/` when present.
 - Exclude transient directories and files such as `.git`, `node_modules`, `dist`, `.DS_Store`, `__pycache__`, and Python bytecode.
+- When the skill-management repository is on `master` or its configured default branch, compare linked copies by `metadata.version`; if versions differ, synchronize and let the higher version replace the lower version.
+- When the repository is on any other branch, do not synchronize only because versions differ unless the user explicitly requests synchronization or the branch work requires updating the target copy.
+- If versions are equal but digests differ, use normal conflict handling and require an explicit source unless only one linked role changed since the previous snapshot.
 - If two or more copies changed since the previous snapshot and no source was specified, stop and report the conflict instead of choosing silently.
-- Keep the logical Skill version in `metadata.version` in `SKILL.md`. Use this skill's own version as `0.0.1`.
+- Keep the logical Skill version in `metadata.version` in `SKILL.md`. Use this skill's own version as `0.0.2`.
 - Record Skill addresses in the registry: `skill_urls` for canonical repository/documentation/registry/source URLs, and `role_urls` for role-specific remote/source URLs.
 - If a role URL is not provided, infer it from `git remote get-url origin` when available.
 - Record audit times in the registry: group `created_at`, group `updated_at`, per-role `content_updated_at`, per-version `created_at` and `updated_at`, and operation records such as `last_sync`, `last_convert`, and `last_rollback`.
