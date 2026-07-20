@@ -83,6 +83,11 @@ name: example-skill
 description: Use when the user asks for a concrete example Skill workflow.
 metadata:
   version: "1.0.0"
+  urls:
+    - type: repository
+      value: https://github.com/example/example-skill
+    - type: documentation
+      value: https://example.com/example-skill/docs
   triggering:
     include:
       - The user explicitly asks to create, edit, validate, or publish example-skill.
@@ -93,7 +98,7 @@ metadata:
 ---
 ```
 
-`name`, `description`, and `metadata.version` are the baseline contract. `description` remains the natural-language discovery text used by Agent Skills. `metadata.triggering` is this repository's structured supplement: `include` describes explicit trigger cases, and `exclude` describes explicit non-trigger cases. When `metadata.triggering` is not configured, it is equivalent to `include: []` and `exclude: []`. `exclude` takes priority over `include` to avoid accidental keyword-triggered activation.
+`name`, `description`, and `metadata.version` are the baseline contract. `description` remains the natural-language discovery text used by Agent Skills. `metadata.urls` is optional stable provenance information for the logical Skill, such as a source repository, documentation page, registry page, package page, or upstream project. `metadata.triggering` is this repository's structured supplement: `include` describes explicit trigger cases, and `exclude` describes explicit non-trigger cases. When `metadata.triggering` is not configured, it is equivalent to `include: []` and `exclude: []`. `exclude` takes priority over `include` to avoid accidental keyword-triggered activation.
 
 A Skill with executable extensions may add:
 
@@ -109,6 +114,56 @@ skills/example-skill/
 ```
 
 `src/core.ts` should contain shared CLI/MCP business logic. `cli.ts` and `mcp.ts` should handle registration and protocol adaptation only.
+
+## Shared Metadata And Audit Conventions
+
+These conventions are shared across Skills and management tools. They should be reflected in schemas, registries, CLI output, and MCP resources as those pieces are implemented.
+
+### Stable Skill information
+
+Keep stable self-description in `SKILL.md`:
+
+- `metadata.version`: the Skill's independent version.
+- `metadata.urls`: canonical addresses for the logical Skill. Use typed entries such as `repository`, `documentation`, `registry`, `package`, or `source`.
+- `metadata.triggering`: optional structured trigger rules.
+
+Do not put machine-local paths, generated snapshots, local sync state, or per-copy timestamps in `SKILL.md`.
+
+### Registry records
+
+Generated registry records should capture environment-specific audit state:
+
+- `skill_urls`: canonical URLs collected from `metadata.urls`, CLI arguments, registry data, or upstream sources.
+- `role_urls`: role-specific URLs for physical copies, such as a local repository remote, project repository, external source page, or bundled plugin address.
+- `roles`: absolute local paths for physical copies, such as `repo`, `local`, `project`, and `external`.
+- `digest`: SHA-256 content digest for each copy or published artifact.
+- `created_at` and `updated_at`: audit timestamps for groups, versions, digests, and operations.
+- `version_history`: observed versions with their first and latest observed times, digests, roles, URLs, and content update times.
+- `differences_by_role`: changed-file summaries for synchronization or upgrade operations.
+
+If a role URL is not explicitly configured, infer it from `git remote get-url origin` when the Skill copy is inside a Git repository.
+
+### Time inference
+
+When a timestamp is missing, infer it in this order:
+
+1. Existing registry or explicit metadata value.
+2. Git commit history for the Skill path: first commit for `created_at`, latest commit for `updated_at`.
+3. File modification time for non-ignored Skill files.
+4. Current UTC time.
+
+Always record how an inferred content timestamp was derived, for example `git`, `filesystem`, `manual`, or `registry`. Use timestamps for auditability only; use digests to decide whether two copies are identical.
+
+### Version differences
+
+When recording or reporting differences between Skill versions or linked copies, report:
+
+- added files;
+- removed files;
+- modified text files, preferably with unified diffs when requested;
+- modified binary files by path and digest only.
+
+Prefer snapshot-to-snapshot comparisons for historical versions. Use snapshot-to-current comparisons when deciding whether an unsynchronized local copy should become the source.
 
 ## CLI (Planned)
 
