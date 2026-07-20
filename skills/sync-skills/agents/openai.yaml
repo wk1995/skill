@@ -1,0 +1,4 @@
+interface:
+  display_name: "Sync Skills"
+  short_description: "Synchronize linked skill copies"
+  default_prompt: "Use $sync-skills to link and synchronize local, project, and external skill copies."
