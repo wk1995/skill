@@ -51,10 +51,12 @@ For this skill, use:
 
 ```yaml
 metadata:
-  version: "0.0.1"
+  version: "0.0.2"
 ```
 
 When a group is synchronized, copy the selected source version to all targets. If target versions differ before sync, record them in the pre-sync snapshot and report the difference.
+
+When the skill-management repository is on `master` or its configured default branch, treat version mismatch as sufficient reason to sync: the higher `metadata.version` replaces the lower one. On feature or other non-default branches, do not sync only because versions differ unless the user explicitly requested sync or the branch task requires it.
 
 ## Conflict Policy
 

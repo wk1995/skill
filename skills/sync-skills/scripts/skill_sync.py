@@ -196,6 +196,47 @@ def git_remote_url(path: Path) -> str | None:
     return remote or None
 
 
+def git_current_branch(path: Path) -> str | None:
+    if not shutil.which("git"):
+        return None
+    try:
+        result = subprocess.run(
+            ["git", "-C", str(path), "branch", "--show-current"],
+            check=False,
+            capture_output=True,
+            text=True,
+            timeout=10,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return None
+    if result.returncode != 0:
+        return None
+    branch = result.stdout.strip()
+    return branch or None
+
+
+def git_default_branch(path: Path) -> str | None:
+    if not shutil.which("git"):
+        return None
+    commands = [
+        ["git", "-C", str(path), "symbolic-ref", "--quiet", "--short", "refs/remotes/origin/HEAD"],
+        ["git", "-C", str(path), "rev-parse", "--abbrev-ref", "origin/HEAD"],
+    ]
+    for command in commands:
+        try:
+            result = subprocess.run(command, check=False, capture_output=True, text=True, timeout=10)
+        except (OSError, subprocess.SubprocessError):
+            continue
+        if result.returncode != 0:
+            continue
+        branch = result.stdout.strip()
+        if branch.startswith("origin/"):
+            return branch.removeprefix("origin/")
+        if branch:
+            return branch
+    return None
+
+
 def read_skill_metadata(path: Path) -> dict[str, Any]:
     skill_md = path / "SKILL.md"
     text = skill_md.read_text(encoding="utf-8").lstrip("\ufeff")
@@ -663,6 +704,10 @@ def summarize_diff(diff: dict[str, Any]) -> dict[str, Any]:
 
 
 def choose_source(group: dict[str, Any], current: dict[str, dict[str, str | None]]) -> str:
+    version_source = choose_source_by_version_on_mainline(group, current)
+    if version_source:
+        return version_source
+
     previous = group.get("last_state", {})
     changed = []
     for role, info in current.items():
@@ -677,6 +722,53 @@ def choose_source(group: dict[str, Any], current: dict[str, dict[str, str | None
 
     newest_role = max(current, key=lambda role: Path(str(current[role]["path"])).stat().st_mtime)
     return newest_role
+
+
+def choose_source_by_version_on_mainline(group: dict[str, Any], current: dict[str, dict[str, str | None]]) -> str | None:
+    repo_path = group.get("roles", {}).get("repo")
+    if not repo_path:
+        return None
+    repo_dir = Path(str(repo_path))
+    current_branch = git_current_branch(repo_dir)
+    default_branch = git_default_branch(repo_dir)
+    if current_branch not in {"master", default_branch}:
+        return None
+
+    versions_by_role = {role: parse_version(info.get("version")) for role, info in current.items() if info.get("version")}
+    comparable = {role: version for role, version in versions_by_role.items() if version is not None}
+    if len(comparable) < 2 or len(set(comparable.values())) <= 1:
+        return None
+
+    highest = max(comparable.values())
+    highest_roles = [role for role, version in comparable.items() if version == highest]
+    if len(highest_roles) == 1:
+        return highest_roles[0]
+
+    highest_digests = {current[role]["digest"] for role in highest_roles}
+    if len(highest_digests) == 1:
+        return sorted(highest_roles)[0]
+    raise SystemExit(
+        "conflict: multiple roles have the highest version with different digests: "
+        f"{', '.join(sorted(highest_roles))}; rerun with --source"
+    )
+
+
+def parse_version(value: str | None) -> tuple[int, int, int, int, tuple[str, ...]] | None:
+    if not value:
+        return None
+    match = re.match(r"^v?(\d+)(?:\.(\d+))?(?:\.(\d+))?(?:[-+.]?(.*))?$", value.strip())
+    if not match:
+        return None
+    major, minor, patch, suffix = match.groups()
+    suffix_parts = tuple(split_version_suffix(suffix or ""))
+    release_rank = 1 if not suffix_parts else 0
+    return (int(major), int(minor or 0), int(patch or 0), release_rank, suffix_parts)
+
+
+def split_version_suffix(value: str) -> list[str]:
+    if not value:
+        return []
+    return [part for part in re.split(r"[-+._]", value) if part]
 
 
 def build_parser() -> argparse.ArgumentParser:
