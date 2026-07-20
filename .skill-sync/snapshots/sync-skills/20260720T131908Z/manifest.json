@@ -1,0 +1,38 @@
+{
+  "created_at": "2026-07-20T13:19:08.157568+00:00",
+  "group": "sync-skills",
+  "members": {
+    "local": {
+      "content_updated_at": "2026-07-20T13:17:24.546253+00:00",
+      "content_updated_at_source": "filesystem",
+      "digest": "492b1f1081d16de233faef364050e7cf1549680668a7ff8af70c029dc1cb0f4f",
+      "git_first_commit_at": null,
+      "git_latest_commit_at": null,
+      "metadata_urls": [
+        "https://github.com/wk1995/skill.git",
+        "skills/sync-skills"
+      ],
+      "name": "sync-skills",
+      "path": "/Users/chengpeng/.codex/skills/sync-skills",
+      "url": "file:///Users/chengpeng/.codex/skills",
+      "version": "0.0.2"
+    },
+    "repo": {
+      "content_updated_at": "2026-07-20T21:09:03+08:00",
+      "content_updated_at_source": "git",
+      "digest": "8dc646493a4886cdf327bf555025ef99a89be5f682976b1828ab79d2d6fb6a8d",
+      "git_first_commit_at": "2026-07-20T21:02:34+08:00",
+      "git_latest_commit_at": "2026-07-20T21:09:03+08:00",
+      "metadata_urls": [
+        "https://github.com/wk1995/skill.git",
+        "skills/sync-skills"
+      ],
+      "name": "sync-skills",
+      "path": "/Users/chengpeng/project/wk/skill/skills/sync-skills",
+      "url": "https://github.com/wk1995/skill.git",
+      "version": "0.0.2"
+    }
+  },
+  "operation": "sync",
+  "source": "repo"
+}
