@@ -1,0 +1,4 @@
+interface:
+  display_name: "Choose Project Doc Location"
+  short_description: "Choose README, docs, or Wiki."
+  default_prompt: "Use $choose-project-doc-location to decide whether this project documentation belongs in README, docs, or Wiki before editing it."

@@ -1,0 +1,4 @@
+interface:
+  display_name: "Sync Skills"
+  short_description: "Synchronize versioned Codex skill copies"
+  default_prompt: "Use $sync-skills to inspect and synchronize linked skill copies."
