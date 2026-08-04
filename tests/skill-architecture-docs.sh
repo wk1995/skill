@@ -6,15 +6,25 @@ README="$ROOT/README.md"
 README_ZH="$ROOT/README.zh-CN.md"
 SPEC="$ROOT/docs/superpowers/specs/2026-07-10-skill-management-architecture-design.md"
 AGENTS="$ROOT/AGENTS.md"
+CATALOG_SCRIPT="$ROOT/scripts/skill_catalog.py"
+CATALOG_WORKFLOW="$ROOT/.github/workflows/skill-catalog.yml"
 
 fail() {
   printf 'FAIL: %s\n' "$*" >&2
   exit 1
 }
 
-for file in "$README" "$README_ZH" "$SPEC" "$AGENTS"; do
+for file in "$README" "$README_ZH" "$SPEC" "$AGENTS" "$CATALOG_SCRIPT" "$CATALOG_WORKFLOW"; do
   [[ -f "$file" ]] || fail "missing file: $file"
 done
+
+python3 "$CATALOG_SCRIPT" --check
+
+rg -q '^    name: skill-catalog$' "$CATALOG_WORKFLOW" || fail "missing skill-catalog required check name"
+rg -q 'python3 scripts/skill_catalog.py --check' "$CATALOG_WORKFLOW" || fail "workflow does not validate generated catalogs"
+rg -q 'SKILL_CATALOG_TOKEN' "$CATALOG_WORKFLOW" || fail "workflow cannot synchronize internal PR catalogs"
+rg -q '::error file=README.md' "$CATALOG_WORKFLOW" || fail "workflow does not annotate stale catalog errors"
+rg -q '::error file=' "$CATALOG_SCRIPT" || fail "catalog validator does not annotate structural errors"
 
 for skill_dir in "$ROOT"/skills/*; do
   [[ -d "$skill_dir" ]] || continue
@@ -39,6 +49,8 @@ rg -q 'English by default' "$AGENTS" || fail "AGENTS.md does not define the defa
 rg -q 'README.zh-CN.md' "$AGENTS" || fail "AGENTS.md does not define Chinese README support"
 rg -q 'release-engineering/README.md' "$README" || fail "missing release-engineering README link"
 rg -q 'sync-skills/README.md' "$README" || fail "missing sync-skills README link"
+rg -q 'release-engineering/README.zh-CN.md' "$README_ZH" || fail "missing Chinese release-engineering README link"
+rg -q 'sync-skills/README.zh-CN.md' "$README_ZH" || fail "missing Chinese sync-skills README link"
 
 rg -q '^# Personal Skills$' "$README" || fail "missing English README title"
 rg -q 'Language: \*\*English\*\* \| \[中文\]\(README.zh-CN.md\)' "$README" || fail "missing Chinese switch link in README.md"
