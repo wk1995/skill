@@ -37,4 +37,15 @@ When adding or removing a Skill, update both root catalogs in the same change:
 
 Do not mix English and Chinese Skill README links within either root catalog.
 
+## Catalog Generation And Pull Requests
+
+The Skills tables in the root READMEs are generated. After adding, removing, or changing a Skill, run:
+
+```bash
+python scripts/skill_catalog.py --write
+python scripts/skill_catalog.py --check
+```
+
+The `skill-catalog` GitHub Actions check validates every Skill and both generated catalogs on PRs targeting `main`. A PR cannot merge until the check passes. For an internal PR, the workflow can commit catalog updates back to its source branch only when the repository provides `SKILL_CATALOG_TOKEN`; never grant this token permission to bypass `main` branch protection. Fork PRs must include generated catalog changes in their own commits.
+
 Optional directories such as `agents/`, `scripts/`, `references/`, `assets/`, `src/`, and `tests/` should be added only when the Skill needs them.

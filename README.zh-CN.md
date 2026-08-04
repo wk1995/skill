@@ -69,12 +69,18 @@ Agent Skills 规范只要求 `SKILL.md`，但本仓库额外要求每个受管�
 
 ## Skills
 
-每个 Skill 都有配套 README，说明使用方法、触发条件和不触发条件。
+每个 Skill 都有配套 README，说明使用方法、触发条件和不触发条件。此表由 `python scripts/skill_catalog.py --write` 生成，请勿手动编辑表格行。
 
+<!-- skills-catalog:start -->
 | Skill | 用途 | 文档 |
 | --- | --- | --- |
-| `release-engineering` | 规划、校验、自动化、记录和排查受控发布流程。 | [README](skills/release-engineering/README.zh-CN.md) |
-| `sync-skills` | 链接、同步、审计、记录版本并回滚同一 Skill 的副本。 | [README](skills/sync-skills/README.zh-CN.md) |
+| `release-engineering` | `release-engineering` 用于规划、校验、自动化、记录和排查受控发布流程。它覆盖 Android 应用、Android 库与 SDK、Gradle 插件、构建产物、发布分支和标签、CI 门禁、发布、回滚计划及发布后处理。 | [README](skills/release-engineering/README.zh-CN.md) |
+| `sync-skills` | `sync-skills` 用于管理同一个 Agent Skill 在本仓库、项目目录、本机 Codex Skill 目录和明确指定的外部路径中的等价副本。它支持链接、转换、比较、同步、版本记录、快照、审计和回滚。 | [README](skills/sync-skills/README.zh-CN.md) |
+<!-- skills-catalog:end -->
+
+## Pull Request 目录检查
+
+`skill-catalog` GitHub Actions 检查会在 PR 合入 `main` 前校验所有 Skill 和两份目录。它会在 CI 日志中打印每一项校验失败原因，并为对应文件创建 GitHub Actions error 注释。若 PR 分支属于本仓库，且已配置具有仓库内容写权限的 `SKILL_CATALOG_TOKEN` secret，workflow 可以将生成后的根 README 目录提交回该 PR；对于 fork PR 或未配置该 secret 的情况，只要目录未同步，检查就会失败并提示贡献者运行生成器后提交两份根 README。
 
 ## Skill 结构与版本
 

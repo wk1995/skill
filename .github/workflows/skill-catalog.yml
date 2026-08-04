@@ -1,0 +1,65 @@
+name: Skill catalog
+
+on:
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  sync-and-validate:
+    name: skill-catalog
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Check out the pull request branch
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Generate Skills catalogs
+        run: python3 scripts/skill_catalog.py --write
+
+      - name: Commit generated catalogs to an internal pull request branch
+        id: commit-catalog
+        env:
+          CATALOG_TOKEN: ${{ secrets.SKILL_CATALOG_TOKEN }}
+          HEAD_REPOSITORY: ${{ github.event.pull_request.head.repo.full_name }}
+          HEAD_REF: ${{ github.event.pull_request.head.ref }}
+          REPOSITORY: ${{ github.repository }}
+        run: |
+          if git diff --quiet -- README.md README.zh-CN.md; then
+            echo "updated=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          if [[ "$HEAD_REPOSITORY" != "$REPOSITORY" || -z "$CATALOG_TOKEN" ]]; then
+            echo "::error file=README.md::Skills catalogs are stale. Run python scripts/skill_catalog.py --write and commit README.md and README.zh-CN.md to this pull request."
+            echo "::error file=README.zh-CN.md::Skills catalogs are stale. Run python scripts/skill_catalog.py --write and commit README.md and README.zh-CN.md to this pull request."
+            if [[ "$HEAD_REPOSITORY" != "$REPOSITORY" ]]; then
+              echo "This is a fork PR, so the workflow cannot write to its source branch."
+            else
+              echo "SKILL_CATALOG_TOKEN is not configured, so the workflow cannot write to this PR branch."
+            fi
+            exit 1
+          fi
+
+          git config user.name "skill-catalog[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add README.md README.zh-CN.md
+          git commit -m "docs: synchronize Skills catalogs"
+          git remote set-url origin "https://x-access-token:${CATALOG_TOKEN}@github.com/${REPOSITORY}.git"
+          git push origin "HEAD:${HEAD_REF}"
+          echo "updated=true" >> "$GITHUB_OUTPUT"
+
+      - name: Validate Skill structure, documentation, and catalogs
+        if: steps.commit-catalog.outputs.updated != 'true'
+        run: |
+          python3 scripts/skill_catalog.py --check
+          bash tests/skill-architecture-docs.sh
+          bash tests/release-engineering-sync.sh
