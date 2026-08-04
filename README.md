@@ -32,7 +32,8 @@ skill/
 |-- skillset.yaml                 # Repository-level configuration, adapters, and trust policy
 |-- skills/
 |   `-- <skill-name>/
-|       |-- SKILL.md              # Required: portable entrypoint, version, and optional trigger rules
+|       |-- SKILL.md              # Required: portable agent entrypoint, version, and trigger rules
+|       |-- README.md             # Required: user guide, trigger cases, and non-trigger cases
 |       |-- agents/
 |       |   `-- openai.yaml       # Optional: Codex display metadata
 |       |-- extensions.yaml       # Optional: CLI/MCP extension declaration
@@ -64,7 +65,16 @@ skill/
 `-- dist/                         # Build output, not committed
 ```
 
-Only `SKILL.md` is required for an individual Skill. Other directories are created only when the Skill needs them.
+The Agent Skills specification requires `SKILL.md`. This repository additionally requires each managed Skill to include a user-facing `README.md`; see [AGENTS.md](AGENTS.md). Other directories are created only when the Skill needs them.
+
+## Skills
+
+Every Skill has a companion README with usage and trigger guidance.
+
+| Skill | Purpose | Documentation |
+| --- | --- | --- |
+| `release-engineering` | Plan, validate, automate, document, and troubleshoot controlled releases. | [README](skills/release-engineering/README.md) |
+| `sync-skills` | Link, synchronize, audit, version, and roll back equivalent Skill copies. | [README](skills/sync-skills/README.md) |
 
 ## Skill Structure And Versioning
 

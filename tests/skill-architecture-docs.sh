@@ -5,15 +5,40 @@ ROOT="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd -P)"
 README="$ROOT/README.md"
 README_ZH="$ROOT/README.zh-CN.md"
 SPEC="$ROOT/docs/superpowers/specs/2026-07-10-skill-management-architecture-design.md"
+AGENTS="$ROOT/AGENTS.md"
 
 fail() {
   printf 'FAIL: %s\n' "$*" >&2
   exit 1
 }
 
-for file in "$README" "$README_ZH" "$SPEC"; do
+for file in "$README" "$README_ZH" "$SPEC" "$AGENTS"; do
   [[ -f "$file" ]] || fail "missing file: $file"
 done
+
+for skill_dir in "$ROOT"/skills/*; do
+  [[ -d "$skill_dir" ]] || continue
+  [[ -f "$skill_dir/SKILL.md" ]] || fail "missing SKILL.md in $skill_dir"
+  [[ -f "$skill_dir/README.md" ]] || fail "missing README.md in $skill_dir"
+  [[ -f "$skill_dir/README.zh-CN.md" ]] || fail "missing Chinese README in $skill_dir"
+
+  for section in '^## How To Use It$' '^## When It Triggers$' '^## When It Does Not Trigger$'; do
+    rg -q "$section" "$skill_dir/README.md" || fail "missing README section $section in $skill_dir"
+  done
+
+  for section in '^## 如何使用$' '^## 何时触发$' '^## 何时不触发$'; do
+    rg -q "$section" "$skill_dir/README.zh-CN.md" || fail "missing Chinese README section $section in $skill_dir"
+  done
+done
+
+rg -q '## Required Structure' "$AGENTS" || fail "missing Skill structure guidance"
+rg -q '`README.md`' "$AGENTS" || fail "AGENTS.md does not require README.md"
+rg -q 'When It Triggers' "$AGENTS" || fail "AGENTS.md does not require trigger documentation"
+rg -q 'When It Does Not Trigger' "$AGENTS" || fail "AGENTS.md does not require non-trigger documentation"
+rg -q 'English by default' "$AGENTS" || fail "AGENTS.md does not define the default language"
+rg -q 'README.zh-CN.md' "$AGENTS" || fail "AGENTS.md does not define Chinese README support"
+rg -q 'release-engineering/README.md' "$README" || fail "missing release-engineering README link"
+rg -q 'sync-skills/README.md' "$README" || fail "missing sync-skills README link"
 
 rg -q '^# Personal Skills$' "$README" || fail "missing English README title"
 rg -q 'Language: \*\*English\*\* \| \[中文\]\(README.zh-CN.md\)' "$README" || fail "missing Chinese switch link in README.md"

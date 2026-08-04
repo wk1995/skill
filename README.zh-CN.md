@@ -32,7 +32,8 @@ skill/
 |-- skillset.yaml                 # 仓库级配置、适配器和信任策略
 |-- skills/
 |   `-- <skill-name>/
-|       |-- SKILL.md              # 必需：通用入口、版本和可选触发规则
+|       |-- SKILL.md              # 必需：面向 Agent 的通用入口、版本和触发规则
+|       |-- README.md             # 必需：使用说明、触发条件和不触发条件
 |       |-- agents/
 |       |   `-- openai.yaml       # 可选：Codex 展示元数据
 |       |-- extensions.yaml       # 可选：CLI/MCP 扩展声明
@@ -64,7 +65,16 @@ skill/
 `-- dist/                         # 构建产物，不提交
 ```
 
-只有 `SKILL.md` 是单个 Skill 的必需文件；其他目录按需创建。
+Agent Skills 规范只要求 `SKILL.md`，但本仓库额外要求每个受管理的 Skill 都提供面向使用者的 `README.md`；详见 [AGENTS.md](AGENTS.md)。其他目录按需创建。
+
+## Skills
+
+每个 Skill 都有配套 README，说明使用方法、触发条件和不触发条件。
+
+| Skill | 用途 | 文档 |
+| --- | --- | --- |
+| `release-engineering` | 规划、校验、自动化、记录和排查受控发布流程。 | [README](skills/release-engineering/README.zh-CN.md) |
+| `sync-skills` | 链接、同步、审计、记录版本并回滚同一 Skill 的副本。 | [README](skills/sync-skills/README.zh-CN.md) |
 
 ## Skill 结构与版本
 

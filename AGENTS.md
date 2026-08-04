@@ -1,0 +1,40 @@
+# Skill Contribution Guide
+
+This file governs every new or substantially updated Skill under `skills/`.
+
+## Required Structure
+
+Each new Skill must use a lowercase hyphenated directory name and include both files:
+
+```text
+skills/<skill-name>/
+|-- SKILL.md
+`-- README.md
+```
+
+`SKILL.md` remains the agent-facing entry point. It must contain valid frontmatter with `name`, `description`, and `metadata.version`; add `metadata.triggering.include` and `metadata.triggering.exclude` when explicit trigger metadata is available.
+
+`README.md` is the user-facing companion document. It must introduce the Skill, explain how to use it, state when it triggers, and state when it does not trigger. Keep it consistent with `SKILL.md`; `metadata.triggering.exclude` takes priority if the two descriptions ever appear to conflict.
+
+## README.md Requirements
+
+Write README files in English by default. Chinese is supported through an equivalent `README.zh-CN.md` with visible language links in both README files. Keep the two language versions aligned when changing usage or trigger guidance.
+
+Every Skill README must contain these sections, or clear equivalents:
+
+1. **How To Use It** — user-facing prompts, inputs, commands, or workflow expectations.
+2. **When It Triggers** — concrete request types that should select the Skill.
+3. **When It Does Not Trigger** — nearby request types that should not select the Skill.
+
+Avoid duplicating the full agent procedure from `SKILL.md`. Link to it for detailed operational and safety instructions instead.
+
+## Repository Documentation
+
+When adding or removing a Skill, update both root catalogs in the same change:
+
+- In `README.md`, link every Skill to its English `skills/<skill-name>/README.md` only.
+- In `README.zh-CN.md`, link every Skill to its Chinese `skills/<skill-name>/README.zh-CN.md` only.
+
+Do not mix English and Chinese Skill README links within either root catalog.
+
+Optional directories such as `agents/`, `scripts/`, `references/`, `assets/`, `src/`, and `tests/` should be added only when the Skill needs them.
