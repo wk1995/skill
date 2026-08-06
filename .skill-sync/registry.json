@@ -234,6 +234,95 @@
           "version": "0.0.2"
         }
       }
+    },
+    "android-release-train": {
+      "created_at": "2026-08-06T09:53:37.178395+00:00",
+      "last_convert": {
+        "at": "2026-08-06T09:53:46.274332+00:00",
+        "snapshot": null,
+        "source": "local",
+        "source_path": "/Users/chengpeng/.codex/skills/android-release-train",
+        "source_url": "file:///Users/chengpeng/.codex/skills/android-release-train",
+        "target": "repo",
+        "target_path": "/Users/chengpeng/project/wk/skill/skills/android-release-train",
+        "target_url": "https://github.com/wk1995/skill.git"
+      },
+      "last_state": {
+        "local": {
+          "content_updated_at": "2026-08-06T09:53:37.178395+00:00",
+          "content_updated_at_source": "filesystem",
+          "digest": "e6637d1fc27d321812038dce2515c35a4c1aa928966bf71bfa307189cee335af",
+          "git_first_commit_at": null,
+          "git_latest_commit_at": null,
+          "metadata_urls": [
+            "https://github.com/wk1995/skill.git",
+            "skills/android-release-train"
+          ],
+          "name": "android-release-train",
+          "path": "/Users/chengpeng/.codex/skills/android-release-train",
+          "url": "file:///Users/chengpeng/.codex/skills/android-release-train",
+          "version": "1.0.0"
+        },
+        "repo": {
+          "content_updated_at": "2026-08-06T09:53:46.273970+00:00",
+          "content_updated_at_source": "filesystem",
+          "digest": "e6637d1fc27d321812038dce2515c35a4c1aa928966bf71bfa307189cee335af",
+          "git_first_commit_at": null,
+          "git_latest_commit_at": null,
+          "metadata_urls": [
+            "https://github.com/wk1995/skill.git",
+            "skills/android-release-train"
+          ],
+          "name": "android-release-train",
+          "path": "/Users/chengpeng/project/wk/skill/skills/android-release-train",
+          "url": "https://github.com/wk1995/skill.git",
+          "version": "1.0.0"
+        }
+      },
+      "role_urls": {
+        "local": "file:///Users/chengpeng/.codex/skills/android-release-train",
+        "repo": "https://github.com/wk1995/skill.git"
+      },
+      "roles": {
+        "local": "/Users/chengpeng/.codex/skills/android-release-train",
+        "repo": "/Users/chengpeng/project/wk/skill/skills/android-release-train"
+      },
+      "skill_urls": [
+        "https://github.com/wk1995/skill.git",
+        "skills/android-release-train"
+      ],
+      "snapshots": [],
+      "updated_at": "2026-08-06T09:53:46.349195+00:00",
+      "version_history": {
+        "1.0.0": {
+          "created_at": "2026-08-06T09:53:37.178395+00:00",
+          "digests": {
+            "e6637d1fc27d321812038dce2515c35a4c1aa928966bf71bfa307189cee335af": {
+              "content_updated_at_by_role": {
+                "local": "2026-08-06T09:53:37.178395+00:00",
+                "repo": "2026-08-06T09:53:46.273970+00:00"
+              },
+              "created_at": "2026-08-06T09:53:37.178395+00:00",
+              "digest": "e6637d1fc27d321812038dce2515c35a4c1aa928966bf71bfa307189cee335af",
+              "role_urls": {
+                "local": "file:///Users/chengpeng/.codex/skills/android-release-train",
+                "repo": "https://github.com/wk1995/skill.git"
+              },
+              "roles": [
+                "local",
+                "repo"
+              ],
+              "updated_at": "2026-08-06T09:53:46.273970+00:00"
+            }
+          },
+          "skill_urls": [
+            "https://github.com/wk1995/skill.git",
+            "skills/android-release-train"
+          ],
+          "updated_at": "2026-08-06T09:53:46.273970+00:00",
+          "version": "1.0.0"
+        }
+      }
     }
   }
 }
