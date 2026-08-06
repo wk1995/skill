@@ -4,10 +4,11 @@
 
 | State | Evidence | Allowed next action |
 | --- | --- | --- |
-| `development` | Branch has no eligible PR | Continue development or open a PR |
-| `pending` | PR is draft, unapproved, or checks are incomplete | Resolve review/checks |
-| `blocked` | A reported check failed | Repair branch and rerun CI |
-| `ready` | Open PR, non-draft, approved, all reported checks succeeded | Include in an explicitly selected train |
+| `development` | Branch has no open PR | Continue development or select it for a version train |
+| `misrouted` | Open PR targets a branch other than `dev/B` | Close or retarget the PR before selection/integration |
+| `pending` | Open PR targets `dev/B` but is draft, unapproved, or has incomplete checks | Resolve review/checks |
+| `blocked` | A reported check on an open feature-to-dev PR failed | Repair branch and rerun CI |
+| `ready` | Open, non-draft, approved PR targets `dev/B` and all reported checks succeeded | Merge into the selected train |
 | `integrated` | Feature PR merged into `dev/B` | Run integration regression |
 | `release-candidate` | `dev/B -> release/B` merged and release gates pass | Archive/upload the release artifact |
 | `published` | Destination confirms the AAB and QA/release criteria pass | Merge, tag, and clean short-lived branches |
@@ -15,6 +16,7 @@
 ## Invariants
 
 - Resolve the default branch from repository metadata. `main` and `master` are aliases in prose, never two required branches.
+- A feature or bugfix branch has no open PR until it is explicitly selected for a version. Its only open integration PR targets that version's `dev/B`; never open a feature-to-default-branch PR in this workflow.
 - A `dev/B` contains only the selected feature branches for B. It is deleted only after its promotion PR is merged.
 - A `release/B` contains only version metadata and release fixes after promotion. It is deleted only after default-branch sync and tag verification.
 - `VERSION_NAME` and `VERSION_CODE` change only in the release flow. `VERSION_CODE` is positive, within Android's supported range, and greater than every already-published value for the applicationId.

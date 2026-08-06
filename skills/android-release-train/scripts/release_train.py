@@ -71,9 +71,12 @@ def inspect(repo: str, branch: str) -> BranchStatus:
         return BranchStatus(branch, "merged", str(pr.get("baseRefName", "-")), "-", "-", str(pr.get("url", "")))
     review = str(pr.get("reviewDecision") or "PENDING").upper()
     checks = checks_state(pr.get("statusCheckRollup"))
+    target = str(pr.get("baseRefName", "-"))
+    if not target.startswith("dev/"):
+        return BranchStatus(branch, "misrouted", target, review, checks, str(pr.get("url", "")))
     ready = not pr.get("isDraft") and review == "APPROVED" and checks == "success"
     state = "ready" if ready else ("blocked" if checks == "failed" else "pending")
-    return BranchStatus(branch, state, str(pr.get("baseRefName", "-")), review, checks, str(pr.get("url", "")))
+    return BranchStatus(branch, state, target, review, checks, str(pr.get("url", "")))
 
 
 def inventory(args: argparse.Namespace) -> int:
@@ -101,10 +104,16 @@ def select(args: argparse.Namespace) -> int:
         raise RuntimeError(f"Branches not found on origin: {', '.join(missing)}")
     repo = resolve_repo(args.repo)
     statuses = [inspect(repo, branch) for branch in requested]
+    expected_target = f"dev/{args.version}"
+    conflicting = [item.branch for item in statuses if item.target not in ("-", expected_target)]
+    if conflicting:
+        raise RuntimeError(
+            f"Feature branches have PRs outside {expected_target}; close or retarget them first: {', '.join(conflicting)}"
+        )
     if args.require_ready:
-        invalid = [item.branch for item in statuses if item.state != "ready"]
+        invalid = [item.branch for item in statuses if item.state != "ready" or item.target != expected_target]
         if invalid:
-            raise RuntimeError(f"Not ready for integration: {', '.join(invalid)}")
+            raise RuntimeError(f"Not ready for integration into {expected_target}: {', '.join(invalid)}")
     print(json.dumps({"version": args.version, "branches": [item.__dict__ for item in statuses]}, ensure_ascii=False, indent=2))
     return 0
 
@@ -124,7 +133,11 @@ def main() -> int:
     )
     select_parser.add_argument("--version", required=True)
     select_parser.add_argument("--branches", required=True, help="Comma-separated feature/bugfix branches")
-    select_parser.add_argument("--require-ready", action="store_true")
+    select_parser.add_argument(
+        "--require-ready",
+        action="store_true",
+        help="Require ready PRs targeting dev/<version>; use after train PRs have been created.",
+    )
     select_parser.set_defaults(handler=select)
     args = parser.parse_args()
     try:

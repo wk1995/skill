@@ -2,7 +2,7 @@
 name: android-release-train
 description: Orchestrate Android feature branches, version-train integration, release branches, signed release archives, and release tags. Use when a user asks to create an Android feature branch for a requirement, list feature-branch or PR readiness, select features for a version, create or promote dev/<version> and release/<version> branches, bootstrap Android CI/release workflows, publish an Android release, or tag a published Android version.
 metadata:
-  version: "1.0.0"
+  version: "1.1.0"
   urls:
     - type: repository
       value: https://github.com/wk1995/skill.git
@@ -48,7 +48,7 @@ Treat Play upload, GitHub App ID/private key, Environment protection, Rulesets, 
 
 ### Implement a requirement
 
-Resolve the default branch and create `feature/<ticket-or-slug>` from it. Keep `VERSION_NAME` and `VERSION_CODE` unchanged. Build and test the requested feature, push it, and open a PR to the branch requested by the user. If no train is named, target the default branch or ask whether the feature belongs to an active train; never silently create a `dev/B`.
+Resolve the default branch and create `feature/<ticket-or-slug>` from it. Keep `VERSION_NAME` and `VERSION_CODE` unchanged. Build, test, and push the requested feature, but do not open a PR yet unless the user explicitly names an existing `dev/B` train. A feature branch without a PR is awaiting version selection; never target the default branch directly from a feature branch in this release-train workflow and never silently create a `dev/B`. If the user names a non-existent train, report that the version must be explicitly selected before a PR can be created.
 
 ### List feature status or choose a release scope
 
@@ -56,12 +56,12 @@ Run the bundled read-only inventory first:
 
 ```bash
 python3 scripts/release_train.py inventory --format table
-python3 scripts/release_train.py select --version 1.4.0 --branches feature/login,feature/report --require-ready
+python3 scripts/release_train.py select --version 1.4.0 --branches feature/login,feature/report
 ```
 
-Interpret **ready** narrowly: the branch has an open, non-draft PR, all reported checks succeeded, and GitHub reports `APPROVED`. It means “eligible for integration,” not that product or QA has accepted the feature. Show branches with their PR target, review state, check state, and URL. Do not infer business completion from a branch name.
+Feature branches do not need a PR before scope selection. The `select` command validates the explicit branch list and rejects PRs targeting another train; then create `dev/B` and the feature-to-dev PRs. Interpret **ready** narrowly after those PRs exist: the branch has an open, non-draft PR targeting `dev/B`, all reported checks succeeded, and GitHub reports `APPROVED`. A PR targeting any other branch is **misrouted** and cannot be included until it is closed or retargeted. **Ready** means “eligible for integration,” not that product or QA has accepted the feature. Show branches with their PR target, review state, check state, and URL. Do not infer business completion from a branch name.
 
-For an explicit request such as “put feature/login and feature/report on version 1.4.0,” show the validated selection and exact remote writes in commentary, then create the protected `dev/1.4.0` from the default branch and PR each selected feature into it through the GitHub App. Require all integration checks before merging.
+For an explicit request such as “put feature/login and feature/report on version 1.4.0,” show the validated selection and exact remote writes in commentary, then create the protected `dev/1.4.0` from the default branch and PR each selected feature into it through the GitHub App. Require all feature-to-dev PRs to be **ready** and all integration checks to pass before merging.
 
 ### Promote and publish a version
 
