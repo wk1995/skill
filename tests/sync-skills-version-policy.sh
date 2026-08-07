@@ -47,6 +47,9 @@ with patch.object(skill_sync, "git_current_branch", return_value="master"), patc
         raise AssertionError("expected highest-version digest conflict")
 
 assert skill_sync.parse_version("v1.2.3") > skill_sync.parse_version("1.2.3-alpha")
+assert skill_sync.parse_version("1.0.0-alpha.10") > skill_sync.parse_version("1.0.0-alpha.2")
+assert skill_sync.parse_version("1.0.0-alpha.1") < skill_sync.parse_version("1.0.0-alpha.beta")
+assert skill_sync.parse_version("1.2.3+build.7") == skill_sync.parse_version("1.2.3")
 
 print("PASS: sync-skills version policy")
 PY
