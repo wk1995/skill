@@ -753,26 +753,22 @@ def choose_source_by_version_on_mainline(group: dict[str, Any], current: dict[st
     )
 
 
-def parse_version(value: str | None) -> tuple[int, int, int, int, tuple[tuple[int, int | str], ...]] | None:
+def parse_version(value: str | None) -> tuple[int, int, int, int, tuple[str, ...]] | None:
     if not value:
         return None
-    version = value.strip().split("+", 1)[0]
-    match = re.fullmatch(r"v?(\d+)(?:\.(\d+))?(?:\.(\d+))?(?:-(.+))?", version)
+    match = re.match(r"^v?(\d+)(?:\.(\d+))?(?:\.(\d+))?(?:[-+.]?(.*))?$", value.strip())
     if not match:
         return None
-    major, minor, patch, prerelease = match.groups()
-    prerelease_parts = tuple(split_version_suffix(prerelease or ""))
-    release_rank = 1 if not prerelease_parts else 0
-    return (int(major), int(minor or 0), int(patch or 0), release_rank, prerelease_parts)
+    major, minor, patch, suffix = match.groups()
+    suffix_parts = tuple(split_version_suffix(suffix or ""))
+    release_rank = 1 if not suffix_parts else 0
+    return (int(major), int(minor or 0), int(patch or 0), release_rank, suffix_parts)
 
 
-def split_version_suffix(value: str) -> list[tuple[int, int | str]]:
+def split_version_suffix(value: str) -> list[str]:
     if not value:
         return []
-    parts = value.split(".")
-    if any(not part for part in parts):
-        return []
-    return [(0, int(part)) if part.isdigit() else (1, part) for part in parts]
+    return [part for part in re.split(r"[-+._]", value) if part]
 
 
 def build_parser() -> argparse.ArgumentParser:

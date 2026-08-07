@@ -1,0 +1,239 @@
+{
+  "groups": {
+    "choose-project-doc-location": {
+      "created_at": "2026-07-20T13:30:13.499189+00:00",
+      "last_convert": {
+        "at": "2026-07-20T13:30:18.271739+00:00",
+        "snapshot": null,
+        "source": "local",
+        "source_path": "/Users/chengpeng/.codex/skills/choose-project-doc-location",
+        "source_url": "file:///Users/chengpeng/.codex/skills",
+        "target": "repo",
+        "target_path": "/Users/chengpeng/project/wk/skill/skills/choose-project-doc-location",
+        "target_url": "https://github.com/wk1995/skill.git"
+      },
+      "last_state": {
+        "local": {
+          "content_updated_at": "2026-07-20T13:30:13.499189+00:00",
+          "content_updated_at_source": "filesystem",
+          "digest": "3512f18ff35636af39412b545f107233c3c3b10593e16a1cf0d0d4595d61af0e",
+          "git_first_commit_at": null,
+          "git_latest_commit_at": null,
+          "metadata_urls": [
+            "https://github.com/wk1995/skill.git",
+            "skills/choose-project-doc-location"
+          ],
+          "name": "choose-project-doc-location",
+          "path": "/Users/chengpeng/.codex/skills/choose-project-doc-location",
+          "url": "file:///Users/chengpeng/.codex/skills",
+          "version": "0.0.1"
+        },
+        "repo": {
+          "content_updated_at": "2026-07-20T13:30:28.574859+00:00",
+          "content_updated_at_source": "filesystem",
+          "digest": "3512f18ff35636af39412b545f107233c3c3b10593e16a1cf0d0d4595d61af0e",
+          "git_first_commit_at": null,
+          "git_latest_commit_at": null,
+          "metadata_urls": [
+            "https://github.com/wk1995/skill.git",
+            "skills/choose-project-doc-location"
+          ],
+          "name": "choose-project-doc-location",
+          "path": "/Users/chengpeng/project/wk/skill/skills/choose-project-doc-location",
+          "url": "https://github.com/wk1995/skill.git",
+          "version": "0.0.1"
+        }
+      },
+      "last_sync": {
+        "at": "2026-07-20T13:30:28.575156+00:00",
+        "differences_by_role": {
+          "repo": {
+            "added_files": [],
+            "changed": false,
+            "modified_binary_files": [],
+            "modified_text_files": [],
+            "removed_files": []
+          }
+        },
+        "snapshot": "20260720T133028Z",
+        "source": "local",
+        "updated_roles": [
+          "repo"
+        ]
+      },
+      "role_urls": {
+        "local": "file:///Users/chengpeng/.codex/skills",
+        "repo": "https://github.com/wk1995/skill.git"
+      },
+      "roles": {
+        "local": "/Users/chengpeng/.codex/skills/choose-project-doc-location",
+        "repo": "/Users/chengpeng/project/wk/skill/skills/choose-project-doc-location"
+      },
+      "skill_urls": [
+        "https://github.com/wk1995/skill.git",
+        "skills/choose-project-doc-location"
+      ],
+      "snapshots": [
+        "20260720T133028Z"
+      ],
+      "updated_at": "2026-07-20T13:30:28.625306+00:00",
+      "version_history": {
+        "0.0.1": {
+          "created_at": "2026-07-20T13:30:13.499189+00:00",
+          "digests": {
+            "3512f18ff35636af39412b545f107233c3c3b10593e16a1cf0d0d4595d61af0e": {
+              "content_updated_at_by_role": {
+                "local": "2026-07-20T13:30:13.499189+00:00",
+                "repo": "2026-07-20T13:30:28.574859+00:00"
+              },
+              "created_at": "2026-07-20T13:30:13.499189+00:00",
+              "digest": "3512f18ff35636af39412b545f107233c3c3b10593e16a1cf0d0d4595d61af0e",
+              "role_urls": {
+                "local": "file:///Users/chengpeng/.codex/skills",
+                "repo": "https://github.com/wk1995/skill.git"
+              },
+              "roles": [
+                "local",
+                "repo"
+              ],
+              "updated_at": "2026-07-20T13:30:28.574859+00:00"
+            }
+          },
+          "skill_urls": [
+            "https://github.com/wk1995/skill.git",
+            "skills/choose-project-doc-location"
+          ],
+          "updated_at": "2026-07-20T13:30:28.574859+00:00",
+          "version": "0.0.1"
+        }
+      }
+    },
+    "sync-skills": {
+      "created_at": "2026-07-20T21:02:34+08:00",
+      "last_convert": {
+        "at": "2026-07-20T13:17:24.546400+00:00",
+        "snapshot": null,
+        "source": "repo",
+        "source_path": "/Users/chengpeng/project/wk/skill/skills/sync-skills",
+        "source_url": "https://github.com/wk1995/skill.git",
+        "target": "local",
+        "target_path": "/Users/chengpeng/.codex/skills/sync-skills",
+        "target_url": "file:///Users/chengpeng/.codex/skills"
+      },
+      "last_state": {
+        "local": {
+          "content_updated_at": "2026-07-20T13:19:08.160620+00:00",
+          "content_updated_at_source": "filesystem",
+          "digest": "8dc646493a4886cdf327bf555025ef99a89be5f682976b1828ab79d2d6fb6a8d",
+          "git_first_commit_at": null,
+          "git_latest_commit_at": null,
+          "metadata_urls": [
+            "https://github.com/wk1995/skill.git",
+            "skills/sync-skills"
+          ],
+          "name": "sync-skills",
+          "path": "/Users/chengpeng/.codex/skills/sync-skills",
+          "url": "file:///Users/chengpeng/.codex/skills",
+          "version": "0.0.2"
+        },
+        "repo": {
+          "content_updated_at": "2026-07-20T21:09:03+08:00",
+          "content_updated_at_source": "git",
+          "digest": "8dc646493a4886cdf327bf555025ef99a89be5f682976b1828ab79d2d6fb6a8d",
+          "git_first_commit_at": "2026-07-20T21:02:34+08:00",
+          "git_latest_commit_at": "2026-07-20T21:09:03+08:00",
+          "metadata_urls": [
+            "https://github.com/wk1995/skill.git",
+            "skills/sync-skills"
+          ],
+          "name": "sync-skills",
+          "path": "/Users/chengpeng/project/wk/skill/skills/sync-skills",
+          "url": "https://github.com/wk1995/skill.git",
+          "version": "0.0.2"
+        }
+      },
+      "last_sync": {
+        "at": "2026-07-20T13:19:08.160751+00:00",
+        "differences_by_role": {
+          "local": {
+            "added_files": [],
+            "changed": true,
+            "modified_binary_files": [],
+            "modified_text_files": [
+              "scripts/skill_sync.py"
+            ],
+            "removed_files": []
+          }
+        },
+        "snapshot": "20260720T131908Z",
+        "source": "repo",
+        "updated_roles": [
+          "local"
+        ]
+      },
+      "role_urls": {
+        "local": "file:///Users/chengpeng/.codex/skills",
+        "repo": "https://github.com/wk1995/skill.git"
+      },
+      "roles": {
+        "local": "/Users/chengpeng/.codex/skills/sync-skills",
+        "repo": "/Users/chengpeng/project/wk/skill/skills/sync-skills"
+      },
+      "skill_urls": [
+        "https://github.com/wk1995/skill.git",
+        "skills/sync-skills"
+      ],
+      "snapshots": [
+        "20260720T131908Z"
+      ],
+      "updated_at": "2026-07-20T13:19:08.208999+00:00",
+      "version_history": {
+        "0.0.2": {
+          "created_at": "2026-07-20T21:02:34+08:00",
+          "digests": {
+            "492b1f1081d16de233faef364050e7cf1549680668a7ff8af70c029dc1cb0f4f": {
+              "content_updated_at_by_role": {
+                "local": "2026-07-20T13:17:24.546253+00:00",
+                "repo": "2026-07-20T21:09:03+08:00"
+              },
+              "created_at": "2026-07-20T21:02:34+08:00",
+              "digest": "492b1f1081d16de233faef364050e7cf1549680668a7ff8af70c029dc1cb0f4f",
+              "role_urls": {
+                "local": "file:///Users/chengpeng/.codex/skills",
+                "repo": "https://github.com/wk1995/skill.git"
+              },
+              "roles": [
+                "local",
+                "repo"
+              ],
+              "updated_at": "2026-07-20T13:17:24.546253+00:00"
+            },
+            "8dc646493a4886cdf327bf555025ef99a89be5f682976b1828ab79d2d6fb6a8d": {
+              "content_updated_at_by_role": {
+                "local": "2026-07-20T13:19:08.160620+00:00",
+                "repo": "2026-07-20T21:09:03+08:00"
+              },
+              "created_at": "2026-07-20T13:19:08.160620+00:00",
+              "digest": "8dc646493a4886cdf327bf555025ef99a89be5f682976b1828ab79d2d6fb6a8d",
+              "role_urls": {
+                "local": "file:///Users/chengpeng/.codex/skills",
+                "repo": "https://github.com/wk1995/skill.git"
+              },
+              "roles": [
+                "local",
+                "repo"
+              ],
+              "updated_at": "2026-07-20T13:19:08.160620+00:00"
+            }
+          },
+          "skill_urls": [
+            "https://github.com/wk1995/skill.git",
+            "skills/sync-skills"
+          ],
+          "updated_at": "2026-07-20T13:19:08.160620+00:00",
+          "version": "0.0.2"
+        }
+      }
+    }
+  }
+}
