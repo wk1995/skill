@@ -3,6 +3,13 @@ name: choose-project-doc-location
 description: Decide whether requested project documentation belongs in README, repository docs, or GitHub Wiki before creating or updating it. MUST use before editing documentation when the user asks to create, update, rewrite, or organize README/readme, Wiki/wiki, docs/doc, project documentation, project details, workflow/workflows, 流程, 项目文档, 项目说明, 仓库说明, 使用说明, skill 列表, skill 作用, skill 使用说明, architecture notes, onboarding guides, or repository documentation. Treat the user's words "README" and "Wiki" as tentative labels, not final placement decisions.
 metadata:
   version: "0.0.1"
+  triggering:
+    include:
+      - "Create, update, rewrite, or organize project documentation."
+      - "Choose between README, repository docs, or GitHub Wiki for project information."
+    exclude:
+      - "Edit application code or non-documentation assets."
+      - "Manage copies or versions of an Agent Skill."
   urls:
     - type: repository
       value: https://github.com/wk1995/skill.git
