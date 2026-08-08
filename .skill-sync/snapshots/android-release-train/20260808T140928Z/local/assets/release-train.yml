@@ -25,7 +25,7 @@ artifact:
 gates:
   feature: [lint, unit-test, debug-build]
   integration: [full-lint, full-unit-test, integration-smoke]
-  release: [release-lint, release-unit-test, signed-release-artifact, signature-verify]
+  release: [release-lint, release-unit-test, signed-aab, signature-verify]
   required_reviewers: 1
 
 delivery:

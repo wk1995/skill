@@ -1,8 +1,8 @@
 ---
 name: android-release-train
-description: Orchestrate Android feature branches, version-train integration, release branches, signed Android release artifacts, configurable distribution destinations, and release tags. Use when a user asks to create an Android feature branch for a requirement, list feature-branch or PR readiness, select features for a version, create or promote dev/<version> and release/<version> branches, bootstrap Android CI/release workflows, distribute an Android release through Google Play, another store, enterprise MDM, direct delivery, or an artifact archive, or tag a released Android version.
+description: Orchestrate Android feature branches, version-train integration, release branches, signed release archives, and release tags. Use when a user asks to create an Android feature branch for a requirement, list feature-branch or PR readiness, select features for a version, create or promote dev/<version> and release/<version> branches, bootstrap Android CI/release workflows, publish an Android release, or tag a published Android version.
 metadata:
-  version: "1.2.0"
+  version: "1.1.0"
   urls:
     - type: repository
       value: https://github.com/wk1995/skill.git
@@ -11,7 +11,7 @@ metadata:
   triggering:
     include:
       - The user asks to create, assess, integrate, promote, publish, or tag an Android version train.
-      - The task involves Android feature or bugfix branches, dev/<version> or release/<version> branches, signed AAB/APK artifacts, configurable distribution destinations, or release tags.
+      - The task involves Android feature or bugfix branches, dev/<version> or release/<version> branches, AAB signing, Play track promotion, or release tags.
       - The user needs Android release-train CI, release configuration, branch gates, or a readiness inventory.
     exclude:
       - The request is a general Android build, test, or code-change task without version-train or release orchestration.
@@ -38,13 +38,13 @@ The default branch is repository configuration, not a hard-coded `main` or `mast
 
 ### Bootstrap or repair automation
 
-When asked to create release automation, inspect the Android module, version source, existing workflows, default branch, branch protection, artifact format, and distribution destination first. Configure Google Play, another store, enterprise MDM, direct delivery, or artifact-only delivery only when the repository uses it. Create or update the repository configuration and these workflows:
+When asked to create release automation, inspect the Android module, version source, existing workflows, default branch, branch protection, and Play target first. Create or update the repository configuration and these workflows:
 
 1. CI: run on PR and push to `feature/**`, `bugfix/**`, `dev/**`, `release/**`, and the default branch. Run branch-appropriate lint, unit tests, and builds.
 2. Train orchestration: GitHub App creates `dev/B`, creates selected feature-to-dev PRs, creates the sole `dev/B -> release/B` promotion PR, and creates `vB` only after release success.
-3. Release archive/distribution: accept only the tip of a protected `release/B`; read versions from source; build, sign, verify, and archive one configured release artifact (`.aab` or `.apk`), then distribute or promote that same immutable artifact. Do not rebuild between destinations.
+3. Release archive/publish: accept only the tip of a protected `release/B`; read versions from source; build, sign, verify, archive, then publish/promote the same AAB. Do not rebuild between Play tracks.
 
-Treat destination credentials or access approvals, GitHub App ID/private key, Environment protection, Rulesets, and required reviewers as external prerequisites. Report missing prerequisites rather than pretending the workflow is production-ready.
+Treat Play upload, GitHub App ID/private key, Environment protection, Rulesets, and required reviewers as external prerequisites. Report missing prerequisites rather than pretending the workflow is production-ready.
 
 ### Implement a requirement
 
@@ -70,7 +70,7 @@ Only start promotion after every selected feature PR is merged into `dev/B` and 
 1. Create `release/B` from the default branch and create the unique `dev/B -> release/B` PR through the GitHub App.
 2. In that protected release flow, write `VERSION_NAME=B` and allocate `VERSION_CODE` from the configured registry. Verify it is higher than every published build.
 3. Delete `dev/B` only after the promotion PR has merged and `release/B` contains every selected commit.
-4. Accept only release fixes on `release/B`. Build and sign one configured release artifact; archive it; distribute it to the configured test destination when applicable; run QA; then promote or deliver that exact artifact to the configured release destination. For direct or artifact-only delivery, record the immutable archive and its recipient/approval evidence instead of inventing a track promotion.
+4. Accept only release fixes on `release/B`. Build and sign one AAB; archive it; upload to internal/closed; run QA; promote that exact AAB.
 5. On confirmed publication, merge the release branch into the default branch, tag the exact published commit as `vB`, verify tag/artifact linkage, then delete `release/B`.
 
 Never tag before the configured success point. If publication, artifact verification, branch sync, or tag verification fails, stop and preserve `release/B` for repair.

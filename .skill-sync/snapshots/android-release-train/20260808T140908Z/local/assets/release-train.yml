@@ -16,20 +16,16 @@ android:
   version_file: version.properties
   version_name_key: VERSION_NAME
   version_code_key: VERSION_CODE
-  version_code_registry: TODO # Distribution-provider API or a protected release registry
+  version_code_registry: TODO # Play Console API or a protected release registry
   release_environment: release
-
-artifact:
-  format: aab # aab | apk; choose a format accepted by the configured destination
 
 gates:
   feature: [lint, unit-test, debug-build]
   integration: [full-lint, full-unit-test, integration-smoke]
-  release: [release-lint, release-unit-test, signed-release-artifact, signature-verify]
+  release: [release-lint, release-unit-test, signed-aab, signature-verify]
   required_reviewers: 1
 
 delivery:
-  provider: TODO # google-play | vendor-store | enterprise-mdm | direct | artifact-only
-  test_destination: TODO # Optional for direct or artifact-only delivery
-  release_destination: TODO
-  promote_same_artifact: true
+  initial_track: internal
+  final_track: production
+  promote_same_aab: true
