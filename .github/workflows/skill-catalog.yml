@@ -57,6 +57,9 @@ jobs:
           git push origin "HEAD:${HEAD_REF}"
           echo "updated=true" >> "$GITHUB_OUTPUT"
 
+      - name: Verify WorkBuddy compatibility
+        run: python3 scripts/workbuddy_compat.py --check
+
       - name: Validate Skill structure, documentation, and catalogs
         if: steps.commit-catalog.outputs.updated != 'true'
         run: |
@@ -65,3 +68,4 @@ jobs:
           bash tests/android-code-release-train-script.sh
           bash tests/sync-skills-version-policy.sh
           bash tests/build-pipeline-engineering-sync.sh
+          bash tests/workbuddy-compat.sh

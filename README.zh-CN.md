@@ -78,6 +78,7 @@ Agent Skills 规范只要求 `SKILL.md`，但本仓库额外要求每个受管�
 | `build-pipeline-engineering` | `build-pipeline-engineering` 用于配置和执行可复现的可分发构建流水线：从一个确定源码引用完成 build variant 选择、环境配置、签名、打包、校验与输出上传。对于支持 variant 的目标，未指定时默认使用 `release`；在 GitHub Actions 中，构建输出默认上传到 GitHub Actions Artifacts。 | [README](skills/build-pipeline-engineering/README.zh-CN.md) |
 | `choose-project-doc-location` | `choose-project-doc-location` 用于在创建或修改项目文档前，判断内容应放在仓库 README、受版本控制的仓库文档，还是 GitHub Wiki 中。 | [README](skills/choose-project-doc-location/README.zh-CN.md) |
 | `sync-skills` | `sync-skills` 用于管理同一个 Agent Skill 在本仓库、项目目录、本机 Codex 或 WorkBuddy Skill 目录和明确指定的外部路径中的等价副本。它支持链接、转换、比较、同步、版本记录、快照、审计和回滚。 | [README](skills/sync-skills/README.zh-CN.md) |
+| `workbuddy-compat` | `workbuddy-compat` 用于让本仓库中的每一个 Agent Skill 在 OpenAI Codex 和 WorkBuddy 中都能运行。配套脚本 `scripts/workbuddy_compat.py` 会检查并自动修复 Codex 编写的 Skill 在 WorkBuddy 上的两类兼容问题：缺少 `## Platform Compatibility` 章节，以及 README 示例中使用了 Codex 专属的 `$<skill>` 调用语法。 | [README](skills/workbuddy-compat/README.zh-CN.md) |
 <!-- skills-catalog:end -->
 
 ## Pull Request 目录检查
