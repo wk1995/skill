@@ -18,6 +18,8 @@ Organize the repository documentation for the new integration.
 
 See [SKILL.md](SKILL.md) for the full placement rules and editing guidance.
 
+In OpenAI Codex you can also invoke the skill explicitly with `$choose-project-doc-location`.
+
 ## When It Triggers
 
 Use this skill when creating, updating, rewriting, or organizing project documentation, including README content, repository docs, project workflows, onboarding notes, or Wiki material where the final location is not yet settled.

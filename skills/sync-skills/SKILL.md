@@ -23,12 +23,21 @@ metadata:
 
 ## Overview
 
-Use this skill to keep equivalent Skill directories connected across locations such as this repository's `skills/`, a project's skill folder, a local Codex/user skill folder, and any external path. Treat one linked group as one logical Skill with multiple materialized copies.
+Use this skill to keep equivalent Skill directories connected across locations such as this repository's `skills/`, a project's skill folder, a local Codex/user or WorkBuddy skill folder, and any external path. Treat one linked group as one logical Skill with multiple materialized copies.
+
+## Platform Compatibility
+
+This skill keeps Skill copies in sync across both OpenAI Codex and WorkBuddy.
+
+- **Codex**: user-level skills live under `$CODEX_HOME/skills` or `~/.codex/skills`; the agent interface is `agents/openai.yaml`; Codex-specific artifacts include `agents/` and `extensions.yaml`.
+- **WorkBuddy**: user-level skills live under `~/.workbuddy/skills` and project-level skills under `<workspace>/.workbuddy/skills`; WorkBuddy reads `SKILL.md` directly and ignores `agents/openai.yaml`. When syncing WorkBuddy copies, treat `SKILL.md` as the required file and copy `agents/`/`extensions.yaml` only when they exist.
+
+Triggering differs between the two runtimes: Codex uses `metadata.triggering` and the `$sync-skills` invocation, while WorkBuddy triggers from the `description` automatically, so no `$`-prefix is needed there. The examples below use the WorkBuddy machine-wide path; substitute `~/.codex/skills` for Codex.
 
 ## Start Here
 
 1. Identify the stable `metadata.sync_id`, current Skill name, and every copy that should participate in the sync group. The sync ID is immutable; the Skill name may change.
-2. Inspect each copy's `SKILL.md`, `agents/openai.yaml`, scripts, references, assets, and extension files before mutating anything.
+2. Inspect each copy's `SKILL.md`, `agents/openai.yaml` (Codex only; ignored by WorkBuddy), scripts, references, assets, and extension files before mutating anything.
 3. Read `references/sync-model.md` when designing a new sync group, resolving a conflict, changing version policy, or performing a rollback.
 4. Use `scripts/skill_sync.py` for deterministic operations whenever copying, snapshotting, status checking, or rollback is needed.
 
@@ -37,7 +46,7 @@ Use this skill to keep equivalent Skill directories connected across locations s
 Use these role names consistently:
 
 - `repo`: the canonical copy inside this repository, usually `skills/<skill-name>`.
-- `local`: a machine-wide copy, usually under `$CODEX_HOME/skills` or `~/.codex/skills`.
+- `local`: a machine-wide copy. In OpenAI Codex this is usually under `$CODEX_HOME/skills` or `~/.codex/skills`; in WorkBuddy it is `~/.workbuddy/skills`.
 - `project`: a project-specific copy owned by another workspace.
 - `external`: any other explicit path, such as a checked-out plugin, bundle, archive staging folder, or temporary migration location.
 
@@ -109,7 +118,7 @@ python skills/sync-skills/scripts/skill_sync.py diff my-skill-id --role local --
 
 - Always snapshot all existing linked copies before overwriting any target.
 - Treat `SKILL.md` as required. A path without `SKILL.md` is not a valid source copy.
-- Preserve each Skill as a directory tree. Copy `SKILL.md`, `agents/`, `scripts/`, `references/`, `assets/`, `extensions.yaml`, `src/`, and `tests/` when present.
+- Preserve each Skill as a directory tree. Copy `SKILL.md`, `agents/` (Codex only), `scripts/`, `references/`, `assets/`, `extensions.yaml` (Codex only), `src/`, and `tests/` when present. WorkBuddy skills are defined entirely by `SKILL.md` and often contain none of the Codex-only `agents/` or `extensions.yaml` files, so copy them only when they exist.
 - Exclude transient directories and files such as `.git`, `node_modules`, `dist`, `.DS_Store`, `__pycache__`, and Python bytecode.
 - When the skill-management repository is on `master` or its configured default branch, compare linked copies by `metadata.version`; if versions differ, synchronize and let the higher version replace the lower version.
 - When the repository is on any other branch, do not synchronize only because versions differ unless the user explicitly requests synchronization or the branch work requires updating the target copy.

@@ -18,6 +18,8 @@
 
 完整的位置选择规则和编辑指南见 [SKILL.md](SKILL.md)。
 
+在 OpenAI Codex 中也可以显式用 `$choose-project-doc-location` 调用本 Skill。
+
 ## 何时触发
 
 当需要创建、更新、改写或整理项目文档时使用，包括 README 内容、仓库文档、项目工作流、上手说明，或尚未确定最终位置的 Wiki 材料。
