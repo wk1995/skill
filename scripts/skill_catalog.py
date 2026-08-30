@@ -37,6 +37,12 @@ def frontmatter(path: Path) -> dict[str, str]:
         match = re.match(r"^(\s*)(name|description|version):\s*[\"']?(.+?)[\"']?\s*$", line)
         if match:
             values[match.group(2)] = match.group(3)
+            continue
+        # when_to_use only counts at zero indentation: runtimes such as ZCode
+        # ignore nested frontmatter keys, so an indented copy must not pass.
+        match = re.match(r"^(when_to_use):\s*[\"']?(.+?)[\"']?\s*$", line)
+        if match:
+            values[match.group(1)] = match.group(2)
     return values
 
 
@@ -71,6 +77,7 @@ def validate_skill(skill_dir: Path) -> tuple[str, str, str]:
     require(metadata.get("name") == name, f"{relative}/SKILL.md name must match its directory")
     require(metadata.get("description"), f"{relative}/SKILL.md must define description")
     require(metadata.get("version"), f"{relative}/SKILL.md must define metadata.version")
+    require(metadata.get("when_to_use"), f"{relative}/SKILL.md must define a top-level when_to_use line for runtimes such as ZCode")
 
     skill_content = skill_file.read_text(encoding="utf-8")
     require("triggering:" in skill_content and "include:" in skill_content and "exclude:" in skill_content,

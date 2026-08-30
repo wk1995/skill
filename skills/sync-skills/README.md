@@ -2,7 +2,7 @@
 
 Language: **English** | [中文](README.zh-CN.md)
 
-`sync-skills` manages equivalent copies of one Agent Skill across this repository, project directories, machine-wide Codex skill folders, and explicit external locations. It supports linking, converting, comparing, synchronizing, versioning, snapshotting, auditing, and rolling back those copies.
+`sync-skills` manages equivalent copies of one Agent Skill across this repository, project directories, machine-wide Codex/ZCode skill folders, and explicit external locations. It supports linking, converting, comparing, synchronizing, versioning, snapshotting, auditing, and rolling back those copies.
 
 ## How To Use It
 
@@ -23,12 +23,14 @@ python skills/sync-skills/scripts/skill_sync.py sync my-skill --source repo
 
 Each location has a role: `repo`, `local`, `project`, or `external`. The workflow validates `SKILL.md`, snapshots existing copies before an overwrite, reports conflicts instead of selecting a source silently, and records versions, digests, provenance, and differences. See [SKILL.md](SKILL.md) for the full command set and trust rules.
 
+ZCode copies follow the same role model: link or sync them under `~/.zcode/skills/` (user scope) or `~/.agents/skills/` (shared across tools), with `SKILL.md` as the only required file — `agents/openai.yaml` and `extensions.yaml` are Codex-only and ignored by ZCode.
+
 ## When It Triggers
 
 Use this skill when the request:
 
 - links, converts, synchronizes, versions, audits, compares, or rolls back Skill copies;
-- involves repository, project, local Codex/user, or external copies of the same Skill; or
+- involves repository, project, local Codex/ZCode/user, or external copies of the same Skill; or
 - needs Skill provenance URLs, version history, content digests, snapshots, or difference reports.
 
 ## When It Does Not Trigger

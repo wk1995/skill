@@ -1,6 +1,7 @@
 ---
 name: release-engineering
 description: Use when planning, validating, automating, documenting, or troubleshooting release/publish/发布/发包 workflows for Android apps, Android libraries/components, Gradle plugins, publish branches, tags, artifacts, CI gates, or when extending release workflows beyond Android.
+when_to_use: Use when planning, validating, automating, documenting, or troubleshooting release/publish workflows (发布, 发包) for Android apps, libraries, Gradle plugins, publish branches, tags, artifacts, or CI gates, or when extending release workflows beyond Android. Not for ordinary code changes or questions about this Skill repository's own architecture.
 metadata:
   version: "1.0.0"
   urls:
@@ -24,12 +25,19 @@ metadata:
 
 Use this skill to handle releases as controlled workflows that bind source, version, artifacts, publishing destination, tags, and aftercare. Do not treat release work as only running a build command.
 
+## Platform Compatibility
+
+This skill works in both OpenAI Codex and ZCode.
+
+- **Codex**: triggered by `metadata.triggering` and the `$release-engineering` invocation; the agent interface is `agents/openai.yaml`.
+- **ZCode**: triggered automatically from the top-level `name`, `description`, and `when_to_use` in `SKILL.md` — no `$`-prefix or slash command is required. ZCode parses only top-level frontmatter keys, so the nested `metadata.*` rules are ignored, and `agents/openai.yaml` is ignored as well. Install the skill under `~/.zcode/skills/` or `~/.agents/skills/` with `scripts/link-zcode-skill.sh` from this repository.
+
 ## Start Here
 
 1. Identify the release target: Android app, Android component/library, Gradle plugin, repository workflow, or other platform.
 2. Identify the operation: design a process, document an existing process, dry-run, validate, publish, troubleshoot, or extend automation.
 3. Inspect the repository before deciding: build files, version source, CI workflows, publish scripts, signing/credential references, branch protections, tags, and artifact outputs.
-4. If the next step mutates remote state, state the exact action first. For git/GitHub pushes, tags, PRs, branch protection, or releases, use `git-account-safety`.
+4. If the next step mutates remote state, state the exact action first. For git/GitHub pushes, tags, PRs, branch protection, or releases, apply the account-safety guard (in OpenAI Codex this is the `git-account-safety` skill; in ZCode, verify the CLI git identity before any remote write and confirm PR/tag outcomes afterwards).
 
 ## Reference Router
 

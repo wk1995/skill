@@ -14,6 +14,8 @@
 排查 Gradle 插件发布任务为什么没有上传产物。
 ```
 
+在 OpenAI Codex 中可以用 `$release-engineering` 显式调用。在 ZCode 中，同样的请求会依据 `description` 与 `when_to_use` 元数据自动触发；在本仓库执行一次 `scripts/link-zcode-skill.sh` 即可链接到 `~/.zcode/skills/`。
+
 此 Skill 会先识别发布目标和操作类型，检查相关构建配置、CI、版本来源、签名和发布配置，再制定或校验发布契约。仅在需要时读取对应资料：
 
 - Android APK/AAB 应用

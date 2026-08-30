@@ -16,6 +16,8 @@
 整理新集成相关的仓库文档。
 ```
 
+这些请求在任何运行时都可用。在 OpenAI Codex 中还可以用 `$choose-project-doc-location` 显式调用；在 ZCode 中会依据 `description` 与 `when_to_use` 元数据自动触发。在本仓库执行一次 `scripts/link-zcode-skill.sh` 即可链接到 `~/.zcode/skills/`。
+
 完整的位置选择规则和编辑指南见 [SKILL.md](SKILL.md)。
 
 ## 何时触发

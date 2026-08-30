@@ -15,6 +15,8 @@ Prepare the dev/1.4.0 integration train from feature/login and feature/report.
 Promote release/1.4.0 after its checks pass, then distribute the signed APK to the enterprise MDM test group.
 ```
 
+In OpenAI Codex you can invoke the skill explicitly with `$android-release-train`. In ZCode the same prompts trigger the skill automatically from its `description` and `when_to_use` metadata; run `scripts/link-zcode-skill.sh` once from this repository to link it into `~/.zcode/skills/`.
+
 The skill resolves the repository's default branch rather than assuming `main` or `master`. A feature branch has no PR until it is explicitly selected for a version; the selection creates `dev/<version>` and feature-to-dev PRs. It inventories those PRs before merging, keeps version metadata changes in the protected release flow, and distributes the same verified AAB or APK to every configured destination. Google Play is optional: configure another store, enterprise MDM, direct delivery, or artifact-only delivery when appropriate. Remote writes are stated in advance and require the relevant release gates and credentials. See [SKILL.md](SKILL.md) and its release-train contract for the detailed procedure.
 
 ## When It Triggers

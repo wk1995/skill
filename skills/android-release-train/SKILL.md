@@ -1,6 +1,7 @@
 ---
 name: android-release-train
 description: Orchestrate Android feature branches, version-train integration, release branches, signed Android release artifacts, configurable distribution destinations, and release tags. Use when a user asks to create an Android feature branch for a requirement, list feature-branch or PR readiness, select features for a version, create or promote dev/<version> and release/<version> branches, bootstrap Android CI/release workflows, distribute an Android release through Google Play, another store, enterprise MDM, direct delivery, or an artifact archive, or tag a released Android version.
+when_to_use: Use when asked to create or assess an Android feature branch, list feature-branch or PR readiness, select features for a version train, create or promote dev/<version> or release/<version> branches, bootstrap Android release CI, distribute or tag a signed Android release. Not for general Android build, test, or code-change tasks, or for managing Skill copies.
 metadata:
   version: "1.2.0"
   urls:
@@ -25,6 +26,13 @@ Use this skill to implement and operate a protected Android release train:
 `feature/*` / `bugfix/*` → `dev/B` → `release/B` → default branch → `vB`
 
 The default branch is repository configuration, not a hard-coded `main` or `master` name. Resolve it before every operation.
+
+## Platform Compatibility
+
+This skill works in both OpenAI Codex and ZCode.
+
+- **Codex**: triggered by `metadata.triggering` and the `$android-release-train` invocation; the agent interface is `agents/openai.yaml`.
+- **ZCode**: triggered automatically from the top-level `name`, `description`, and `when_to_use` in `SKILL.md` — no `$`-prefix or slash command is required. ZCode parses only top-level frontmatter keys, so the nested `metadata.*` rules are ignored, and `agents/openai.yaml` is ignored as well. Install the skill under `~/.zcode/skills/` or `~/.agents/skills/` with `scripts/link-zcode-skill.sh` from this repository.
 
 ## Prerequisites
 
@@ -79,7 +87,7 @@ Never tag before the configured success point. If publication, artifact verifica
 
 The user naming a feature or version authorizes planning, not accidental publication. Before a remote mutation, state the target repo, default branch, source/target branches, selected features, version, intended artifact destination, and whether the operation will create branches, PRs, merge, publish, tag, or delete branches.
 
-Use the repository's existing release scripts/workflows if present. For GitHub changes, follow `git-account-safety`; verify the CLI identity before pushes and verify PR/tag outcomes afterwards. Never force-push, bypass branch protection, alter Rulesets, delete a branch before its stated gate, or use a personal token where a GitHub App is required.
+Use the repository's existing release scripts/workflows if present. For GitHub changes, apply the account-safety guard (in OpenAI Codex this is the `git-account-safety` skill; in ZCode, verify the CLI git identity before any remote write and confirm PR/tag outcomes afterwards). Never force-push, bypass branch protection, alter Rulesets, delete a branch before its stated gate, or use a personal token where a GitHub App is required.
 
 ## Resources
 

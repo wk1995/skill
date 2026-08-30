@@ -16,6 +16,8 @@ Should this project overview be added to the README or the Wiki?
 Organize the repository documentation for the new integration.
 ```
 
+These prompts work in any runtime. In OpenAI Codex you can also invoke the skill explicitly with `$choose-project-doc-location`; in ZCode it triggers automatically from its `description` and `when_to_use` metadata. Run `scripts/link-zcode-skill.sh` once from this repository to link it into `~/.zcode/skills/`.
+
 See [SKILL.md](SKILL.md) for the full placement rules and editing guidance.
 
 ## When It Triggers

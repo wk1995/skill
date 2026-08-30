@@ -77,7 +77,7 @@ Every Skill has a companion README with usage and trigger guidance. This table i
 | `android-release-train` | Orchestrate Android feature branches, version-train integration, release branches, signed Android release artifacts, configurable distribution destinations, and release tags. Use when a user asks to create an Android feature branch for a requirement, list feature-branch or PR readiness, select features for a version, create or promote dev/<version> and release/<version> branches, bootstrap Android CI/release workflows, distribute an Android release through Google Play, another store, enterprise MDM, direct delivery, or an artifact archive, or tag a released Android version. | [README](skills/android-release-train/README.md) |
 | `choose-project-doc-location` | Decide whether requested project documentation belongs in README, repository docs, or GitHub Wiki before creating or updating it. MUST use before editing documentation when the user asks to create, update, rewrite, or organize README/readme, Wiki/wiki, docs/doc, project documentation, project details, workflow/workflows, 流程, 项目文档, 项目说明, 仓库说明, 使用说明, skill 列表, skill 作用, skill 使用说明, architecture notes, onboarding guides, or repository documentation. Treat the user's words "README" and "Wiki" as tentative labels, not final placement decisions. | [README](skills/choose-project-doc-location/README.md) |
 | `release-engineering` | Use when planning, validating, automating, documenting, or troubleshooting release/publish/发布/发包 workflows for Android apps, Android libraries/components, Gradle plugins, publish branches, tags, artifacts, CI gates, or when extending release workflows beyond Android. | [README](skills/release-engineering/README.md) |
-| `sync-skills` | Use when linking, converting, synchronizing, versioning, auditing, or rolling back multiple copies of the same Agent Skill across this repository, project-level skill folders, local Codex/user skill folders, or arbitrary external paths. | [README](skills/sync-skills/README.md) |
+| `sync-skills` | Use when linking, converting, synchronizing, versioning, auditing, or rolling back multiple copies of the same Agent Skill across this repository, project-level skill folders, local Codex/ZCode/user skill folders, or arbitrary external paths. | [README](skills/sync-skills/README.md) |
 <!-- skills-catalog:end -->
 
 ## Pull Request Catalog Check
@@ -99,6 +99,7 @@ skills/example-skill/
 ---
 name: example-skill
 description: Use when the user asks for a concrete example Skill workflow.
+when_to_use: Use when the user asks for a concrete example Skill workflow; skip it for questions about the Skill repository itself.
 metadata:
   version: "1.0.0"
   urls:
@@ -116,7 +117,7 @@ metadata:
 ---
 ```
 
-`name`, `description`, and `metadata.version` are the baseline contract. `description` remains the natural-language discovery text used by Agent Skills. `metadata.urls` is optional stable provenance information for the logical Skill, such as a source repository, documentation page, registry page, package page, or upstream project. `metadata.triggering` is this repository's structured supplement: `include` describes explicit trigger cases, and `exclude` describes explicit non-trigger cases. When `metadata.triggering` is not configured, it is equivalent to `include: []` and `exclude: []`. `exclude` takes priority over `include` to avoid accidental keyword-triggered activation.
+`name`, `description`, and `metadata.version` are the baseline contract. `description` remains the natural-language discovery text used by Agent Skills. `metadata.urls` is optional stable provenance information for the logical Skill, such as a source repository, documentation page, registry page, package page, or upstream project. `metadata.triggering` is this repository's structured supplement: `include` describes explicit trigger cases, and `exclude` describes explicit non-trigger cases. When `metadata.triggering` is not configured, it is equivalent to `include: []` and `exclude: []`. `exclude` takes priority over `include` to avoid accidental keyword-triggered activation. The top-level `when_to_use` condenses those rules into one sentence for runtimes such as ZCode that read only top-level frontmatter keys; keep it aligned with `metadata.triggering` when both are present.
 
 A Skill with executable extensions may add:
 
@@ -244,6 +245,22 @@ dist/codex/
 ```
 
 The Codex plugin has its own aggregate package version. It does not replace the independent version of each Skill. The plugin shape follows the [Codex plugin documentation](https://developers.openai.com/codex/plugins/build).
+
+## ZCode Compatibility
+
+Every Skill in this repository also runs in ZCode. ZCode discovers skills under `~/.zcode/skills/` (user scope), `~/.agents/skills/` (shared across tools), and `<repo>/.zcode/skills/` or `<repo>/.agents/skills/` (workspace scope, searched from the current directory up to the repository root). This repository's root `skills/` directory is not a discovery root, so link each Skill into one of those locations first:
+
+```bash
+scripts/link-zcode-skill.sh                          # link every Skill into ~/.zcode/skills
+scripts/link-zcode-skill.sh release-engineering      # link one Skill
+ZCODE_SKILLS_DIR=~/.agents/skills scripts/link-zcode-skill.sh   # share the links across tools
+```
+
+Frontmatter and triggering then behave as follows:
+
+- ZCode parses only top-level frontmatter keys (`name`, `description`, `when_to_use`, `license`, `metadata`) and drops a Skill whose `name` or `description` is missing or whose `description` exceeds 1024 characters. Nested keys such as `metadata.version`, `metadata.urls`, and `metadata.triggering` are ignored, which is why every Skill also defines a top-level `when_to_use` line condensing its trigger rules.
+- ZCode presents `name`, `description` (truncated to roughly 250 characters), and `when_to_use` to the model, and triggers automatically — there is no `$`-prefix or slash-command invocation and no keyword matcher. Keep trigger wording front-loaded.
+- `agents/openai.yaml` and `extensions.yaml` are Codex-only and ignored by ZCode; ZCode-only copies need only `SKILL.md` plus the Skill's own scripts, references, and assets.
 
 ## Versioning And Releases (Planned)
 

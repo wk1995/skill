@@ -2,7 +2,7 @@
 
 语言：[English](README.md) | **中文**
 
-`sync-skills` 用于管理同一个 Agent Skill 在本仓库、项目目录、本机 Codex Skill 目录和明确指定的外部路径中的等价副本。它支持链接、转换、比较、同步、版本记录、快照、审计和回滚。
+`sync-skills` 用于管理同一个 Agent Skill 在本仓库、项目目录、本机 Codex/ZCode Skill 目录和明确指定的外部路径中的等价副本。它支持链接、转换、比较、同步、版本记录、快照、审计和回滚。
 
 ## 如何使用
 
@@ -23,12 +23,14 @@ python skills/sync-skills/scripts/skill_sync.py sync my-skill --source repo
 
 每个位置使用一个固定角色：`repo`、`local`、`project` 或 `external`。流程会校验 `SKILL.md`，在覆盖前为已有副本创建快照；多份副本发生冲突时会报告而不会自行选择来源，并记录版本、摘要、来源和差异。完整命令及信任规则见 [SKILL.md](SKILL.md)。
 
+ZCode 副本遵循同样的角色模型：可以链接或同步到 `~/.zcode/skills/`（用户级）或 `~/.agents/skills/`（跨工具共享），必需文件只有 `SKILL.md` —— `agents/openai.yaml` 和 `extensions.yaml` 为 Codex 专用，ZCode 会忽略。
+
 ## 何时触发
 
 在以下情况使用此 Skill：
 
 - 需要链接、转换、同步、记录版本、审计、比较或回滚 Skill 副本；
-- 涉及同一个 Skill 的仓库、项目、本机 Codex/用户目录或外部副本；
+- 涉及同一个 Skill 的仓库、项目、本机 Codex/ZCode/用户目录或外部副本；
 - 需要处理 Skill 的来源 URL、版本历史、内容摘要、快照或差异报告。
 
 ## 何时不触发

@@ -1,6 +1,7 @@
 ---
 name: sync-skills
-description: Use when linking, converting, synchronizing, versioning, auditing, or rolling back multiple copies of the same Agent Skill across this repository, project-level skill folders, local Codex/user skill folders, or arbitrary external paths.
+description: Use when linking, converting, synchronizing, versioning, auditing, or rolling back multiple copies of the same Agent Skill across this repository, project-level skill folders, local Codex/ZCode/user skill folders, or arbitrary external paths.
+when_to_use: Use when linking, converting, synchronizing, versioning, auditing, comparing, or rolling back multiple copies of the same Agent Skill across this repository, project-level skill folders, local Codex/ZCode/user skill folders, or external paths. Not when merely using a Skill for its domain workflow.
 metadata:
   version: "0.0.2"
   urls:
@@ -22,7 +23,16 @@ metadata:
 
 ## Overview
 
-Use this skill to keep equivalent Skill directories connected across locations such as this repository's `skills/`, a project's skill folder, a local Codex/user skill folder, and any external path. Treat one linked group as one logical Skill with multiple materialized copies.
+Use this skill to keep equivalent Skill directories connected across locations such as this repository's `skills/`, a project's skill folder, a local Codex/ZCode/user skill folder, and any external path. Treat one linked group as one logical Skill with multiple materialized copies.
+
+## Platform Compatibility
+
+This skill keeps Skill copies in sync across both OpenAI Codex and ZCode.
+
+- **Codex**: user-level skills live under `$CODEX_HOME/skills` or `~/.codex/skills`; the agent interface is `agents/openai.yaml`; Codex-specific artifacts include `agents/` and `extensions.yaml`.
+- **ZCode**: user-level skills live under `~/.zcode/skills`, cross-tool skills under `~/.agents/skills`, and workspace skills under `<repo>/.zcode/skills` or `<repo>/.agents/skills` (searched from the current directory up to the repository root); ZCode reads `SKILL.md` directly, parses only top-level frontmatter keys (`name`, `description`, `when_to_use`), and ignores `agents/openai.yaml`. When syncing ZCode copies, treat `SKILL.md` as the required file and copy `agents/`/`extensions.yaml` only when they exist.
+
+Triggering differs between the two runtimes: Codex uses `metadata.triggering` and the `$sync-skills` invocation, while ZCode triggers automatically from the top-level `description` and `when_to_use`, so no `$`-prefix is needed there.
 
 ## Start Here
 
@@ -36,7 +46,7 @@ Use this skill to keep equivalent Skill directories connected across locations s
 Use these role names consistently:
 
 - `repo`: the canonical copy inside this repository, usually `skills/<skill-name>`.
-- `local`: a machine-wide copy, usually under `$CODEX_HOME/skills` or `~/.codex/skills`.
+- `local`: a machine-wide copy. In OpenAI Codex this is usually under `$CODEX_HOME/skills` or `~/.codex/skills`; in ZCode it is `~/.zcode/skills` or `~/.agents/skills`.
 - `project`: a project-specific copy owned by another workspace.
 - `external`: any other explicit path, such as a checked-out plugin, bundle, archive staging folder, or temporary migration location.
 
@@ -102,7 +112,7 @@ python skills/sync-skills/scripts/skill_sync.py diff my-skill --role local --fro
 
 - Always snapshot all existing linked copies before overwriting any target.
 - Treat `SKILL.md` as required. A path without `SKILL.md` is not a valid source copy.
-- Preserve each Skill as a directory tree. Copy `SKILL.md`, `agents/`, `scripts/`, `references/`, `assets/`, `extensions.yaml`, `src/`, and `tests/` when present.
+- Preserve each Skill as a directory tree. Copy `SKILL.md`, `agents/` (Codex only; ignored by ZCode), `scripts/`, `references/`, `assets/`, `extensions.yaml`, `src/`, and `tests/` when present.
 - Exclude transient directories and files such as `.git`, `node_modules`, `dist`, `.DS_Store`, `__pycache__`, and Python bytecode.
 - When the skill-management repository is on `master` or its configured default branch, compare linked copies by `metadata.version`; if versions differ, synchronize and let the higher version replace the lower version.
 - When the repository is on any other branch, do not synchronize only because versions differ unless the user explicitly requests synchronization or the branch work requires updating the target copy.

@@ -1,6 +1,7 @@
 ---
 name: choose-project-doc-location
 description: Decide whether requested project documentation belongs in README, repository docs, or GitHub Wiki before creating or updating it. MUST use before editing documentation when the user asks to create, update, rewrite, or organize README/readme, Wiki/wiki, docs/doc, project documentation, project details, workflow/workflows, 流程, 项目文档, 项目说明, 仓库说明, 使用说明, skill 列表, skill 作用, skill 使用说明, architecture notes, onboarding guides, or repository documentation. Treat the user's words "README" and "Wiki" as tentative labels, not final placement decisions.
+when_to_use: MUST use before creating, updating, rewriting, or organizing project documentation — README/readme, Wiki/wiki, docs/doc, project documentation, workflow/workflows, 流程, 项目文档, 项目说明, 仓库说明, 使用说明, skill 列表, architecture notes, onboarding guides — to decide README versus repository docs versus GitHub Wiki. Not for editing application code or managing Agent Skill copies.
 metadata:
   version: "0.0.1"
   triggering:
@@ -22,6 +23,13 @@ metadata:
 ## Overview
 
 Use this skill before editing project documentation when the requested destination may be README, GitHub Wiki, or detailed docs. The goal is to choose the right documentation surface first, then create or update the matching artifact.
+
+## Platform Compatibility
+
+This skill works in both OpenAI Codex and ZCode.
+
+- **Codex**: triggered by `metadata.triggering` and the `$choose-project-doc-location` invocation; the agent interface is `agents/openai.yaml`.
+- **ZCode**: triggered automatically from the top-level `name`, `description`, and `when_to_use` in `SKILL.md` — no `$`-prefix or slash command is required. ZCode parses only top-level frontmatter keys, so the nested `metadata.*` rules are ignored, and `agents/openai.yaml` is ignored as well. Install the skill under `~/.zcode/skills/` or `~/.agents/skills/` with `scripts/link-zcode-skill.sh` from this repository.
 
 ## Decision Workflow
 

@@ -14,6 +14,8 @@ Audit the Maven publishing workflow for this Android library.
 Troubleshoot why the Gradle plugin release job did not publish an artifact.
 ```
 
+In OpenAI Codex you can invoke the skill explicitly with `$release-engineering`. In ZCode the same prompts trigger the skill automatically from its `description` and `when_to_use` metadata; run `scripts/link-zcode-skill.sh` once from this repository to link it into `~/.zcode/skills/`.
+
 The skill first identifies the target and operation, inspects the relevant build, CI, version, signing, and publishing configuration, then creates or validates a release contract. It uses the target-specific references only when they apply:
 
 - Android APK/AAB applications

@@ -12,7 +12,7 @@ skills/<skill-name>/
 `-- README.md
 ```
 
-`SKILL.md` remains the agent-facing entry point. It must contain valid frontmatter with `name`, `description`, and `metadata.version`; add `metadata.triggering.include` and `metadata.triggering.exclude` when explicit trigger metadata is available.
+`SKILL.md` remains the agent-facing entry point. It must contain valid frontmatter with `name`, `description`, and `metadata.version`; add `metadata.triggering.include` and `metadata.triggering.exclude` when explicit trigger metadata is available. Also keep a top-level `when_to_use` line that condenses those trigger rules into one sentence: runtimes with a flat frontmatter parser, such as ZCode, surface only top-level keys, so `when_to_use` is what makes trigger guidance visible there. Keep `description` under 1024 characters and front-load trigger wording, because ZCode drops over-long descriptions and presents only the first roughly 250 characters to the model.
 
 `README.md` is the user-facing companion document. It must introduce the Skill, explain how to use it, state when it triggers, and state when it does not trigger. Keep it consistent with `SKILL.md`; `metadata.triggering.exclude` takes priority if the two descriptions ever appear to conflict.
 

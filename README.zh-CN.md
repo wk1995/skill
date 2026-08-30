@@ -77,7 +77,7 @@ Agent Skills 规范只要求 `SKILL.md`，但本仓库额外要求每个受管�
 | `android-release-train` | `android-release-train` 用于编排受保护的 Android 交付路径：从功能或修复分支，经版本集成和发布提升，到签名 Android 产物、可配置分发及已验证的发布标签。 | [README](skills/android-release-train/README.zh-CN.md) |
 | `choose-project-doc-location` | `choose-project-doc-location` 用于在创建或修改项目文档前，判断内容应放在仓库 README、受版本控制的仓库文档，还是 GitHub Wiki 中。 | [README](skills/choose-project-doc-location/README.zh-CN.md) |
 | `release-engineering` | `release-engineering` 用于规划、校验、自动化、记录和排查受控发布流程。它覆盖 Android 应用、Android 库与 SDK、Gradle 插件、构建产物、发布分支和标签、CI 门禁、发布、回滚计划及发布后处理。 | [README](skills/release-engineering/README.zh-CN.md) |
-| `sync-skills` | `sync-skills` 用于管理同一个 Agent Skill 在本仓库、项目目录、本机 Codex Skill 目录和明确指定的外部路径中的等价副本。它支持链接、转换、比较、同步、版本记录、快照、审计和回滚。 | [README](skills/sync-skills/README.zh-CN.md) |
+| `sync-skills` | `sync-skills` 用于管理同一个 Agent Skill 在本仓库、项目目录、本机 Codex/ZCode Skill 目录和明确指定的外部路径中的等价副本。它支持链接、转换、比较、同步、版本记录、快照、审计和回滚。 | [README](skills/sync-skills/README.zh-CN.md) |
 <!-- skills-catalog:end -->
 
 ## Pull Request 目录检查
@@ -99,6 +99,7 @@ skills/example-skill/
 ---
 name: example-skill
 description: Use when the user asks for a concrete example Skill workflow.
+when_to_use: Use when the user asks for a concrete example Skill workflow; skip it for questions about the Skill repository itself.
 metadata:
   version: "1.0.0"
   triggering:
@@ -111,7 +112,7 @@ metadata:
 ---
 ```
 
-其中 `name`、`description` 和 `metadata.version` 是基础约定。`description` 继续承担兼容 Agent Skills 发现的自然语言触发说明；`metadata.triggering` 是本仓库额外的结构化补充。`include` 表示明确触发时机，`exclude` 表示明确不触发时机。未配置 `metadata.triggering` 时等价于 `include: []` 和 `exclude: []`。`exclude` 优先于 `include`，避免关键词命中导致误触发。
+其中 `name`、`description` 和 `metadata.version` 是基础约定。`description` 继续承担兼容 Agent Skills 发现的自然语言触发说明；`metadata.triggering` 是本仓库额外的结构化补充。`include` 表示明确触发时机，`exclude` 表示明确不触发时机。未配置 `metadata.triggering` 时等价于 `include: []` 和 `exclude: []`。`exclude` 优先于 `include`，避免关键词命中导致误触发。顶层 `when_to_use` 把上述规则压缩成一句话，供 ZCode 这类只读取顶层 frontmatter 键的运行时使用；两者同时存在时应保持一致。
 
 带可执行扩展的 Skill 可以增加：
 
@@ -189,6 +190,22 @@ dist/codex/
 ```
 
 Codex 插件使用独立的聚合包版本；它不会替代每个 Skill 自己的版本。插件结构依据 [Codex 插件文档](https://developers.openai.com/codex/plugins/build)。
+
+## ZCode 兼容
+
+本仓库中的每个 Skill 也可以在 ZCode 中运行。ZCode 的 Skill 发现路径包括 `~/.zcode/skills/`（用户级）、`~/.agents/skills/`（跨工具共享）以及 `<repo>/.zcode/skills/` 或 `<repo>/.agents/skills/`（仓库级，从当前目录向上搜索到仓库根）。本仓库根目录的 `skills/` 不是发现路径，需要先把 Skill 链接到上述位置：
+
+```bash
+scripts/link-zcode-skill.sh                          # 将全部 Skill 链接到 ~/.zcode/skills
+scripts/link-zcode-skill.sh release-engineering      # 只链接一个 Skill
+ZCODE_SKILLS_DIR=~/.agents/skills scripts/link-zcode-skill.sh   # 跨工具共享
+```
+
+Frontmatter 与触发的差异如下：
+
+- ZCode 只解析顶层 frontmatter 键（`name`、`description`、`when_to_use`、`license`、`metadata`）；缺失 `name` 或 `description`，或 `description` 超过 1024 字符时，Skill 会被直接丢弃。`metadata.version`、`metadata.urls`、`metadata.triggering` 等嵌套键会被忽略，因此每个 Skill 还需要一条顶层 `when_to_use`，把触发规则压缩成一句话。
+- ZCode 会把 `name`、`description`（约截断到 250 字符）和 `when_to_use` 提供给模型并自动触发，没有 `$` 前缀或斜杠命令，也没有关键词匹配器；触发关键词应尽量前置。
+- `agents/openai.yaml` 与 `extensions.yaml` 为 Codex 专用，ZCode 会忽略；仅面向 ZCode 的副本只需要 `SKILL.md` 以及 Skill 自己的 scripts、references 和 assets。
 
 ## 版本与发布（规划）
 
