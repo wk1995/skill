@@ -3,7 +3,7 @@ name: sync-skills
 description: Use when linking, converting, synchronizing, versioning, auditing, or rolling back multiple copies of the same Agent Skill across this repository, project-level skill folders, local Codex/ZCode/user skill folders, or arbitrary external paths.
 when_to_use: Use when linking, converting, synchronizing, versioning, auditing, comparing, or rolling back multiple copies of the same Agent Skill across this repository, project-level skill folders, local Codex/ZCode/user skill folders, or external paths. Not when merely using a Skill for its domain workflow.
 metadata:
-  version: "0.0.2"
+  version: "0.0.3"
   urls:
     - type: repository
       value: https://github.com/wk1995/skill.git
@@ -66,6 +66,14 @@ Convert one physical copy into another location and link both:
 python skills/sync-skills/scripts/skill_sync.py convert my-skill --source-path ~/.codex/skills/my-skill --source-role local --source-url https://example.com/source --target-path skills/my-skill --target-role repo --target-url https://github.com/me/skills-repo
 ```
 
+Verify ZCode compatibility of linked group roles, one skill directory, or a whole folder of skills (`link`, `convert`, and `sync` print the same findings as a warning whenever a linked or source copy is incompatible; exit code 2 means at least one copy is incompatible):
+
+```bash
+python skills/sync-skills/scripts/skill_sync.py check my-skill
+python skills/sync-skills/scripts/skill_sync.py check --path ~/.codex/skills/my-skill
+python skills/sync-skills/scripts/skill_sync.py check --path ~/.codex/skills
+```
+
 Inspect divergence:
 
 ```bash
@@ -118,7 +126,7 @@ python skills/sync-skills/scripts/skill_sync.py diff my-skill --role local --fro
 - When the repository is on any other branch, do not synchronize only because versions differ unless the user explicitly requests synchronization or the branch work requires updating the target copy.
 - If versions are equal but digests differ, use normal conflict handling and require an explicit source unless only one linked role changed since the previous snapshot.
 - If two or more copies changed since the previous snapshot and no source was specified, stop and report the conflict instead of choosing silently.
-- Keep the logical Skill version in `metadata.version` in `SKILL.md`. Use this skill's own version as `0.0.2`.
+- Keep the logical Skill version in `metadata.version` in `SKILL.md`. Use this skill's own version as `0.0.3`.
 - Record Skill addresses in the registry: `skill_urls` for canonical repository/documentation/registry/source URLs, and `role_urls` for role-specific remote/source URLs.
 - If a role URL is not provided, infer it from `git remote get-url origin` when available.
 - Record audit times in the registry: group `created_at`, group `updated_at`, per-role `content_updated_at`, per-version `created_at` and `updated_at`, and operation records such as `last_sync`, `last_convert`, and `last_rollback`.
@@ -132,9 +140,10 @@ python skills/sync-skills/scripts/skill_sync.py diff my-skill --role local --fro
 To convert a local, project, external, or repo copy into another location:
 
 1. Validate the source has `SKILL.md` and a valid `name`.
-2. Run `convert` with explicit source and target paths.
-3. Run `status` and confirm all roles report the same digest.
-4. Preserve or set `metadata.version` according to the source of truth chosen for the group.
+2. Confirm ZCode compatibility with `check --path` — top-level `name`, `description` within 1024 characters, and a top-level `when_to_use`; `convert` warns automatically when the source is not compatible.
+3. Run `convert` with explicit source and target paths.
+4. Run `status` and confirm all roles report the same digest.
+5. Preserve or set `metadata.version` according to the source of truth chosen for the group.
 
 ## Output Shape
 

@@ -21,6 +21,12 @@ python skills/sync-skills/scripts/skill_sync.py status my-skill
 python skills/sync-skills/scripts/skill_sync.py sync my-skill --source repo
 ```
 
+Before or after importing a Skill from another runtime, verify that it is ZCode-compatible — linked group roles, a single skill directory, or a whole folder of skills all work, and `link`, `convert`, and `sync` print the same findings as a warning whenever a linked or source copy is incompatible:
+
+```bash
+python skills/sync-skills/scripts/skill_sync.py check --path ~/.codex/skills
+```
+
 Each location has a role: `repo`, `local`, `project`, or `external`. The workflow validates `SKILL.md`, snapshots existing copies before an overwrite, reports conflicts instead of selecting a source silently, and records versions, digests, provenance, and differences. See [SKILL.md](SKILL.md) for the full command set and trust rules.
 
 ZCode copies follow the same role model: link or sync them under `~/.zcode/skills/` (user scope) or `~/.agents/skills/` (shared across tools), with `SKILL.md` as the only required file — `agents/openai.yaml` and `extensions.yaml` are Codex-only and ignored by ZCode.

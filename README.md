@@ -262,6 +262,8 @@ Frontmatter and triggering then behave as follows:
 - ZCode presents `name`, `description` (truncated to roughly 250 characters), and `when_to_use` to the model, and triggers automatically — there is no `$`-prefix or slash-command invocation and no keyword matcher. Keep trigger wording front-loaded.
 - `agents/openai.yaml` and `extensions.yaml` are Codex-only and ignored by ZCode; ZCode-only copies need only `SKILL.md` plus the Skill's own scripts, references, and assets.
 
+Skills that originate in other agent tools are covered by the same contract automatically: sync-skills `link`, `convert`, and `sync` warn whenever a linked or source copy is not ZCode-compatible, `python skills/sync-skills/scripts/skill_sync.py check --path <dir>` verifies a single skill or a whole folder on demand (exit code 2 means at least one copy is incompatible), and re-running `scripts/link-zcode-skill.sh` exposes newly added Skills to ZCode. Skills placed directly under `~/.agents/skills/` are discovered by every tool that reads that directory.
+
 ## Versioning And Releases (Planned)
 
 - The single source of truth for a Skill version is `metadata.version` in `SKILL.md`.

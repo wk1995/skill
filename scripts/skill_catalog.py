@@ -34,15 +34,16 @@ def frontmatter(path: Path) -> dict[str, str]:
 
     values: dict[str, str] = {}
     for line in match.group(1).splitlines():
-        match = re.match(r"^(\s*)(name|description|version):\s*[\"']?(.+?)[\"']?\s*$", line)
-        if match:
-            values[match.group(2)] = match.group(3)
-            continue
-        # when_to_use only counts at zero indentation: runtimes such as ZCode
-        # ignore nested frontmatter keys, so an indented copy must not pass.
-        match = re.match(r"^(when_to_use):\s*[\"']?(.+?)[\"']?\s*$", line)
+        # ZCode parses only top-level keys, so name/description/when_to_use
+        # count only at zero indentation; version stays permissive because
+        # this repository nests it under metadata.
+        match = re.match(r"^(name|description|when_to_use):\s*[\"']?(.+?)[\"']?\s*$", line)
         if match:
             values[match.group(1)] = match.group(2)
+            continue
+        match = re.match(r"^(\s*)(version):\s*[\"']?(.+?)[\"']?\s*$", line)
+        if match:
+            values[match.group(2)] = match.group(3)
     return values
 
 
@@ -76,6 +77,8 @@ def validate_skill(skill_dir: Path) -> tuple[str, str, str]:
     metadata = frontmatter(skill_file)
     require(metadata.get("name") == name, f"{relative}/SKILL.md name must match its directory")
     require(metadata.get("description"), f"{relative}/SKILL.md must define description")
+    require(len(metadata["description"]) <= 1024,
+            f"{relative}/SKILL.md description exceeds 1024 characters; ZCode drops such skills")
     require(metadata.get("version"), f"{relative}/SKILL.md must define metadata.version")
     require(metadata.get("when_to_use"), f"{relative}/SKILL.md must define a top-level when_to_use line for runtimes such as ZCode")
 

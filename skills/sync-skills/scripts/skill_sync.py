@@ -22,6 +22,7 @@ IGNORE_FILES = {".DS_Store"}
 BYTECODE_SUFFIXES = {".pyc", ".pyo"}
 DEFAULT_STATE_DIR = ".skill-sync"
 ROLE_FLAGS = ("repo", "local", "project", "external")
+ZCODE_DESCRIPTION_LIMIT = 1024
 
 
 def utc_snapshot_id() -> str:
@@ -238,13 +239,7 @@ def git_default_branch(path: Path) -> str | None:
 
 
 def read_skill_metadata(path: Path) -> dict[str, Any]:
-    skill_md = path / "SKILL.md"
-    text = skill_md.read_text(encoding="utf-8").lstrip("\ufeff")
-    frontmatter = ""
-    if text.startswith("---"):
-        end = text.find("\n---", 3)
-        if end != -1:
-            frontmatter = text[3:end]
+    frontmatter = read_frontmatter_block(path)
     name = match_yaml_scalar(frontmatter, "name")
     version = match_yaml_scalar(frontmatter, "version")
     urls = parse_metadata_url_values(frontmatter)
@@ -278,6 +273,87 @@ def match_yaml_scalar(text: str, key: str) -> str | None:
     pattern = re.compile(rf"^\s*{re.escape(key)}\s*:\s*[\"']?([^\"'\n]+)[\"']?\s*$", re.MULTILINE)
     match = pattern.search(text)
     return match.group(1).strip() if match else None
+
+
+def frontmatter_block_from_text(text: str) -> str:
+    text = text.lstrip("\ufeff")
+    if not text.startswith("---"):
+        return ""
+    match = re.search(r"^---+[ \t]*\r?$", text[3:], re.MULTILINE)
+    if not match:
+        return ""
+    return text[3:match.start() + 3]
+
+
+def read_frontmatter_block(skill_dir: Path) -> str:
+    return frontmatter_block_from_text((skill_dir / "SKILL.md").read_text(encoding="utf-8"))
+
+
+def top_level_yaml_scalar(frontmatter: str, key: str) -> str | None:
+    pattern = re.compile(rf"^{re.escape(key)}\s*:\s*[\"']?(.+?)[\"']?\s*$", re.MULTILINE)
+    match = pattern.search(frontmatter)
+    return match.group(1).strip() if match else None
+
+
+def zcode_compat_issues(skill_dir: Path) -> list[str]:
+    """Report why ZCode would drop this skill or fail to surface its triggers.
+
+    ZCode parses only top-level frontmatter keys, drops a skill whose
+    description exceeds 1024 characters, and reads `when_to_use` (never the
+    nested `metadata.triggering`) as the trigger text.
+    """
+    skill_md = skill_dir / "SKILL.md"
+    try:
+        if not skill_md.is_file():
+            return [f"missing SKILL.md: {skill_dir}"]
+        frontmatter = read_frontmatter_block(skill_dir)
+    except (OSError, UnicodeDecodeError) as error:
+        return [f"cannot inspect skill directory: {error}"]
+    if not frontmatter.strip():
+        return ["SKILL.md has no YAML frontmatter block"]
+
+    issues: list[str] = []
+    if not top_level_yaml_scalar(frontmatter, "name"):
+        issues.append("no top-level name")
+    description = top_level_yaml_scalar(frontmatter, "description")
+    if not description:
+        issues.append("no top-level description")
+    elif len(description) > ZCODE_DESCRIPTION_LIMIT:
+        issues.append(
+            f"description is {len(description)} characters; ZCode drops skills whose description exceeds {ZCODE_DESCRIPTION_LIMIT}"
+        )
+    if not top_level_yaml_scalar(frontmatter, "when_to_use"):
+        issues.append("no top-level when_to_use; nested copies are ignored, so trigger rules stay invisible to ZCode")
+    return issues
+
+
+def warn_zcode_compat(label: str, skill_dir: Path) -> None:
+    issues = zcode_compat_issues(skill_dir)
+    if issues:
+        print(f"warning: {label} skill is not ZCode-compatible: " + "; ".join(issues), file=sys.stderr)
+
+
+def collect_skill_copies(path: Path) -> dict[str, str]:
+    if (path / "SKILL.md").is_file():
+        return {path.name: str(path)}
+    copies: dict[str, str] = {}
+    try:
+        children = sorted(path.iterdir())
+    except OSError as error:
+        raise SystemExit(f"cannot list directory: {path}: {error}") from None
+    for child in children:
+        try:
+            if not child.is_dir() or child.name.startswith("."):
+                continue
+            has_skill_md = (child / "SKILL.md").is_file()
+        except OSError:
+            # Keep unreadable children so zcode_compat_issues reports them
+            # instead of silently granting a false all-clear.
+            copies[child.name] = str(child)
+            continue
+        if has_skill_md:
+            copies[child.name] = str(child)
+    return copies
 
 
 def load_registry(state_dir: Path) -> dict[str, Any]:
@@ -447,6 +523,7 @@ def command_link(args: argparse.Namespace) -> int:
         path = resolve_path(getattr(args, role))
         if path:
             require_skill_dir(path, role)
+            warn_zcode_compat(role, Path(path))
             group["roles"][role] = path
 
     update_group_state(group)
@@ -462,6 +539,7 @@ def command_convert(args: argparse.Namespace) -> int:
     apply_url_args(group, args)
 
     source = require_skill_dir(str(Path(args.source_path).expanduser().resolve()), args.source_role)
+    warn_zcode_compat(args.source_role, source)
     target = Path(args.target_path).expanduser().resolve()
     if source == target:
         raise SystemExit("source and target paths are the same")
@@ -502,6 +580,48 @@ def command_convert(args: argparse.Namespace) -> int:
     save_registry(state_dir, registry)
     print(json.dumps({"group": args.group, "source": args.source_role, "target": args.target_role, "target_path": str(target), "snapshot": snapshot_id, "updated_at": operation_at, "skill_urls": group.get("skill_urls", []), "source_url": group.get("role_urls", {}).get(args.source_role), "target_url": group.get("role_urls", {}).get(args.target_role)}, indent=2, sort_keys=True))
     return 0
+
+
+def command_check(args: argparse.Namespace) -> int:
+    if not args.path and not args.group:
+        raise SystemExit("provide a linked group name, or --path pointing at a skill directory or a folder of skill directories")
+    if args.path and args.group:
+        raise SystemExit("use either a linked group name or --path, not both")
+
+    targets: dict[str, str] = {}
+    if args.path:
+        path = Path(args.path).expanduser().resolve()
+        try:
+            if not path.is_dir():
+                raise SystemExit(f"path is not a directory: {path}")
+            targets = collect_skill_copies(path)
+        except OSError as error:
+            raise SystemExit(f"cannot inspect path: {path}: {error}") from None
+        if not targets:
+            raise SystemExit(f"no skill directories with SKILL.md found under: {path}")
+    else:
+        state_dir = Path(args.state_dir).resolve()
+        registry = load_registry(state_dir)
+        group = get_group(registry, args.group)
+        for role, role_path in group.get("roles", {}).items():
+            targets[role] = str(require_skill_dir(role_path, role))
+        if not targets:
+            raise SystemExit(f"group has no linked roles: {args.group}")
+
+    results: dict[str, Any] = {}
+    incompatible: list[str] = []
+    for label, copy_path in targets.items():
+        issues = zcode_compat_issues(Path(copy_path))
+        results[label] = {"path": copy_path, "zcode_compatible": not issues, "issues": issues}
+        if issues:
+            incompatible.append(label)
+
+    print(json.dumps({
+        "zcode_compatible": not incompatible,
+        "incompatible": incompatible,
+        "skills": results,
+    }, indent=2, sort_keys=True))
+    return 2 if incompatible else 0
 
 
 def command_status(args: argparse.Namespace) -> int:
@@ -550,6 +670,7 @@ def command_sync(args: argparse.Namespace) -> int:
         raise SystemExit(f"source role is not linked or does not exist: {source_role}")
 
     source_path = Path(str(current[source_role]["path"]))
+    warn_zcode_compat(source_role, source_path)
     snapshot_id = create_snapshot(state_dir, args.group, group, "sync", source_role)
     snapshot_dir = state_dir / "snapshots" / args.group / snapshot_id
     differences_by_role = {}
@@ -798,6 +919,14 @@ def build_parser() -> argparse.ArgumentParser:
     convert.add_argument("--target-url", help="Repository, source, or documentation URL for the target role.")
     convert.add_argument("--skill-url", action="append", help="Canonical repository, documentation, registry, or source URL for the logical skill. Can be repeated.")
     convert.set_defaults(func=command_convert)
+
+    check = subparsers.add_parser(
+        "check",
+        help="Verify skill copies are ZCode-compatible. Exits 2 when any copy is incompatible.",
+    )
+    check.add_argument("group", nargs="?", help="Linked group whose roles should be checked.")
+    check.add_argument("--path", help="Skill directory, or a folder of skill directories, to check without a registry.")
+    check.set_defaults(func=command_check)
 
     status = subparsers.add_parser("status", help="Show linked role digests and versions.")
     status.add_argument("group")

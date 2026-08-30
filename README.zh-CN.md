@@ -207,6 +207,8 @@ Frontmatter 与触发的差异如下：
 - ZCode 会把 `name`、`description`（约截断到 250 字符）和 `when_to_use` 提供给模型并自动触发，没有 `$` 前缀或斜杠命令，也没有关键词匹配器；触发关键词应尽量前置。
 - `agents/openai.yaml` 与 `extensions.yaml` 为 Codex 专用，ZCode 会忽略；仅面向 ZCode 的副本只需要 `SKILL.md` 以及 Skill 自己的 scripts、references 和 assets。
 
+来自其他 Agent 工具的 Skill 也自动遵循同一契约：sync-skills 的 `link`、`convert` 和 `sync` 在所链接或来源副本不兼容 ZCode 时会打印警告，`python skills/sync-skills/scripts/skill_sync.py check --path <目录>` 可以按需校验单个 Skill 或整个文件夹（退出码 2 表示至少有一份副本不兼容），重新执行 `scripts/link-zcode-skill.sh` 即可让新增 Skill 出现在 ZCode 中。直接放在 `~/.agents/skills/` 下的 Skill 会被所有读取该目录的工具发现。
+
 ## 版本与发布（规划）
 
 - Skill 版本的单一事实源是 `SKILL.md` 中的 `metadata.version`。

@@ -16,6 +16,8 @@ skills/<skill-name>/
 
 `README.md` is the user-facing companion document. It must introduce the Skill, explain how to use it, state when it triggers, and state when it does not trigger. Keep it consistent with `SKILL.md`; `metadata.triggering.exclude` takes priority if the two descriptions ever appear to conflict.
 
+When importing a Skill from another runtime into `skills/`, verify it with `python skills/sync-skills/scripts/skill_sync.py check --path <dir>`; the sync-skills `link`, `convert`, and `sync` commands print the same findings as a warning whenever a linked or source copy is not ZCode-compatible.
+
 ## README.md Requirements
 
 Write README files in English by default. Chinese is supported through an equivalent `README.zh-CN.md` with visible language links in both README files. Keep the two language versions aligned when changing usage or trigger guidance.
