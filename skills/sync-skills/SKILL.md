@@ -118,6 +118,7 @@ python skills/sync-skills/scripts/skill_sync.py diff my-skill-id --role local --
 
 - Always snapshot all existing linked copies before overwriting any target.
 - Treat `SKILL.md` as required. A path without `SKILL.md` is not a valid source copy.
+- Refuse to link two roles that resolve to the same path, or one role nested inside another. A symlinked copy such as `~/.workbuddy/skills/<name>` pointing at the repository copy is already identical to its target, so register only real copies; linking it as a separate role would make a later sync copy the directory onto itself and destroy it.
 - Preserve each Skill as a directory tree. Copy `SKILL.md`, `agents/` (Codex only), `scripts/`, `references/`, `assets/`, `extensions.yaml` (Codex only), `src/`, and `tests/` when present. WorkBuddy skills are defined entirely by `SKILL.md` and often contain none of the Codex-only `agents/` or `extensions.yaml` files, so copy them only when they exist.
 - Exclude transient directories and files such as `.git`, `node_modules`, `dist`, `.DS_Store`, `__pycache__`, and Python bytecode.
 - When the skill-management repository is on `master` or its configured default branch, compare linked copies by `metadata.version`; if versions differ, synchronize and let the higher version replace the lower version.

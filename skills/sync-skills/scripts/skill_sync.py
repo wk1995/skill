@@ -88,6 +88,12 @@ def require_skill_dir(path: str, role: str) -> Path:
 
 
 def copy_skill_tree(source: Path, target: Path) -> None:
+    source_real = source.resolve()
+    target_real = target.resolve()
+    if source_real == target_real:
+        raise SystemExit(f"refusing to copy a skill onto itself: {source_real}")
+    if is_relative_to(target_real, source_real):
+        raise SystemExit(f"refusing to copy a skill into its own subtree: {target_real} is inside {source_real}")
     if target.exists() and not target.is_dir():
         raise SystemExit(f"target exists and is not a directory: {target}")
     target.mkdir(parents=True, exist_ok=True)
@@ -525,7 +531,31 @@ def command_link(args: argparse.Namespace) -> int:
     apply_url_args(group, args)
 
     expected_id = group_id(key, group)
-    for role, path in paths.items():
+    resolved_roles: dict[str, str] = {}
+    for role in ROLE_FLAGS:
+        path = resolve_path(getattr(args, role))
+        if path:
+            require_skill_dir(path, role)
+            resolved_roles[role] = path
+
+    # Refuse to link roles that resolve to the same path (e.g. a symlinked copy
+    # is already identical to its target, so link only real copies).
+    by_path: dict[str, list[str]] = {}
+    for role, path in resolved_roles.items():
+        by_path.setdefault(path, []).append(role)
+    for path, roles in by_path.items():
+        if len(roles) > 1:
+            raise SystemExit(
+                "refusing to link roles that resolve to the same path: "
+                + ", ".join(sorted(roles)) + " -> " + path
+                + ". A symlinked copy is already identical to its target, so link only real copies."
+            )
+    for role_a, path_a in resolved_roles.items():
+        for role_b, path_b in resolved_roles.items():
+            if role_a != role_b and is_relative_to(Path(path_b), Path(path_a)):
+                raise SystemExit(f"refusing to link role {role_b} inside role {role_a}: {path_b} is inside {path_a}")
+
+    for role, path in resolved_roles.items():
         skill_dir = require_skill_dir(path, role)
         metadata = read_skill_metadata(skill_dir)
         if metadata.get("sync_id") and str(metadata["sync_id"]) != expected_id:
