@@ -135,6 +135,7 @@ python skills/sync-skills/scripts/skill_sync.py diff my-skill-id --role local --
 - Record changed file summaries in `last_sync.differences_by_role`; use `diff` when line-level text differences are needed.
 - Use `versions` to inspect version history and `diff` to inspect the exact files that differ between snapshots, current copies, or explicit paths.
 - Do not overwrite executable extensions from an untrusted remote or external source until the user has approved the source, version, digest, entrypoints, and permissions.
+- When bumping `metadata.version`, update the Skill's `CHANGELOG.md` with the new version, the date, and a change summary. This is a project requirement (see AGENTS.md).
 
 ## Conversion Pattern
 

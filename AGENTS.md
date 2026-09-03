@@ -49,3 +49,12 @@ python scripts/skill_catalog.py --check
 The `skill-catalog` GitHub Actions check validates every Skill and both generated catalogs on PRs targeting `main`. A PR cannot merge until the check passes. For an internal PR, the workflow can commit catalog updates back to its source branch only when the repository provides `SKILL_CATALOG_TOKEN`; never grant this token permission to bypass `main` branch protection. Fork PRs must include generated catalog changes in their own commits.
 
 Optional directories such as `agents/`, `scripts/`, `references/`, `assets/`, `src/`, and `tests/` should be added only when the Skill needs them.
+
+## Changelog Requirement
+
+Every Skill must maintain a `CHANGELOG.md` in its own directory, next to `SKILL.md`.
+
+- Whenever `metadata.version` is incremented (major, minor, or patch), add an entry recording the new version, the date (UTC), and a short summary of what changed, including any impact on triggers, safety, or compatibility.
+- An upgrade PR that bumps `metadata.version` without updating `CHANGELOG.md` is non-compliant.
+- Use a top-level `## [Unreleased]` section for committed changes that have not yet shipped under a new version.
+- `CHANGELOG.md` is written in English; a bilingual entry is optional for Skills that also ship a Chinese README.
