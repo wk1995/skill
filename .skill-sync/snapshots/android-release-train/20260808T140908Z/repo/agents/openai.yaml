@@ -1,4 +1,0 @@
-interface:
-  display_name: "Android 版本列车发布编排"
-  short_description: "编排 Android 集成、可配置分发和发布标签流程"
-  default_prompt: "Use $android-release-train to select Android feature branches for a version train and distribute its signed artifact to an enterprise MDM."
