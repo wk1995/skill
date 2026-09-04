@@ -100,6 +100,7 @@ skills/example-skill/
 name: example-skill
 description: Use when the user asks for a concrete example Skill workflow.
 metadata:
+  sync_id: "example-skill"
   version: "1.0.0"
   triggering:
     include:
@@ -111,7 +112,7 @@ metadata:
 ---
 ```
 
-其中 `name`、`description` 和 `metadata.version` 是基础约定。`description` 继续承担兼容 Agent Skills 发现的自然语言触发说明；`metadata.triggering` 是本仓库额外的结构化补充。`include` 表示明确触发时机，`exclude` 表示明确不触发时机。未配置 `metadata.triggering` 时等价于 `include: []` 和 `exclude: []`。`exclude` 优先于 `include`，避免关键词命中导致误触发。
+其中 `name`、`description`、`metadata.sync_id` 和 `metadata.version` 是基础约定。`metadata.sync_id` 是 `sync-skills` 使用的逻辑 Skill 不可变标识；创建 Skill 时确定，后续即使触发名称或目录变化也不得修改。`description` 继续承担兼容 Agent Skills 发现的自然语言触发说明；`metadata.triggering` 是本仓库额外的结构化补充。`include` 表示明确触发时机，`exclude` 表示明确不触发时机。未配置 `metadata.triggering` 时等价于 `include: []` 和 `exclude: []`。`exclude` 优先于 `include`，避免关键词命中导致误触发。
 
 带可执行扩展的 Skill 可以增加：
 

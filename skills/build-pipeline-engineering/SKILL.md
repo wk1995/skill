@@ -2,6 +2,7 @@
 name: build-pipeline-engineering
 description: Configure, validate, run, and troubleshoot reproducible distributable builds from an exact source ref, including CI environments, user-selected build variants, Android signing, APK/AAB/AAR or plugin packaging, output verification, manifests, checksums, and uploads. For variant-based builds default to release; for CI output default to GitHub Actions Artifacts. Do not use for requirement branches, PR integration, source version changes, or tag creation.
 metadata:
+  sync_id: "build-pipeline-engineering"
   version: "2.0.0"
   urls:
     - type: repository

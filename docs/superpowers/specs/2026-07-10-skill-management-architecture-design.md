@@ -125,6 +125,7 @@ execution:
 name: example-skill
 description: Use when the user asks for a concrete example Skill workflow.
 metadata:
+  sync_id: "example-skill"
   version: "1.0.0"
   triggering:
     include:
@@ -136,7 +137,7 @@ metadata:
 ---
 ```
 
-版本遵循 SemVer。CLI 解析 frontmatter，不再维护第二份中央版本字段。`name` 必须与父目录名一致。`description` 继续承担兼容 Agent Skills 发现的自然语言触发说明，`metadata.triggering` 是本仓库额外的结构化补充。`include` 表示明确触发时机，`exclude` 表示明确不触发时机。未配置 `metadata.triggering` 时等价于 `include: []` 和 `exclude: []`，即没有额外显式触发或显式屏蔽规则。`exclude` 优先于 `include`，避免关键词命中导致误触发。
+版本遵循 SemVer。CLI 解析 frontmatter，不再维护第二份中央版本字段。`name` 必须与父目录名一致；`metadata.sync_id` 是同步组的稳定主键，创建 Skill 时确定，后续不得随 Skill 名称或目录变化而修改。`description` 继续承担兼容 Agent Skills 发现的自然语言触发说明，`metadata.triggering` 是本仓库额外的结构化补充。`include` 表示明确触发时机，`exclude` 表示明确不触发时机。未配置 `metadata.triggering` 时等价于 `include: []` 和 `exclude: []`，即没有额外显式触发或显式屏蔽规则。`exclude` 优先于 `include`，避免关键词命中导致误触发。
 
 ### 5.2 可执行扩展
 

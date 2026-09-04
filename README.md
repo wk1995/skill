@@ -100,6 +100,7 @@ skills/example-skill/
 name: example-skill
 description: Use when the user asks for a concrete example Skill workflow.
 metadata:
+  sync_id: "example-skill"
   version: "1.0.0"
   urls:
     - type: repository
@@ -116,7 +117,7 @@ metadata:
 ---
 ```
 
-`name`, `description`, and `metadata.version` are the baseline contract. `description` remains the natural-language discovery text used by Agent Skills. `metadata.urls` is optional stable provenance information for the logical Skill, such as a source repository, documentation page, registry page, package page, or upstream project. `metadata.triggering` is this repository's structured supplement: `include` describes explicit trigger cases, and `exclude` describes explicit non-trigger cases. When `metadata.triggering` is not configured, it is equivalent to `include: []` and `exclude: []`. `exclude` takes priority over `include` to avoid accidental keyword-triggered activation.
+`name`, `description`, `metadata.sync_id`, and `metadata.version` are the baseline contract. `metadata.sync_id` is the immutable identifier of the logical Skill used by `sync-skills`; choose it when the Skill is created and do not change it when the trigger name or directory changes. `description` remains the natural-language discovery text used by Agent Skills. `metadata.urls` is optional stable provenance information for the logical Skill, such as a source repository, documentation page, registry page, package page, or upstream project. `metadata.triggering` is this repository's structured supplement: `include` describes explicit trigger cases, and `exclude` describes explicit non-trigger cases. When `metadata.triggering` is not configured, it is equivalent to `include: []` and `exclude: []`. `exclude` takes priority over `include` to avoid accidental keyword-triggered activation.
 
 A Skill with executable extensions may add:
 
@@ -141,6 +142,7 @@ These conventions are shared across Skills and management tools. They should be 
 
 Keep stable self-description in `SKILL.md`:
 
+- `metadata.sync_id`: immutable synchronization-group identifier. Choose it when creating the Skill; it must survive Skill name and directory changes.
 - `metadata.version`: the Skill's independent version.
 - `metadata.urls`: canonical addresses for the logical Skill. Use typed entries such as `repository`, `documentation`, `registry`, `package`, or `source`.
 - `metadata.triggering`: optional structured trigger rules.

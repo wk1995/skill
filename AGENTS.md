@@ -12,7 +12,7 @@ skills/<skill-name>/
 `-- README.md
 ```
 
-`SKILL.md` remains the agent-facing entry point. It must contain valid frontmatter with `name`, `description`, and `metadata.version`; add `metadata.triggering.include` and `metadata.triggering.exclude` when explicit trigger metadata is available.
+`SKILL.md` remains the agent-facing entry point. It must contain valid frontmatter with `name`, `description`, `metadata.sync_id`, and `metadata.version`; `metadata.sync_id` is the immutable synchronization-group identifier and must not change when the Skill name changes. Add `metadata.triggering.include` and `metadata.triggering.exclude` when explicit trigger metadata is available.
 
 `README.md` is the user-facing companion document. It must introduce the Skill, explain how to use it, state when it triggers, and state when it does not trigger. Keep it consistent with `SKILL.md`; `metadata.triggering.exclude` takes priority if the two descriptions ever appear to conflict.
 

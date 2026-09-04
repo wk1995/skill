@@ -2,6 +2,7 @@
 name: android-code-release-train
 description: Orchestrate Android source code from a requirement branch through version-train integration, release promotion, default-branch synchronization, and an immutable source tag. Use for feature/bugfix branches, versioned dev and release PRs, code-readiness gates, version metadata, or source-release tags; do not use for APK/AAB/AAR builds, signing, packaging, or artifact uploads.
 metadata:
+  sync_id: "android-code-release-train"
   version: "2.0.0"
   urls:
     - type: repository

@@ -6,7 +6,7 @@ Language: **English** | [中文](README.zh-CN.md)
 
 ## How To Use It
 
-Name the logical skill, the paths or location roles involved, and the desired operation. Common prompts include:
+Use the immutable `metadata.sync_id` declared in each `SKILL.md`, along with the paths or location roles involved and the desired operation. The Skill name is a display/trigger name and may change without changing the sync group. Common prompts include:
 
 ```text
 Use $sync-skills to compare the repository and local copies of my-skill.
@@ -17,11 +17,12 @@ Synchronize the project and external copies from the repository version.
 Use the supplied script for deterministic changes:
 
 ```bash
-python skills/sync-skills/scripts/skill_sync.py status my-skill
-python skills/sync-skills/scripts/skill_sync.py sync my-skill --source repo
+python skills/sync-skills/scripts/skill_sync.py status my-skill-id
+python skills/sync-skills/scripts/skill_sync.py sync my-skill-id --source repo
+python skills/sync-skills/scripts/skill_sync.py rename old-skill-name --to my-skill-id --name new-skill-name
 ```
 
-Each location has a role: `repo`, `local`, `project`, or `external`. The workflow validates `SKILL.md`, snapshots existing copies before an overwrite, reports conflicts instead of selecting a source silently, and records versions, digests, provenance, and differences. See [SKILL.md](SKILL.md) for the full command set and trust rules.
+Each location has a role: `repo`, `local`, `project`, or `external`. The workflow validates `SKILL.md` and its stable `metadata.sync_id`, snapshots existing copies before an overwrite, reports conflicts instead of selecting a source silently, and records versions, digests, provenance, and differences. See [SKILL.md](SKILL.md) for the full command set and trust rules.
 
 ## When It Triggers
 
