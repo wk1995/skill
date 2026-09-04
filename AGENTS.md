@@ -50,6 +50,19 @@ The `skill-catalog` GitHub Actions check validates every Skill and both generate
 
 Optional directories such as `agents/`, `scripts/`, `references/`, `assets/`, `src/`, and `tests/` should be added only when the Skill needs them.
 
+## Required PR Review Procedure
+
+Before declaring a PR review or PR fix complete, the agent must:
+
+1. Work from a clean, committed worktree and compare the complete PR with its base branch using `git diff --name-status --find-renames <base>...HEAD`.
+2. Inspect deletions, renames, executable-bit changes, generated files, and newly tracked ignored files. A review based only on reading changed source lines is incomplete.
+3. Run `bash tests/pr-review-gate.sh <base>` and report its result. For the usual local checkout, `<base>` is `origin/main`; CI passes the pull request's exact base SHA.
+4. Exercise stateful commands across multiple invocations, including existing or malformed persisted state, rather than testing only a fresh single command.
+5. Add a regression test for every confirmed review defect. Auto-fix behavior requires negative, fix-success, and idempotency coverage.
+6. Verify external product claims against current authoritative documentation and, when behavior is version-dependent, a versioned product configuration. State the scope instead of generalizing one installation.
+
+The `skill-catalog` required status check invokes the same gate in GitHub Actions. Protected local state under `.skill-sync/` must have no net PR changes; stopping tracking or migrating it requires a separately designed migration rather than an ordinary cleanup commit.
+
 ## Changelog Requirement
 
 Every Skill must maintain a `CHANGELOG.md` in its own directory, next to `SKILL.md`.

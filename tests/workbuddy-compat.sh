@@ -4,12 +4,14 @@ set -euo pipefail
 ROOT="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd -P)"
 COMPAT_SCRIPT="$ROOT/scripts/workbuddy_compat.py"
 CATALOG_WORKFLOW="$ROOT/.github/workflows/skill-catalog.yml"
+PR_REVIEW_GATE="$ROOT/tests/pr-review-gate.sh"
 
 [[ -f "$COMPAT_SCRIPT" ]]
 [[ -f "$CATALOG_WORKFLOW" ]]
+[[ -f "$PR_REVIEW_GATE" ]]
 
 python3 "$COMPAT_SCRIPT" --check
-grep -Eq 'bash tests/workbuddy-compat.sh' "$CATALOG_WORKFLOW"
+grep -Eq 'tests/\*\.sh' "$PR_REVIEW_GATE"
 
 PYTHONDONTWRITEBYTECODE=1 python3 - "$COMPAT_SCRIPT" <<'PY'
 import subprocess

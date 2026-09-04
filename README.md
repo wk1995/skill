@@ -81,9 +81,9 @@ Every Skill has a companion README with usage and trigger guidance. This table i
 | `workbuddy-compat` | Use when adding, auditing, or converting an Agent Skill so it stays compatible with both OpenAI Codex and WorkBuddy; also use to check or auto-fix the `## Platform Compatibility` section and the Codex `$<skill>` invocation examples in a Skill's READMEs. | [README](skills/workbuddy-compat/README.md) |
 <!-- skills-catalog:end -->
 
-## Pull Request Catalog Check
+## Pull Request Review Gate
 
-The `skill-catalog` GitHub Actions check validates every Skill and both catalogs before a PR can merge into `main`. It prints each validation failure in the CI log and creates a GitHub Actions error annotation for the relevant file. For branches in this repository, it can commit regenerated root catalogs back to the PR when the repository secret `SKILL_CATALOG_TOKEN` is configured with repository-contents write access. For fork PRs, and when that secret is absent, stale catalogs fail the check and the error tells the contributor to run the generator and commit both root READMEs.
+Run `bash tests/pr-review-gate.sh origin/main` from a clean, committed worktree before declaring a PR ready. The `skill-catalog` required GitHub Actions check invokes the same gate before a PR can merge into `main`. It validates the complete PR diff and simulated merge, protects `.skill-sync/`, rejects unexpected tracked ignored files, parses Python sources, and runs every repository validation test. For internal branches it can still commit regenerated catalogs when `SKILL_CATALOG_TOKEN` is configured; fork PRs must commit both generated root READMEs themselves.
 
 ## Skill Structure And Versioning
 

@@ -4,7 +4,7 @@ set -euo pipefail
 ROOT="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd -P)"
 SCRIPT="$ROOT/skills/sync-skills/scripts/skill_sync.py"
 
-python3 - "$SCRIPT" "$ROOT" <<'PY'
+PYTHONDONTWRITEBYTECODE=1 python3 - "$SCRIPT" "$ROOT" <<'PY'
 import importlib.util
 import sys
 import tempfile

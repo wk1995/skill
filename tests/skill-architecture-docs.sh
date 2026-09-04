@@ -8,13 +8,14 @@ SPEC="$ROOT/docs/superpowers/specs/2026-07-10-skill-management-architecture-desi
 AGENTS="$ROOT/AGENTS.md"
 CATALOG_SCRIPT="$ROOT/scripts/skill_catalog.py"
 CATALOG_WORKFLOW="$ROOT/.github/workflows/skill-catalog.yml"
+PR_REVIEW_GATE="$ROOT/tests/pr-review-gate.sh"
 
 fail() {
   printf 'FAIL: %s\n' "$*" >&2
   exit 1
 }
 
-for file in "$README" "$README_ZH" "$SPEC" "$AGENTS" "$CATALOG_SCRIPT" "$CATALOG_WORKFLOW"; do
+for file in "$README" "$README_ZH" "$SPEC" "$AGENTS" "$CATALOG_SCRIPT" "$CATALOG_WORKFLOW" "$PR_REVIEW_GATE"; do
   [[ -f "$file" ]] || fail "missing file: $file"
 done
 
@@ -136,7 +137,9 @@ print("PASS: CHANGELOG negative validation cases")
 PY
 
 grep -Eq '^    name: skill-catalog$' "$CATALOG_WORKFLOW" || fail "missing skill-catalog required check name"
-grep -Eq 'python3 scripts/skill_catalog.py --check' "$CATALOG_WORKFLOW" || fail "workflow does not validate generated catalogs"
+grep -Eq 'bash tests/pr-review-gate.sh' "$CATALOG_WORKFLOW" || fail "workflow does not run the required PR review gate"
+grep -Eq 'python3 scripts/skill_catalog.py --check' "$PR_REVIEW_GATE" || fail "PR review gate does not validate generated catalogs"
+grep -Eq 'scripts/pr_review_guard.py' "$PR_REVIEW_GATE" || fail "PR review gate does not inspect PR tree safety"
 grep -Eq 'SKILL_CATALOG_TOKEN' "$CATALOG_WORKFLOW" || fail "workflow cannot synchronize internal PR catalogs"
 grep -Eq '::error file=README.md' "$CATALOG_WORKFLOW" || fail "workflow does not annotate stale catalog errors"
 grep -Eq '::error file=' "$CATALOG_SCRIPT" || fail "catalog validator does not annotate structural errors"
@@ -158,6 +161,8 @@ for skill_dir in "$ROOT"/skills/*; do
 done
 
 grep -Eq '## Required Structure' "$AGENTS" || fail "missing Skill structure guidance"
+grep -Eq '## Required PR Review Procedure' "$AGENTS" || fail "missing required PR review procedure"
+grep -Eq 'tests/pr-review-gate.sh' "$AGENTS" || fail "AGENTS.md does not require the PR review gate"
 grep -Eq '`README.md`' "$AGENTS" || fail "AGENTS.md does not require README.md"
 grep -Eq 'When It Triggers' "$AGENTS" || fail "AGENTS.md does not require trigger documentation"
 grep -Eq 'When It Does Not Trigger' "$AGENTS" || fail "AGENTS.md does not require non-trigger documentation"

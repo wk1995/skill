@@ -81,9 +81,9 @@ Agent Skills 规范只要求 `SKILL.md`，但本仓库额外要求每个受管�
 | `workbuddy-compat` | `workbuddy-compat` 用于让本仓库中的每一个 Agent Skill 在 OpenAI Codex 和 WorkBuddy 中都能运行。配套脚本 `scripts/workbuddy_compat.py` 会检查并自动修复两类常见兼容问题：缺少 `## Platform Compatibility` 章节，以及 `SKILL.md` 或 README 使用示例中存在未注明 Codex 场景的 `$<skill>` 调用语法。WorkBuddy 的 Skill 安装目录由具体产品配置决定，并不存在适用于所有版本的单一路径。 | [README](skills/workbuddy-compat/README.zh-CN.md) |
 <!-- skills-catalog:end -->
 
-## Pull Request 目录检查
+## Pull Request 审查门禁
 
-`skill-catalog` GitHub Actions 检查会在 PR 合入 `main` 前校验所有 Skill 和两份目录。它会在 CI 日志中打印每一项校验失败原因，并为对应文件创建 GitHub Actions error 注释。若 PR 分支属于本仓库，且已配置具有仓库内容写权限的 `SKILL_CATALOG_TOKEN` secret，workflow 可以将生成后的根 README 目录提交回该 PR；对于 fork PR 或未配置该 secret 的情况，只要目录未同步，检查就会失败并提示贡献者运行生成器后提交两份根 README。
+在宣布 PR 可以合并前，应从干净且已提交的工作区运行 `bash tests/pr-review-gate.sh origin/main`。GitHub Actions 的 required check `skill-catalog` 会调用同一门禁：检查完整 PR diff 与模拟合并结果、保护 `.skill-sync/`、拒绝预期范围外的已跟踪忽略文件、解析 Python 源码，并运行仓库全部校验测试。内部 PR 在配置 `SKILL_CATALOG_TOKEN` 后仍可自动提交生成目录；fork PR 必须自行提交两份根 README。
 
 ## Skill 结构与版本
 
