@@ -10,11 +10,11 @@
 
 ```text
 比较 my-skill 的仓库副本和本机副本。
-将此 Skill 的仓库副本链接到 ~/.workbuddy/skills/my-skill。
+将此 Skill 的仓库副本链接到当前所安装 WorkBuddy 产品实际使用的 Skill 目录。
 以仓库版本为来源同步项目和外部副本。
 ```
 
-在 OpenAI Codex 中也可以显式用 `$sync-skills` 调用本 Skill；Codex 的本机路径是 `~/.codex/skills`（而非 `~/.workbuddy/skills`）。
+在 OpenAI Codex 中也可以显式用 `$sync-skills` 调用本 Skill。Codex 通常使用 `~/.codex/skills`；WorkBuddy 路径由产品配置决定（国内版通常为 `~/.workbuddy/skills`，WorkBuddy AI/海外版可能为 `~/.workbuddy-ai/skills`）。
 
 需要确定性变更时使用随附脚本：
 

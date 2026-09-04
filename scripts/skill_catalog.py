@@ -65,7 +65,8 @@ def validate_skill(skill_dir: Path) -> tuple[str, str, str]:
     skill_file = skill_dir / "SKILL.md"
     english_readme = skill_dir / "README.md"
     chinese_readme = skill_dir / "README.zh-CN.md"
-    for path in (skill_file, english_readme, chinese_readme):
+    changelog = skill_dir / "CHANGELOG.md"
+    for path in (skill_file, english_readme, chinese_readme, changelog):
         require(path.is_file(), f"{relative} is missing {path.name}")
 
     metadata = frontmatter(skill_file)
@@ -75,6 +76,13 @@ def validate_skill(skill_dir: Path) -> tuple[str, str, str]:
     require(SYNC_ID.fullmatch(metadata["sync_id"]) is not None,
             f"{relative}/SKILL.md metadata.sync_id must use lowercase letters, digits, and hyphens")
     require(metadata.get("version"), f"{relative}/SKILL.md must define metadata.version")
+
+    changelog_content = changelog.read_text(encoding="utf-8")
+    require(re.search(r"^## \[Unreleased\]\s*$", changelog_content, flags=re.MULTILINE) is not None,
+            f"{relative}/CHANGELOG.md must define an [Unreleased] section")
+    require(re.search(r"^## \[" + re.escape(metadata["version"]) + r"\]\s+-\s+\d{4}-\d{2}-\d{2}\s*$",
+                      changelog_content, flags=re.MULTILINE) is not None,
+            f"{relative}/CHANGELOG.md must document current metadata.version {metadata['version']} with a UTC date")
 
     skill_content = skill_file.read_text(encoding="utf-8")
     require("triggering:" in skill_content and "include:" in skill_content and "exclude:" in skill_content,

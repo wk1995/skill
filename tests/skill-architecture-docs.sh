@@ -20,6 +20,121 @@ done
 
 python3 "$CATALOG_SCRIPT" --check
 
+PYTHONDONTWRITEBYTECODE=1 python3 - "$CATALOG_SCRIPT" <<'PY'
+import importlib.util
+import sys
+import tempfile
+from pathlib import Path
+
+script = Path(sys.argv[1])
+spec = importlib.util.spec_from_file_location("skill_catalog", script)
+assert spec is not None and spec.loader is not None
+catalog = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(catalog)
+
+
+def write_fixture(skill: Path, changelog: str | None) -> None:
+    skill.mkdir()
+    (skill / "SKILL.md").write_text(
+        """---
+name: demo
+description: Demonstrate catalog validation.
+metadata:
+  version: "1.2.3"
+  triggering:
+    include: [demo]
+    exclude: [unrelated]
+---
+
+# Demo
+""",
+        encoding="utf-8",
+    )
+    (skill / "README.md").write_text(
+        """# Demo
+
+[中文](README.zh-CN.md)
+
+Intro.
+
+## How To Use It
+
+Use it.
+
+## When It Triggers
+
+For demos.
+
+## When It Does Not Trigger
+
+For unrelated work.
+""",
+        encoding="utf-8",
+    )
+    (skill / "README.zh-CN.md").write_text(
+        """# Demo
+
+[English](README.md)
+
+简介。
+
+## 如何使用
+
+使用它。
+
+## 何时触发
+
+用于演示。
+
+## 何时不触发
+
+无关工作。
+""",
+        encoding="utf-8",
+    )
+    if changelog is not None:
+        (skill / "CHANGELOG.md").write_text(changelog, encoding="utf-8")
+
+
+with tempfile.TemporaryDirectory() as raw_tmp:
+    fixture_root = Path(raw_tmp).resolve()
+    catalog.ROOT = fixture_root
+
+    missing = fixture_root / "demo"
+    write_fixture(missing, None)
+    try:
+        catalog.validate_skill(missing)
+    except catalog.ValidationError as error:
+        assert "missing CHANGELOG.md" in str(error)
+    else:
+        raise AssertionError("missing CHANGELOG.md must fail validation")
+
+    for path in missing.iterdir():
+        path.unlink()
+    missing.rmdir()
+
+    mismatched = fixture_root / "demo"
+    write_fixture(
+        mismatched,
+        """# Changelog
+
+## [Unreleased]
+
+## [1.2.2] - 2026-09-04
+
+- Previous release.
+""",
+    )
+    try:
+        catalog.validate_skill(mismatched)
+    except catalog.ValidationError as error:
+        assert "must document current metadata.version 1.2.3 with a UTC date" in str(error)
+    else:
+        raise AssertionError("a mismatched CHANGELOG version must fail validation")
+
+print("PASS: CHANGELOG negative validation cases")
+PY
+
 grep -Eq '^    name: skill-catalog$' "$CATALOG_WORKFLOW" || fail "missing skill-catalog required check name"
 grep -Eq 'python3 scripts/skill_catalog.py --check' "$CATALOG_WORKFLOW" || fail "workflow does not validate generated catalogs"
 grep -Eq 'SKILL_CATALOG_TOKEN' "$CATALOG_WORKFLOW" || fail "workflow cannot synchronize internal PR catalogs"
@@ -31,6 +146,7 @@ for skill_dir in "$ROOT"/skills/*; do
   [[ -f "$skill_dir/SKILL.md" ]] || fail "missing SKILL.md in $skill_dir"
   [[ -f "$skill_dir/README.md" ]] || fail "missing README.md in $skill_dir"
   [[ -f "$skill_dir/README.zh-CN.md" ]] || fail "missing Chinese README in $skill_dir"
+  [[ -f "$skill_dir/CHANGELOG.md" ]] || fail "missing CHANGELOG.md in $skill_dir"
 
   for section in '^## How To Use It$' '^## When It Triggers$' '^## When It Does Not Trigger$'; do
     grep -Eq "$section" "$skill_dir/README.md" || fail "missing README section $section in $skill_dir"

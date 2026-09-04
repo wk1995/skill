@@ -19,7 +19,7 @@ A sync group maps one logical Skill to one or more physical copies. The registry
 Use stable role names:
 
 - `repo`: copy inside the current skill-management repository.
-- `local`: machine-wide user copy (Codex: `~/.codex/skills`; WorkBuddy: `~/.workbuddy/skills`).
+- `local`: machine-wide user copy (Codex commonly uses `~/.codex/skills`; WorkBuddy uses the installed product's configured data directory, commonly `~/.workbuddy/skills` for domestic builds or `~/.workbuddy-ai/skills` for WorkBuddy AI/overseas builds).
 - `project`: another workspace's project-level copy.
 - `external`: arbitrary copy outside the previous categories.
 
@@ -63,7 +63,7 @@ For this skill, use:
 
 ```yaml
 metadata:
-  version: "0.0.3"
+  version: "0.0.4"
 ```
 
 When a group is synchronized, copy the selected source version to all targets. If target versions differ before sync, record them in the pre-sync snapshot and report the difference.

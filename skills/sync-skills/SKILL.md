@@ -3,7 +3,7 @@ name: sync-skills
 description: Use when linking, converting, synchronizing, versioning, auditing, or rolling back multiple copies of the same Agent Skill across this repository, project-level skill folders, local Codex/user skill folders, or arbitrary external paths.
 metadata:
   sync_id: "sync-skills"
-  version: "0.0.3"
+  version: "0.0.4"
   urls:
     - type: repository
       value: https://github.com/wk1995/skill.git
@@ -30,9 +30,9 @@ Use this skill to keep equivalent Skill directories connected across locations s
 This skill keeps Skill copies in sync across both OpenAI Codex and WorkBuddy.
 
 - **Codex**: user-level skills live under `$CODEX_HOME/skills` or `~/.codex/skills`; the agent interface is `agents/openai.yaml`; Codex-specific artifacts include `agents/` and `extensions.yaml`.
-- **WorkBuddy**: user-level skills live under `~/.workbuddy/skills` and project-level skills under `<workspace>/.workbuddy/skills`; WorkBuddy reads `SKILL.md` directly and ignores `agents/openai.yaml`. When syncing WorkBuddy copies, treat `SKILL.md` as the required file and copy `agents/`/`extensions.yaml` only when they exist.
+- **WorkBuddy**: WorkBuddy reads `SKILL.md` directly and ignores `agents/openai.yaml`. Its installed-Skill directory is product-configured: domestic builds commonly use `~/.workbuddy/skills`, while WorkBuddy AI/overseas builds may use `~/.workbuddy-ai/skills`. Use the actual directory configured by the installed product. When syncing WorkBuddy copies, treat `SKILL.md` as the required file and copy `agents/`/`extensions.yaml` only when they exist.
 
-Triggering differs between the two runtimes: Codex uses `metadata.triggering` and the `$sync-skills` invocation, while WorkBuddy triggers from the `description` automatically, so no `$`-prefix is needed there. The examples below use the WorkBuddy machine-wide path; substitute `~/.codex/skills` for Codex.
+Triggering differs between the two runtimes: Codex uses `metadata.triggering` and the `$sync-skills` invocation, while WorkBuddy triggers from the `description` automatically, so no `$`-prefix is needed there. Resolve the real Skill directory for the installed product before linking it.
 
 ## Start Here
 
@@ -46,7 +46,7 @@ Triggering differs between the two runtimes: Codex uses `metadata.triggering` an
 Use these role names consistently:
 
 - `repo`: the canonical copy inside this repository, usually `skills/<skill-name>`.
-- `local`: a machine-wide copy. In OpenAI Codex this is usually under `$CODEX_HOME/skills` or `~/.codex/skills`; in WorkBuddy it is `~/.workbuddy/skills`.
+- `local`: a machine-wide copy. In OpenAI Codex this is usually under `$CODEX_HOME/skills` or `~/.codex/skills`; in WorkBuddy it is under the product-configured data directory's `skills/` folder.
 - `project`: a project-specific copy owned by another workspace.
 - `external`: any other explicit path, such as a checked-out plugin, bundle, archive staging folder, or temporary migration location.
 

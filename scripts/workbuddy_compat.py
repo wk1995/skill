@@ -7,9 +7,9 @@ every Skill under ``skills/``:
 
 1. ``SKILL.md`` must contain a ``## Platform Compatibility`` section that
    documents Codex vs WorkBuddy behavior (paths, triggering, ignored files).
-2. A README's "How To Use It" / "如何使用" section must not teach WorkBuddy
-   users the Codex-only ``$<skill>`` invocation syntax, except inside an
-   explicit "OpenAI Codex" note.
+2. ``SKILL.md`` and a README's "How To Use It" / "如何使用" section must not
+   teach WorkBuddy users the Codex-only ``$<skill>`` invocation syntax, except
+   on a line explicitly scoped to Codex.
 
 ``--check`` reports gaps and exits non-zero when any Skill fails.
 ``--fix`` idempotently injects the Platform Compatibility section and rewrites
@@ -21,6 +21,7 @@ from __future__ import annotations
 import argparse
 import re
 import sys
+from dataclasses import dataclass
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -40,13 +41,28 @@ PLATFORM_TEMPLATE = """## Platform Compatibility
 This skill is written to run in both OpenAI Codex and WorkBuddy.
 
 - **Codex**: user-level skills live under `$CODEX_HOME/skills` or `~/.codex/skills`; the agent interface is `agents/openai.yaml`; Codex uses `metadata.triggering` and the `${name}` invocation syntax, and Codex-specific artifacts include `agents/` and `extensions.yaml`.
-- **WorkBuddy**: user-level skills live under `~/.workbuddy/skills` and project-level skills under `<workspace>/.workbuddy/skills`; WorkBuddy reads `SKILL.md` directly, triggers automatically from the `description` field, and ignores `agents/openai.yaml`. No `$`-prefix is needed.
+- **WorkBuddy**: WorkBuddy reads `SKILL.md` directly, triggers automatically from the `description` field, and ignores `agents/openai.yaml`. Its installed-Skill directory is product-configured: domestic builds commonly use `~/.workbuddy/skills`, while WorkBuddy AI/overseas builds may use `~/.workbuddy-ai/skills`. Import through WorkBuddy or use the directory configured by the installed product. No `$`-prefix is needed.
 
 When copying this skill to WorkBuddy, treat `SKILL.md` as the required file and copy `agents/`/`extensions.yaml` only when they exist.
 """
 
-EN_CODEX_NOTE = "In OpenAI Codex you can also invoke the skill explicitly with `{name}`.".format
-ZH_CODEX_NOTE = "在 OpenAI Codex 中也可以显式用 `{name}` 调用本 Skill。".format
+@dataclass(frozen=True)
+class CompatibilityIssue:
+    path: Path
+    message: str
+    line: int | None = None
+
+
+def display_path(path: Path) -> str:
+    """Use a repository-relative path when possible, else an absolute path."""
+    try:
+        return path.relative_to(ROOT).as_posix()
+    except ValueError:
+        return str(path)
+
+
+def invocation_pattern(name: str) -> re.Pattern[str]:
+    return re.compile(r"\$\s*" + re.escape(name) + r"\b")
 
 
 def parse_name(skill_dir: Path) -> str:
@@ -62,10 +78,19 @@ def parse_name(skill_dir: Path) -> str:
 
 def is_allowed_codex_line(line: str, name: str) -> bool:
     """A `$name` mention is allowed only inside an explicit OpenAI Codex note."""
-    if re.search(r"\$\s*" + re.escape(name) + r"\b", line) is None:
+    if invocation_pattern(name).search(line) is None:
         return True
-    low = line.lower()
-    return "codex" in low and ("invoke" in low or "调用" in line)
+    return "codex" in line.lower()
+
+
+def skill_body_start(lines: list[str]) -> int:
+    """Return the first line after YAML frontmatter, or zero when absent."""
+    if not lines or lines[0].strip() != "---":
+        return 0
+    for index in range(1, len(lines)):
+        if lines[index].strip() == "---":
+            return index + 1
+    return 0
 
 
 def section_lines(lines: list[str], heading: str) -> tuple[int, int] | None:
@@ -102,16 +127,25 @@ def readme_issues(section: list[str], name: str) -> list[tuple[int, str]]:
     return issues
 
 
-def check_skill(skill_dir: Path) -> list[str]:
+def check_skill(skill_dir: Path) -> list[CompatibilityIssue]:
     """Return human-readable issues for one Skill (empty means compatible)."""
-    issues: list[str] = []
+    issues: list[CompatibilityIssue] = []
     name = parse_name(skill_dir)
-    relative = skill_dir.relative_to(ROOT)
 
     skill_file = skill_dir / "SKILL.md"
+    skill_text = skill_file.read_text(encoding="utf-8")
     if not re.search(r"^" + re.escape(PLATFORM_HEADING) + r"\s*$",
-                     skill_file.read_text(encoding="utf-8"), flags=re.MULTILINE):
-        issues.append(f"{relative}/SKILL.md is missing a `{PLATFORM_HEADING}` section")
+                     skill_text, flags=re.MULTILINE):
+        issues.append(CompatibilityIssue(skill_file, f"missing a `{PLATFORM_HEADING}` section"))
+
+    skill_lines = skill_text.splitlines()
+    for index, line in enumerate(skill_lines[skill_body_start(skill_lines):], start=skill_body_start(skill_lines) + 1):
+        if invocation_pattern(name).search(line) and not is_allowed_codex_line(line, name):
+            issues.append(CompatibilityIssue(
+                skill_file,
+                "SKILL.md body teaches the Codex `$<skill>` invocation without a Codex qualifier",
+                index,
+            ))
 
     for readme_name, heading in ((skill_dir / "README.md", EN_SECTION),
                                  (skill_dir / "README.zh-CN.md", ZH_SECTION)):
@@ -122,7 +156,7 @@ def check_skill(skill_dir: Path) -> list[str]:
         if bounds is None:
             continue
         for lineno, reason in readme_issues(lines[bounds[0]:bounds[1]], name):
-            issues.append(f"{readme_name.relative_to(ROOT)}:{bounds[0] + lineno} {reason}")
+            issues.append(CompatibilityIssue(readme_name, reason, bounds[0] + lineno))
     return issues
 
 
@@ -145,6 +179,22 @@ def inject_platform_section(skill_dir: Path) -> bool:
     return True
 
 
+def fix_skill_invocations(skill_dir: Path) -> bool:
+    """Remove unqualified Codex invocation syntax from the SKILL.md body."""
+    skill_file = skill_dir / "SKILL.md"
+    name = parse_name(skill_dir)
+    lines = skill_file.read_text(encoding="utf-8").splitlines(keepends=True)
+    changed = False
+    for index in range(skill_body_start(lines), len(lines)):
+        line = lines[index]
+        if invocation_pattern(name).search(line) and not is_allowed_codex_line(line, name):
+            lines[index] = invocation_pattern(name).sub(name, line)
+            changed = True
+    if changed:
+        skill_file.write_text("".join(lines), encoding="utf-8")
+    return changed
+
+
 def fix_readme(readme_path: Path, name: str, heading: str) -> bool:
     """Rewrite a README example section so the gate passes. Returns True if changed."""
     lines = readme_path.read_text(encoding="utf-8").splitlines(keepends=True)
@@ -159,21 +209,27 @@ def fix_readme(readme_path: Path, name: str, heading: str) -> bool:
     in_code = False
     open_idx = None
     fence_lang = ""
+    fence_indent = ""
+    fence_marker = "```"
     block_had_skill = False
     for line in section:
         fence = re.match(r"^(\s*)(`{3,})(.*)$", line)
         if fence:
             if in_code:
                 if block_had_skill and fence_lang in ("bash", "sh", "shell"):
-                    out[open_idx] = "```text\n"
+                    out[open_idx] = f"{fence_indent}{fence_marker}text\n"
                 in_code = False
                 block_had_skill = False
                 fence_lang = ""
+                fence_indent = ""
+                fence_marker = "```"
                 open_idx = None
                 out.append(line)
                 continue
             in_code = True
             open_idx = len(out)
+            fence_indent = fence.group(1)
+            fence_marker = fence.group(2)
             fence_lang = fence.group(3).strip()
             out.append(line)
             continue
@@ -193,16 +249,6 @@ def fix_readme(readme_path: Path, name: str, heading: str) -> bool:
             continue
         out.append(line)
 
-    if not readme_issues(out, name):
-        # Already compliant after prose/code fixes; no extra note needed.
-        pass
-    elif heading == EN_SECTION:
-        out.append("\n" + EN_CODEX_NOTE(name=name) + "\n")
-        changed = True
-    elif heading == ZH_SECTION:
-        out.append("\n" + ZH_CODEX_NOTE(name=name) + "\n")
-        changed = True
-
     if changed:
         lines[start:end] = out
         readme_path.write_text("".join(lines), encoding="utf-8")
@@ -212,6 +258,7 @@ def fix_readme(readme_path: Path, name: str, heading: str) -> bool:
 def fix_skill(skill_dir: Path) -> bool:
     name = parse_name(skill_dir)
     changed = inject_platform_section(skill_dir)
+    changed = fix_skill_invocations(skill_dir) or changed
     for readme_path, heading in ((skill_dir / "README.md", EN_SECTION),
                                  (skill_dir / "README.zh-CN.md", ZH_SECTION)):
         if readme_path.is_file() and section_lines(
@@ -233,7 +280,7 @@ def main() -> int:
     args = parser.parse_args()
 
     targets = [Path(args.skill).resolve()] if args.skill else iter_skills()
-    failures: list[tuple[Path, list[str]]] = []
+    failures: list[tuple[Path, list[CompatibilityIssue]]] = []
     for skill_dir in targets:
         if not SKILL_NAME_RE.fullmatch(skill_dir.name):
             continue
@@ -245,11 +292,13 @@ def main() -> int:
 
     if failures:
         for skill_dir, issues in failures:
-            rel = skill_dir.relative_to(ROOT)
-            print(f"FAIL: {rel}", file=sys.stderr)
+            print(f"FAIL: {display_path(skill_dir)}", file=sys.stderr)
             for issue in issues:
-                print(f"  - {issue}", file=sys.stderr)
-                print(f"::error file={rel}/SKILL.md::{issue}", file=sys.stderr)
+                path = display_path(issue.path)
+                location = f"{path}:{issue.line}" if issue.line else path
+                print(f"  - {location} {issue.message}", file=sys.stderr)
+                line_arg = f",line={issue.line}" if issue.line else ""
+                print(f"::error file={path}{line_arg}::{issue.message}", file=sys.stderr)
         if args.fix:
             print("Fixed where possible; re-run --check to confirm.", file=sys.stderr)
         return 1

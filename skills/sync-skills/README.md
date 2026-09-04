@@ -10,11 +10,11 @@ Use the immutable `metadata.sync_id` declared in each `SKILL.md`, along with the
 
 ```text
 Compare the repository and local copies of my-skill.
-Link this skill repository copy to ~/.workbuddy/skills/my-skill.
+Link this skill repository copy to the installed WorkBuddy product's Skill directory.
 Synchronize the project and external copies from the repository version.
 ```
 
-In OpenAI Codex you can also invoke the skill explicitly with `$sync-skills`. For Codex the machine-wide path is `~/.codex/skills` instead of `~/.workbuddy/skills`.
+In OpenAI Codex you can also invoke the skill explicitly with `$sync-skills`. Codex commonly uses `~/.codex/skills`; WorkBuddy's path is product-configured (commonly `~/.workbuddy/skills` for domestic builds or `~/.workbuddy-ai/skills` for WorkBuddy AI/overseas builds).
 
 Use the supplied script for deterministic changes:
 

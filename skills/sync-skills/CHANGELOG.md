@@ -6,9 +6,19 @@ version, date, and a change summary.
 
 ## [Unreleased]
 
-- Docs: fixed the version example in `references/sync-model.md` (`0.0.2` -> `0.0.3`).
-- Sync Rules: added the requirement that every `metadata.version` bump must
-  update `CHANGELOG.md` (project constraint, see `AGENTS.md`).
+- No unreleased changes.
+
+## [0.0.4] - 2026-09-04
+
+- Safety: `link` and `convert` now validate the complete candidate registry,
+  including roles saved by earlier commands and symlink-resolved paths.
+- Status: unsafe same-path or nested role registrations now report
+  `path_issues` and make the group non-clean.
+- Compatibility: documented product-configured WorkBuddy Skill directories
+  instead of treating one domestic or overseas path as universal.
+- Data safety: documented that removal of legacy tracked `.skill-sync` state
+  must be staged separately so merges cannot delete collaborators' snapshots.
+- Docs: updated the version-policy example and changelog requirement.
 
 ## [0.0.3] - 2026-08-30
 

@@ -1,0 +1,35 @@
+# Copy to .release/release-train.yml and replace every placeholder before enabling writes.
+repository:
+  default_branch: master # Resolve and verify from GitHub; do not assume this value.
+  github_app:
+    app_id_secret: RELEASE_BOT_APP_ID
+    private_key_secret: RELEASE_BOT_PRIVATE_KEY
+
+branches:
+  feature_prefixes: [feature/, bugfix/]
+  integration_prefix: dev/
+  release_prefix: release/
+  tag_prefix: v
+
+android:
+  module: :app
+  version_file: version.properties
+  version_name_key: VERSION_NAME
+  version_code_key: VERSION_CODE
+  version_code_registry: TODO # Distribution-provider API or a protected release registry
+  release_environment: release
+
+artifact:
+  format: aab # aab | apk; choose a format accepted by the configured destination
+
+gates:
+  feature: [lint, unit-test, debug-build]
+  integration: [full-lint, full-unit-test, integration-smoke]
+  release: [release-lint, release-unit-test, signed-aab, signature-verify]
+  required_reviewers: 1
+
+delivery:
+  provider: TODO # google-play | vendor-store | enterprise-mdm | direct | artifact-only
+  test_destination: TODO # Optional for direct or artifact-only delivery
+  release_destination: TODO
+  promote_same_artifact: true

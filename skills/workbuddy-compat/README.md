@@ -2,7 +2,7 @@
 
 Language: **English** | [中文](README.zh-CN.md)
 
-`workbuddy-compat` keeps every Agent Skill in this repository runnable in both OpenAI Codex and WorkBuddy. The companion script `scripts/workbuddy_compat.py` checks and auto-fixes the two compatibility gaps that Codex-authored Skills hit on WorkBuddy: a missing `## Platform Compatibility` section and README examples that teach the Codex-only `$<skill>` invocation.
+`workbuddy-compat` keeps every Agent Skill in this repository runnable in both OpenAI Codex and WorkBuddy. The companion script `scripts/workbuddy_compat.py` checks and auto-fixes two common compatibility gaps: a missing `## Platform Compatibility` section and unqualified Codex-only `$<skill>` invocations in `SKILL.md` or README usage examples. WorkBuddy's installed-Skill directory is product-configured rather than one universal path.
 
 ## How To Use It
 
@@ -23,7 +23,7 @@ python3 scripts/workbuddy_compat.py --check
 python3 scripts/workbuddy_compat.py --fix --skill skills/my-skill
 ```
 
-See [SKILL.md](SKILL.md) for the exact rules, the injected section text, and how the CI gate runs.
+See [SKILL.md](SKILL.md) for the exact rules, the injected section text, the distinction between runtime portability and marketplace publishing, and how the CI gate runs.
 
 ## When It Triggers
 

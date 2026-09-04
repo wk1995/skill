@@ -1,0 +1,38 @@
+{
+  "created_at": "2026-08-08T14:09:28.829490+00:00",
+  "group": "android-release-train",
+  "members": {
+    "local": {
+      "content_updated_at": "2026-08-08T14:09:08.831376+00:00",
+      "content_updated_at_source": "filesystem",
+      "digest": "3edc6bc5095d69dcac792485c68f5ad5613313f3d7b057d6e05ed5dc88deab22",
+      "git_first_commit_at": null,
+      "git_latest_commit_at": null,
+      "metadata_urls": [
+        "https://github.com/wk1995/skill.git",
+        "skills/android-release-train"
+      ],
+      "name": "android-release-train",
+      "path": "/Users/wangkang/.codex/skills/android-release-train",
+      "url": "file:///Users/wangkang/.codex/skills/android-release-train",
+      "version": "1.2.0"
+    },
+    "repo": {
+      "content_updated_at": "2026-08-06T22:02:16+08:00",
+      "content_updated_at_source": "git",
+      "digest": "d49e981d850c9178ed3b7b0576fa9e2b4fc061c9be1413538c4242e0f1119f88",
+      "git_first_commit_at": "2026-08-06T20:36:46+08:00",
+      "git_latest_commit_at": "2026-08-06T22:02:16+08:00",
+      "metadata_urls": [
+        "https://github.com/wk1995/skill.git",
+        "skills/android-release-train"
+      ],
+      "name": "android-release-train",
+      "path": "/Users/wangkang/Documents/github/skill/skills/android-release-train",
+      "url": "https://github.com/wk1995/skill.git",
+      "version": "1.2.0"
+    }
+  },
+  "operation": "sync",
+  "source": "repo"
+}
