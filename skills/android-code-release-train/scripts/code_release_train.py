@@ -29,9 +29,23 @@ def resolve_repo(explicit: str | None) -> str:
     return run("gh", "repo", "view", "--json", "nameWithOwner", "--jq", ".nameWithOwner").strip()
 
 
-def list_branches() -> list[str]:
-    refs = run("git", "ls-remote", "--heads", "origin", "feature/*", "bugfix/*")
-    return sorted(line.split("refs/heads/", 1)[1] for line in refs.splitlines() if "refs/heads/" in line)
+def list_branches(repo: str) -> list[str]:
+    refs: list[str] = []
+    for prefix in ("feature/", "bugfix/"):
+        output = run(
+            "gh",
+            "api",
+            "--paginate",
+            f"repos/{repo}/git/matching-refs/heads/{prefix}",
+            "--jq",
+            ".[].ref",
+        )
+        refs.extend(
+            line.split("refs/heads/", 1)[1]
+            for line in output.splitlines()
+            if line.startswith("refs/heads/")
+        )
+    return sorted(set(refs))
 
 
 def checks_state(checks: list[dict[str, Any]] | None) -> str:
@@ -69,6 +83,8 @@ def inspect(repo: str, branch: str) -> BranchStatus:
         return BranchStatus(branch, "development", "-", "-", "-", "")
     if pr.get("state") == "MERGED":
         return BranchStatus(branch, "merged", str(pr.get("baseRefName", "-")), "-", "-", str(pr.get("url", "")))
+    if pr.get("state") != "OPEN":
+        return BranchStatus(branch, "development", "-", "-", "-", "")
     review = str(pr.get("reviewDecision") or "PENDING").upper()
     checks = checks_state(pr.get("statusCheckRollup"))
     target = str(pr.get("baseRefName", "-"))
@@ -81,7 +97,7 @@ def inspect(repo: str, branch: str) -> BranchStatus:
 
 def inventory(args: argparse.Namespace) -> int:
     repo = resolve_repo(args.repo)
-    statuses = [inspect(repo, branch) for branch in list_branches()]
+    statuses = [inspect(repo, branch) for branch in list_branches(repo)]
     if args.format == "json":
         print(json.dumps([status.__dict__ for status in statuses], ensure_ascii=False, indent=2))
         return 0
@@ -97,12 +113,12 @@ def inventory(args: argparse.Namespace) -> int:
 def select(args: argparse.Namespace) -> int:
     if not args.version or not args.branches:
         raise RuntimeError("select requires --version and --branches")
-    available = set(list_branches())
+    repo = resolve_repo(args.repo)
+    available = set(list_branches(repo))
     requested = [branch.strip() for branch in args.branches.split(",") if branch.strip()]
     missing = sorted(set(requested) - available)
     if missing:
-        raise RuntimeError(f"Branches not found on origin: {', '.join(missing)}")
-    repo = resolve_repo(args.repo)
+        raise RuntimeError(f"Branches not found in {repo}: {', '.join(missing)}")
     statuses = [inspect(repo, branch) for branch in requested]
     expected_target = f"dev/{args.version}"
     conflicting = [item.branch for item in statuses if item.target not in ("-", expected_target)]
