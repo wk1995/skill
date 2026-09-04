@@ -1,0 +1,4 @@
+interface:
+  display_name: "Build Pipeline Engineering"
+  short_description: "Configure variant-aware, signed build pipelines"
+  default_prompt: "Use $build-pipeline-engineering to configure CI that builds a requested Android variant, defaults to release, and uploads verified outputs to GitHub Actions Artifacts."

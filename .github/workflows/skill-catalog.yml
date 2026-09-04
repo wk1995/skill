@@ -62,4 +62,4 @@ jobs:
         run: |
           python3 scripts/skill_catalog.py --check
           bash tests/skill-architecture-docs.sh
-          bash tests/release-engineering-sync.sh
+          bash tests/build-pipeline-engineering-sync.sh

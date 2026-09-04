@@ -1,0 +1,32 @@
+# Copy to .release/code-release-train.yml and replace every placeholder before enabling writes.
+repository:
+  default_branch: TODO # Resolve from repository metadata; never assume main or master.
+  github_app:
+    app_id_secret: RELEASE_BOT_APP_ID
+    private_key_secret: RELEASE_BOT_PRIVATE_KEY
+
+branches:
+  requirement_prefixes: [feature/, bugfix/]
+  integration_prefix: dev/
+  release_prefix: release/
+  tag_prefix: v
+
+android_source:
+  version_file: version.properties
+  version_name_key: VERSION_NAME
+  version_code_key: VERSION_CODE
+  version_policy: TODO
+
+code_gates:
+  requirement: [lint, unit-test, compile-check]
+  integration: [full-lint, full-unit-test, integration-test]
+  release: [release-lint, release-unit-test, source-review]
+  required_reviewers: 1
+
+source_release:
+  merge_release_to_default: true
+  tag_exact_default_commit: true
+  delete_integration_after_promotion: true
+  delete_release_after_tag_verification: true
+
+# Signing, packaging, build-output destinations, and retention belong to build-pipeline-engineering.

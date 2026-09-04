@@ -3,10 +3,10 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
 REPO_ROOT="$(cd -- "$SCRIPT_DIR/.." && pwd -P)"
-SOURCE="$REPO_ROOT/skills/release-engineering"
+SOURCE="$REPO_ROOT/skills/build-pipeline-engineering"
 CODEX_ROOT="${CODEX_HOME:-$HOME/.codex}"
 SKILLS_DIR="$CODEX_ROOT/skills"
-TARGET="$SKILLS_DIR/release-engineering"
+TARGET="$SKILLS_DIR/build-pipeline-engineering"
 
 if [[ ! -f "$SOURCE/SKILL.md" ]]; then
   printf 'Source Skill is missing: %s\n' "$SOURCE" >&2

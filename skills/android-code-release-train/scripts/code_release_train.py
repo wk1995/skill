@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Read-only GitHub branch/PR inventory for Android release trains."""
+"""Read-only GitHub branch/PR inventory for Android code release trains."""
 
 from __future__ import annotations
 

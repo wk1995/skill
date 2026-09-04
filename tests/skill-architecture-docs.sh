@@ -47,9 +47,11 @@ grep -Eq 'When It Triggers' "$AGENTS" || fail "AGENTS.md does not require trigge
 grep -Eq 'When It Does Not Trigger' "$AGENTS" || fail "AGENTS.md does not require non-trigger documentation"
 grep -Eq 'English by default' "$AGENTS" || fail "AGENTS.md does not define the default language"
 grep -Eq 'README.zh-CN.md' "$AGENTS" || fail "AGENTS.md does not define Chinese README support"
-grep -Eq 'release-engineering/README.md' "$README" || fail "missing release-engineering README link"
+grep -Eq 'android-code-release-train/README.md' "$README" || fail "missing android-code-release-train README link"
+grep -Eq 'build-pipeline-engineering/README.md' "$README" || fail "missing build-pipeline-engineering README link"
 grep -Eq 'sync-skills/README.md' "$README" || fail "missing sync-skills README link"
-grep -Eq 'release-engineering/README.zh-CN.md' "$README_ZH" || fail "missing Chinese release-engineering README link"
+grep -Eq 'android-code-release-train/README.zh-CN.md' "$README_ZH" || fail "missing Chinese android-code-release-train README link"
+grep -Eq 'build-pipeline-engineering/README.zh-CN.md' "$README_ZH" || fail "missing Chinese build-pipeline-engineering README link"
 grep -Eq 'sync-skills/README.zh-CN.md' "$README_ZH" || fail "missing Chinese sync-skills README link"
 
 grep -Eq '^# Personal Skills$' "$README" || fail "missing English README title"
