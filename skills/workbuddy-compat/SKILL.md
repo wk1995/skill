@@ -2,6 +2,7 @@
 name: workbuddy-compat
 description: Use when adding, auditing, or converting an Agent Skill so it stays compatible with both OpenAI Codex and WorkBuddy; also use to check or auto-fix the `## Platform Compatibility` section and the Codex `$<skill>` invocation examples in a Skill's READMEs.
 metadata:
+  sync_id: "workbuddy-compat"
   version: "0.0.1"
   urls:
     - type: repository
