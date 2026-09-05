@@ -789,7 +789,17 @@ def get_group(registry: dict[str, Any], reference: str) -> tuple[str, dict[str, 
 def command_rename(args: argparse.Namespace) -> int:
     state_dir = Path(args.state_dir).resolve()
     registry = load_registry(state_dir)
-    old_key, group = get_group(registry, args.group)
+    match = find_group(registry, args.group)
+    if not match:
+        raise SystemExit(f"group not found: {args.group}")
+    old_key, group = match
+    # A missing sync_id marks a legacy name-keyed registry that may be
+    # migrated. Once a stable ID exists, it is immutable; only the display
+    # name may change.
+    legacy_group = "sync_id" not in group
+    group.setdefault("sync_id", group_id(old_key, group))
+    group.setdefault("name", group_name(old_key, group))
+    group.setdefault("aliases", [])
     new_id = validate_sync_id(args.to)
     groups = registry.setdefault("groups", {})
     if new_id != old_key and new_id in groups:
@@ -799,6 +809,10 @@ def command_rename(args: argparse.Namespace) -> int:
 
     old_name = group_name(old_key, group)
     old_id = group_id(old_key, group)
+    if not legacy_group and new_id != old_id:
+        raise SystemExit(
+            f"cannot change immutable sync ID {old_id!r}; use --to {old_id!r} and optionally --name"
+        )
     aliases = set(group.get("aliases", []))
     aliases.update({old_key, old_id, old_name})
     aliases.discard(new_id)
@@ -978,9 +992,16 @@ def build_parser() -> argparse.ArgumentParser:
     convert.add_argument("--skill-url", action="append", help="Canonical repository, documentation, registry, or source URL for the logical skill. Can be repeated.")
     convert.set_defaults(func=command_convert)
 
-    rename = subparsers.add_parser("rename", help="Rename a Skill while preserving its stable sync group ID history.")
+    rename = subparsers.add_parser(
+        "rename",
+        help="Migrate a legacy group or rename a Skill without changing an existing stable sync ID.",
+    )
     rename.add_argument("group", help="Existing sync ID, Skill name, or registered alias.")
-    rename.add_argument("--to", required=True, help="New stable sync ID.")
+    rename.add_argument(
+        "--to",
+        required=True,
+        help="Stable sync ID to assign during legacy migration; must remain unchanged for existing groups.",
+    )
     rename.add_argument("--name", help="Optional new display/trigger name.")
     rename.set_defaults(func=command_rename)
 

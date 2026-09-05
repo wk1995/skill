@@ -94,5 +94,39 @@ with tempfile.TemporaryDirectory() as temp:
     assert "old-skill-name" in migrated_group["aliases"]
     assert (state_dir / "snapshots" / "stable-skill-id" / "20260904T000000Z").is_dir()
 
+with tempfile.TemporaryDirectory() as temp:
+    state_dir = Path(temp)
+    registry = {
+        "groups": {
+            "stable-skill-id": {
+                "sync_id": "stable-skill-id",
+                "name": "stable-skill",
+                "roles": {"repo": str(root / "skills" / "sync-skills")},
+                "snapshots": [],
+            }
+        }
+    }
+    skill_sync.save_registry(state_dir, registry)
+    try:
+        skill_sync.command_rename(
+            type(
+                "Args",
+                (),
+                {
+                    "state_dir": str(state_dir),
+                    "group": "stable-skill-id",
+                    "to": "another-stable-id",
+                    "name": "renamed-skill",
+                },
+            )()
+        )
+    except SystemExit as exc:
+        assert "immutable sync ID" in str(exc)
+    else:
+        raise AssertionError("changing an existing stable sync ID must fail")
+    unchanged = skill_sync.load_registry(state_dir)
+    assert set(unchanged["groups"]) == {"stable-skill-id"}
+    assert unchanged["groups"]["stable-skill-id"]["sync_id"] == "stable-skill-id"
+
 print("PASS: sync-skills version policy")
 PY

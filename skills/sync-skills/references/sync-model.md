@@ -10,7 +10,7 @@ The registry stores groups by sync ID and keeps the current Skill name plus old 
 python skills/sync-skills/scripts/skill_sync.py rename old-skill-name --to stable-skill-id --name new-skill-name
 ```
 
-Legacy registries keyed by Skill name remain readable. A migration should be explicit so old snapshots and local links are not silently split into a second group.
+Legacy registries keyed by Skill name remain readable. A migration should be explicit so old snapshots and local links are not silently split into a second group. Once a group has a `sync_id`, `rename --to` must keep that same value; use `--name` for display/trigger-name changes.
 
 ## Logical Group
 

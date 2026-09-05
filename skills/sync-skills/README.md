@@ -22,6 +22,8 @@ python skills/sync-skills/scripts/skill_sync.py sync my-skill-id --source repo
 python skills/sync-skills/scripts/skill_sync.py rename old-skill-name --to my-skill-id --name new-skill-name
 ```
 
+The `--to` option is for migrating a legacy name-keyed registry. For an existing stable group, keep `--to` equal to its current ID and use `--name` for display or trigger-name changes; stable IDs cannot be changed.
+
 Each location has a role: `repo`, `local`, `project`, or `external`. The workflow validates `SKILL.md` and its stable `metadata.sync_id`, snapshots existing copies before an overwrite, reports conflicts instead of selecting a source silently, and records versions, digests, provenance, and differences. See [SKILL.md](SKILL.md) for the full command set and trust rules.
 
 ## When It Triggers

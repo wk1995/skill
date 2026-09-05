@@ -56,8 +56,11 @@ Convert one physical copy into another location and link both:
 ```bash
 python skills/sync-skills/scripts/skill_sync.py convert my-skill-id --source-path ~/.codex/skills/my-skill --source-role local --source-url https://example.com/source --target-path skills/my-skill --target-role repo --target-url https://github.com/me/skills-repo
 
-# Preserve the group when a Skill's trigger name changes.
+# Migrate a legacy name-keyed registry and set its first stable ID.
 python skills/sync-skills/scripts/skill_sync.py rename old-skill-name --to my-skill-id --name new-skill-name
+
+# For an existing stable group, keep --to equal to its current ID and change only the display name.
+python skills/sync-skills/scripts/skill_sync.py rename my-skill-id --to my-skill-id --name new-skill-name
 ```
 
 Inspect divergence:
@@ -112,7 +115,7 @@ python skills/sync-skills/scripts/skill_sync.py diff my-skill-id --role local --
 - When the repository is on any other branch, do not synchronize only because versions differ unless the user explicitly requests synchronization or the branch work requires updating the target copy.
 - If versions are equal but digests differ, use normal conflict handling and require an explicit source unless only one linked role changed since the previous snapshot.
 - If two or more copies changed since the previous snapshot and no source was specified, stop and report the conflict instead of choosing silently.
-- Keep the immutable sync-group identity in `metadata.sync_id` and the logical Skill version in `metadata.version` in `SKILL.md`. New Skills must define a stable sync ID that does not change with `metadata.name`.
+- Keep the immutable sync-group identity in `metadata.sync_id` and the logical Skill version in `metadata.version` in `SKILL.md`. New Skills must define a stable sync ID that does not change with `metadata.name`; `rename --to` is reserved for migrating legacy name-keyed registry entries and cannot change an existing stable ID.
 - Use this Skill's own sync ID as `sync-skills` and its version as `0.0.3`.
 - Legacy registries keyed by a Skill name remain readable; run `rename <old-reference> --to <sync-id> --name <new-name>` to migrate the group and its snapshots before linking a renamed Skill.
 - Record Skill addresses in the registry: `skill_urls` for canonical repository/documentation/registry/source URLs, and `role_urls` for role-specific remote/source URLs.

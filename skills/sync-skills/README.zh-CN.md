@@ -22,6 +22,8 @@ python skills/sync-skills/scripts/skill_sync.py sync my-skill-id --source repo
 python skills/sync-skills/scripts/skill_sync.py rename old-skill-name --to my-skill-id --name new-skill-name
 ```
 
+`--to` 仅用于迁移按名称作为键的旧 registry。对于已有稳定同步组，`--to` 必须保持为当前 ID；如需修改展示或触发名称，请使用 `--name`，稳定 ID 不可变。
+
 每个位置使用一个固定角色：`repo`、`local`、`project` 或 `external`。流程会校验 `SKILL.md` 及其稳定的 `metadata.sync_id`，在覆盖前为已有副本创建快照；多份副本发生冲突时会报告而不会自行选择来源，并记录版本、摘要、来源和差异。完整命令及信任规则见 [SKILL.md](SKILL.md)。
 
 ## 何时触发
