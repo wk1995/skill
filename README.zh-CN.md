@@ -74,9 +74,9 @@ Agent Skills 规范只要求 `SKILL.md`，但本仓库额外要求每个受管�
 <!-- skills-catalog:start -->
 | Skill | 用途 | 文档 |
 | --- | --- | --- |
-| `android-release-train` | `android-release-train` 用于编排受保护的 Android 交付路径：从功能或修复分支，经版本集成和发布提升，到签名 Android 产物、可配置分发及已验证的发布标签。 | [README](skills/android-release-train/README.zh-CN.md) |
+| `android-code-release-train` | `android-code-release-train` 约束 Android 需求从功能分支、版本集成和发布提升，到形成已评审源码提交及不可变 Tag 的完整代码链路。它不构建、签名、打包或上传发布产物。 | [README](skills/android-code-release-train/README.zh-CN.md) |
+| `build-pipeline-engineering` | `build-pipeline-engineering` 用于配置和执行可复现的可分发构建流水线：从一个确定源码引用完成 build variant 选择、环境配置、签名、打包、校验与输出上传。对于支持 variant 的目标，未指定时默认使用 `release`；在 GitHub Actions 中，构建输出默认上传到 GitHub Actions Artifacts。 | [README](skills/build-pipeline-engineering/README.zh-CN.md) |
 | `choose-project-doc-location` | `choose-project-doc-location` 用于在创建或修改项目文档前，判断内容应放在仓库 README、受版本控制的仓库文档，还是 GitHub Wiki 中。 | [README](skills/choose-project-doc-location/README.zh-CN.md) |
-| `release-engineering` | `release-engineering` 用于规划、校验、自动化、记录和排查受控发布流程。它覆盖 Android 应用、Android 库与 SDK、Gradle 插件、构建产物、发布分支和标签、CI 门禁、发布、回滚计划及发布后处理。 | [README](skills/release-engineering/README.zh-CN.md) |
 | `sync-skills` | `sync-skills` 用于管理同一个 Agent Skill 在本仓库、项目目录、本机 Codex Skill 目录和明确指定的外部路径中的等价副本。它支持链接、转换、比较、同步、版本记录、快照、审计和回滚。 | [README](skills/sync-skills/README.zh-CN.md) |
 <!-- skills-catalog:end -->
 
@@ -100,6 +100,7 @@ skills/example-skill/
 name: example-skill
 description: Use when the user asks for a concrete example Skill workflow.
 metadata:
+  sync_id: "example-skill"
   version: "1.0.0"
   triggering:
     include:
@@ -111,7 +112,7 @@ metadata:
 ---
 ```
 
-其中 `name`、`description` 和 `metadata.version` 是基础约定。`description` 继续承担兼容 Agent Skills 发现的自然语言触发说明；`metadata.triggering` 是本仓库额外的结构化补充。`include` 表示明确触发时机，`exclude` 表示明确不触发时机。未配置 `metadata.triggering` 时等价于 `include: []` 和 `exclude: []`。`exclude` 优先于 `include`，避免关键词命中导致误触发。
+其中 `name`、`description`、`metadata.sync_id` 和 `metadata.version` 是基础约定。`metadata.sync_id` 是 `sync-skills` 使用的逻辑 Skill 不可变标识；创建 Skill 时确定，后续即使触发名称或目录变化也不得修改。`description` 继续承担兼容 Agent Skills 发现的自然语言触发说明；`metadata.triggering` 是本仓库额外的结构化补充。`include` 表示明确触发时机，`exclude` 表示明确不触发时机。未配置 `metadata.triggering` 时等价于 `include: []` 和 `exclude: []`。`exclude` 优先于 `include`，避免关键词命中导致误触发。
 
 带可执行扩展的 Skill 可以增加：
 

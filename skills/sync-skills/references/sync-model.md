@@ -1,8 +1,20 @@
 # Sync Model
 
+## Stable Identity
+
+Every managed Skill must declare an immutable `metadata.sync_id` in `SKILL.md`. It is the primary key for synchronization and must not change when `metadata.name`, the directory name, or the trigger wording changes. Use lowercase letters, digits, and hyphens. The Skill `name` remains the Agent-facing display and trigger name, not the synchronization key.
+
+The registry stores groups by sync ID and keeps the current Skill name plus old names in `aliases`. New `link` and `convert` operations must use the declared sync ID. Use `rename` to migrate a legacy name or change a Skill name while preserving the group, version history, and snapshots:
+
+```bash
+python skills/sync-skills/scripts/skill_sync.py rename old-skill-name --to stable-skill-id --name new-skill-name
+```
+
+Legacy registries keyed by Skill name remain readable. A migration should be explicit so old snapshots and local links are not silently split into a second group. Once a group has a `sync_id`, `rename --to` must keep that same value; use `--name` for display/trigger-name changes.
+
 ## Logical Group
 
-A sync group maps one logical Skill to one or more physical copies. The registry lives in `.skill-sync/registry.json` by default and stores group names, roles, absolute paths, canonical URLs, role-specific URLs, last known digests, versions, content update times, operation update times, and snapshot history.
+A sync group maps one logical Skill to one or more physical copies. The registry lives in `.skill-sync/registry.json` by default and stores stable sync IDs, current Skill names, aliases, roles, absolute paths, canonical URLs, role-specific URLs, last known digests, versions, content update times, operation update times, and snapshot history. Snapshot directories use the stable sync ID.
 
 Use stable role names:
 
@@ -23,7 +35,7 @@ Record addresses separately from local paths:
 Use explicit CLI values when provided:
 
 ```bash
-python skills/sync-skills/scripts/skill_sync.py link my-skill --repo skills/my-skill --repo-url https://github.com/me/skills --skill-url https://github.com/me/my-skill
+python skills/sync-skills/scripts/skill_sync.py link my-skill-id --repo skills/my-skill --repo-url https://github.com/me/skills --skill-url https://github.com/me/my-skill
 ```
 
 If a role URL is missing, infer it from `git remote get-url origin` for that role's path. Keep inferred URLs in member state and preserve explicit URLs in the registry.
@@ -36,7 +48,7 @@ Conversion means materializing a Skill copy from one role or path into another r
 
 Before conversion:
 
-1. Validate the source path has `SKILL.md`.
+1. Validate the source path has `SKILL.md` and a valid `metadata.sync_id`.
 2. Refuse targets inside the source tree to avoid recursive self-copying.
 3. If the target exists and contains a Skill, snapshot it before overwriting.
 4. If the target exists but is not a Skill directory, stop and ask for a different target.

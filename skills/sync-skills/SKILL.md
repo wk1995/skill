@@ -2,7 +2,8 @@
 name: sync-skills
 description: Use when linking, converting, synchronizing, versioning, auditing, or rolling back multiple copies of the same Agent Skill across this repository, project-level skill folders, local Codex/user skill folders, or arbitrary external paths.
 metadata:
-  version: "0.0.2"
+  sync_id: "sync-skills"
+  version: "0.0.3"
   urls:
     - type: repository
       value: https://github.com/wk1995/skill.git
@@ -26,7 +27,7 @@ Use this skill to keep equivalent Skill directories connected across locations s
 
 ## Start Here
 
-1. Identify the logical skill name and every copy that should participate in the sync group.
+1. Identify the stable `metadata.sync_id`, current Skill name, and every copy that should participate in the sync group. The sync ID is immutable; the Skill name may change.
 2. Inspect each copy's `SKILL.md`, `agents/openai.yaml`, scripts, references, assets, and extension files before mutating anything.
 3. Read `references/sync-model.md` when designing a new sync group, resolving a conflict, changing version policy, or performing a rollback.
 4. Use `scripts/skill_sync.py` for deterministic operations whenever copying, snapshotting, status checking, or rollback is needed.
@@ -44,58 +45,64 @@ A group may contain any subset of these roles. Do not invent paths; resolve each
 
 ## Common Operations
 
-Create or update a sync group:
+Create or update a sync group using the immutable ID declared in `SKILL.md`:
 
 ```bash
-python skills/sync-skills/scripts/skill_sync.py link my-skill --repo skills/my-skill --local ~/.codex/skills/my-skill --external /path/to/my-skill --skill-url https://github.com/me/my-skill --repo-url https://github.com/me/skills-repo
+python skills/sync-skills/scripts/skill_sync.py link my-skill-id --repo skills/my-skill --local ~/.codex/skills/my-skill --external /path/to/my-skill --skill-url https://github.com/me/my-skill --repo-url https://github.com/me/skills-repo
 ```
 
 Convert one physical copy into another location and link both:
 
 ```bash
-python skills/sync-skills/scripts/skill_sync.py convert my-skill --source-path ~/.codex/skills/my-skill --source-role local --source-url https://example.com/source --target-path skills/my-skill --target-role repo --target-url https://github.com/me/skills-repo
+python skills/sync-skills/scripts/skill_sync.py convert my-skill-id --source-path ~/.codex/skills/my-skill --source-role local --source-url https://example.com/source --target-path skills/my-skill --target-role repo --target-url https://github.com/me/skills-repo
+
+# Migrate a legacy name-keyed registry and set its first stable ID.
+python skills/sync-skills/scripts/skill_sync.py rename old-skill-name --to my-skill-id --name new-skill-name
+
+# For an existing stable group, keep --to equal to its current ID and change only the display name.
+python skills/sync-skills/scripts/skill_sync.py rename my-skill-id --to my-skill-id --name new-skill-name
 ```
 
 Inspect divergence:
 
 ```bash
-python skills/sync-skills/scripts/skill_sync.py status my-skill
+python skills/sync-skills/scripts/skill_sync.py status my-skill-id
 ```
 
 Show recorded versions and their update times:
 
 ```bash
-python skills/sync-skills/scripts/skill_sync.py versions my-skill
+python skills/sync-skills/scripts/skill_sync.py versions my-skill-id
 ```
 
 Synchronize all linked copies from the most recently modified copy:
 
 ```bash
-python skills/sync-skills/scripts/skill_sync.py sync my-skill
+python skills/sync-skills/scripts/skill_sync.py sync my-skill-id
 ```
 
 Synchronize from an explicit source role:
 
 ```bash
-python skills/sync-skills/scripts/skill_sync.py sync my-skill --source repo
+python skills/sync-skills/scripts/skill_sync.py sync my-skill-id --source repo
 ```
 
 Rollback every linked copy to a recorded snapshot:
 
 ```bash
-python skills/sync-skills/scripts/skill_sync.py rollback my-skill --snapshot 20260720T120000Z
+python skills/sync-skills/scripts/skill_sync.py rollback my-skill-id --snapshot 20260720T120000Z
 ```
 
 List available snapshots:
 
 ```bash
-python skills/sync-skills/scripts/skill_sync.py snapshots my-skill
+python skills/sync-skills/scripts/skill_sync.py snapshots my-skill-id
 ```
 
 Compare the different places between two snapshots or a snapshot and the current copy:
 
 ```bash
-python skills/sync-skills/scripts/skill_sync.py diff my-skill --role local --from-snapshot 20260720T120000Z --to-current
+python skills/sync-skills/scripts/skill_sync.py diff my-skill-id --role local --from-snapshot 20260720T120000Z --to-current
 ```
 
 ## Sync Rules
@@ -108,7 +115,9 @@ python skills/sync-skills/scripts/skill_sync.py diff my-skill --role local --fro
 - When the repository is on any other branch, do not synchronize only because versions differ unless the user explicitly requests synchronization or the branch work requires updating the target copy.
 - If versions are equal but digests differ, use normal conflict handling and require an explicit source unless only one linked role changed since the previous snapshot.
 - If two or more copies changed since the previous snapshot and no source was specified, stop and report the conflict instead of choosing silently.
-- Keep the logical Skill version in `metadata.version` in `SKILL.md`. Use this skill's own version as `0.0.2`.
+- Keep the immutable sync-group identity in `metadata.sync_id` and the logical Skill version in `metadata.version` in `SKILL.md`. New Skills must define a stable sync ID that does not change with `metadata.name`; `rename --to` is reserved for migrating legacy name-keyed registry entries and cannot change an existing stable ID.
+- Use this Skill's own sync ID as `sync-skills` and its version as `0.0.3`.
+- Legacy registries keyed by a Skill name remain readable; run `rename <old-reference> --to <sync-id> --name <new-name>` to migrate the group and its snapshots before linking a renamed Skill.
 - Record Skill addresses in the registry: `skill_urls` for canonical repository/documentation/registry/source URLs, and `role_urls` for role-specific remote/source URLs.
 - If a role URL is not provided, infer it from `git remote get-url origin` when available.
 - Record audit times in the registry: group `created_at`, group `updated_at`, per-role `content_updated_at`, per-version `created_at` and `updated_at`, and operation records such as `last_sync`, `last_convert`, and `last_rollback`.

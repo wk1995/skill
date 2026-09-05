@@ -6,7 +6,7 @@
 
 ## 如何使用
 
-请提供逻辑 Skill 名称、涉及的路径或位置角色，以及希望执行的操作。常见请求包括：
+请使用每个 `SKILL.md` 中声明的不可变 `metadata.sync_id`，并提供涉及的路径或位置角色以及希望执行的操作。Skill 名称只是展示/触发名称，可以变化而不改变同步组。常见请求包括：
 
 ```text
 使用 $sync-skills 比较 my-skill 的仓库副本和本机副本。
@@ -17,11 +17,14 @@
 需要确定性变更时使用随附脚本：
 
 ```bash
-python skills/sync-skills/scripts/skill_sync.py status my-skill
-python skills/sync-skills/scripts/skill_sync.py sync my-skill --source repo
+python skills/sync-skills/scripts/skill_sync.py status my-skill-id
+python skills/sync-skills/scripts/skill_sync.py sync my-skill-id --source repo
+python skills/sync-skills/scripts/skill_sync.py rename old-skill-name --to my-skill-id --name new-skill-name
 ```
 
-每个位置使用一个固定角色：`repo`、`local`、`project` 或 `external`。流程会校验 `SKILL.md`，在覆盖前为已有副本创建快照；多份副本发生冲突时会报告而不会自行选择来源，并记录版本、摘要、来源和差异。完整命令及信任规则见 [SKILL.md](SKILL.md)。
+`--to` 仅用于迁移按名称作为键的旧 registry。对于已有稳定同步组，`--to` 必须保持为当前 ID；如需修改展示或触发名称，请使用 `--name`，稳定 ID 不可变。
+
+每个位置使用一个固定角色：`repo`、`local`、`project` 或 `external`。流程会校验 `SKILL.md` 及其稳定的 `metadata.sync_id`，在覆盖前为已有副本创建快照；多份副本发生冲突时会报告而不会自行选择来源，并记录版本、摘要、来源和差异。完整命令及信任规则见 [SKILL.md](SKILL.md)。
 
 ## 何时触发
 

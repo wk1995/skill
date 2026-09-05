@@ -74,9 +74,9 @@ Every Skill has a companion README with usage and trigger guidance. This table i
 <!-- skills-catalog:start -->
 | Skill | Purpose | Documentation |
 | --- | --- | --- |
-| `android-release-train` | Orchestrate Android feature branches, version-train integration, release branches, signed Android release artifacts, configurable distribution destinations, and release tags. Use when a user asks to create an Android feature branch for a requirement, list feature-branch or PR readiness, select features for a version, create or promote dev/<version> and release/<version> branches, bootstrap Android CI/release workflows, distribute an Android release through Google Play, another store, enterprise MDM, direct delivery, or an artifact archive, or tag a released Android version. | [README](skills/android-release-train/README.md) |
+| `android-code-release-train` | Orchestrate Android source code from a requirement branch through version-train integration, release promotion, default-branch synchronization, and an immutable source tag. Use for feature/bugfix branches, versioned dev and release PRs, code-readiness gates, version metadata, or source-release tags; do not use for APK/AAB/AAR builds, signing, packaging, or artifact uploads. | [README](skills/android-code-release-train/README.md) |
+| `build-pipeline-engineering` | Configure, validate, run, and troubleshoot reproducible distributable builds from an exact source ref, including CI environments, user-selected build variants, Android signing, APK/AAB/AAR or plugin packaging, output verification, manifests, checksums, and uploads. For variant-based builds default to release; for CI output default to GitHub Actions Artifacts. Do not use for requirement branches, PR integration, source version changes, or tag creation. | [README](skills/build-pipeline-engineering/README.md) |
 | `choose-project-doc-location` | Decide whether requested project documentation belongs in README, repository docs, or GitHub Wiki before creating or updating it. MUST use before editing documentation when the user asks to create, update, rewrite, or organize README/readme, Wiki/wiki, docs/doc, project documentation, project details, workflow/workflows, 流程, 项目文档, 项目说明, 仓库说明, 使用说明, skill 列表, skill 作用, skill 使用说明, architecture notes, onboarding guides, or repository documentation. Treat the user's words "README" and "Wiki" as tentative labels, not final placement decisions. | [README](skills/choose-project-doc-location/README.md) |
-| `release-engineering` | Use when planning, validating, automating, documenting, or troubleshooting release/publish/发布/发包 workflows for Android apps, Android libraries/components, Gradle plugins, publish branches, tags, artifacts, CI gates, or when extending release workflows beyond Android. | [README](skills/release-engineering/README.md) |
 | `sync-skills` | Use when linking, converting, synchronizing, versioning, auditing, or rolling back multiple copies of the same Agent Skill across this repository, project-level skill folders, local Codex/user skill folders, or arbitrary external paths. | [README](skills/sync-skills/README.md) |
 <!-- skills-catalog:end -->
 
@@ -100,6 +100,7 @@ skills/example-skill/
 name: example-skill
 description: Use when the user asks for a concrete example Skill workflow.
 metadata:
+  sync_id: "example-skill"
   version: "1.0.0"
   urls:
     - type: repository
@@ -116,7 +117,7 @@ metadata:
 ---
 ```
 
-`name`, `description`, and `metadata.version` are the baseline contract. `description` remains the natural-language discovery text used by Agent Skills. `metadata.urls` is optional stable provenance information for the logical Skill, such as a source repository, documentation page, registry page, package page, or upstream project. `metadata.triggering` is this repository's structured supplement: `include` describes explicit trigger cases, and `exclude` describes explicit non-trigger cases. When `metadata.triggering` is not configured, it is equivalent to `include: []` and `exclude: []`. `exclude` takes priority over `include` to avoid accidental keyword-triggered activation.
+`name`, `description`, `metadata.sync_id`, and `metadata.version` are the baseline contract. `metadata.sync_id` is the immutable identifier of the logical Skill used by `sync-skills`; choose it when the Skill is created and do not change it when the trigger name or directory changes. `description` remains the natural-language discovery text used by Agent Skills. `metadata.urls` is optional stable provenance information for the logical Skill, such as a source repository, documentation page, registry page, package page, or upstream project. `metadata.triggering` is this repository's structured supplement: `include` describes explicit trigger cases, and `exclude` describes explicit non-trigger cases. When `metadata.triggering` is not configured, it is equivalent to `include: []` and `exclude: []`. `exclude` takes priority over `include` to avoid accidental keyword-triggered activation.
 
 A Skill with executable extensions may add:
 
@@ -141,6 +142,7 @@ These conventions are shared across Skills and management tools. They should be 
 
 Keep stable self-description in `SKILL.md`:
 
+- `metadata.sync_id`: immutable synchronization-group identifier. Choose it when creating the Skill; it must survive Skill name and directory changes.
 - `metadata.version`: the Skill's independent version.
 - `metadata.urls`: canonical addresses for the logical Skill. Use typed entries such as `repository`, `documentation`, `registry`, `package`, or `source`.
 - `metadata.triggering`: optional structured trigger rules.

@@ -1,0 +1,4 @@
+interface:
+  display_name: "Android 代码发布列车"
+  short_description: "约束 Android 需求到源码 Tag 的代码链路"
+  default_prompt: "Use $android-code-release-train to select Android requirement branches for a version and finalize the reviewed source tag without building artifacts."

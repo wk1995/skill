@@ -16,6 +16,7 @@ CATALOG_END = "<!-- skills-catalog:end -->"
 ENGLISH_SECTIONS = ("## How To Use It", "## When It Triggers", "## When It Does Not Trigger")
 CHINESE_SECTIONS = ("## 如何使用", "## 何时触发", "## 何时不触发")
 SKILL_NAME = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
+SYNC_ID = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
 
 
 class ValidationError(Exception):
@@ -34,7 +35,7 @@ def frontmatter(path: Path) -> dict[str, str]:
 
     values: dict[str, str] = {}
     for line in match.group(1).splitlines():
-        match = re.match(r"^(\s*)(name|description|version):\s*[\"']?(.+?)[\"']?\s*$", line)
+        match = re.match(r"^(\s*)(name|description|sync_id|version):\s*[\"']?(.+?)[\"']?\s*$", line)
         if match:
             values[match.group(2)] = match.group(3)
     return values
@@ -70,6 +71,9 @@ def validate_skill(skill_dir: Path) -> tuple[str, str, str]:
     metadata = frontmatter(skill_file)
     require(metadata.get("name") == name, f"{relative}/SKILL.md name must match its directory")
     require(metadata.get("description"), f"{relative}/SKILL.md must define description")
+    require(metadata.get("sync_id"), f"{relative}/SKILL.md must define metadata.sync_id")
+    require(SYNC_ID.fullmatch(metadata["sync_id"]) is not None,
+            f"{relative}/SKILL.md metadata.sync_id must use lowercase letters, digits, and hyphens")
     require(metadata.get("version"), f"{relative}/SKILL.md must define metadata.version")
 
     skill_content = skill_file.read_text(encoding="utf-8")
@@ -138,11 +142,20 @@ def main() -> int:
 
     skills: list[tuple[str, str, str]] = []
     errors: list[str] = []
+    sync_ids: dict[str, str] = {}
     for path in sorted(SKILLS_DIR.iterdir()):
         if not path.is_dir() or path.name.startswith("."):
             continue
         try:
             skills.append(validate_skill(path))
+            sync_id = frontmatter(path / "SKILL.md")["sync_id"]
+            previous = sync_ids.get(sync_id)
+            if previous:
+                errors.append(
+                    f"{path.relative_to(ROOT)}/SKILL.md metadata.sync_id {sync_id!r} is already used by {previous}"
+                )
+            else:
+                sync_ids[sync_id] = str(path.relative_to(ROOT))
         except ValidationError as error:
             errors.append(str(error))
 
