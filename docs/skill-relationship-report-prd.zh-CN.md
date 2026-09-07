@@ -52,6 +52,7 @@
 - 不自动把“名称相同”的 Skill 建立为正式关系。
 - 不因生成报告而自动覆盖或同步任何 Skill。
 - 不把本机绝对路径、用户名或项目关系提交到 Git。
+- 不提供报告分享或路径脱敏模式；本机报告直接展示完整绝对路径。
 - 不提供云端关系中心、多人共享或 Web UI。
 - 不在本需求中清理 Git 历史里已有的机器路径。
 
@@ -287,6 +288,7 @@ python3 skills/sync-skills/scripts/skill_sync.py relationships
 - JSON 是机器可读的派生数据，Markdown 是面向用户的展示文档。
 - 两者都不作为 registry 的第二份事实来源，可以随时重新生成。
 - 文件默认权限为 `0600`，`reports/` 默认权限为 `0700`。
+- 报告直接展示完整绝对路径，包括路径中的本机用户名；产物仅限本机用户读取，因此本期不提供 `--redact-paths`。
 - 使用临时文件写完并校验后再原子替换正式文件。
 - 报告不得进入 Skill snapshot，也不得被 `sync` 复制到任何角色目录。
 - 输出路径必须拒绝指向仓库内部、Skill 目录内部、registry 或 snapshot 目录。
@@ -426,6 +428,8 @@ python3 skills/sync-skills/scripts/skill_sync.py diff android-release-train --ro
 17. 生成关系报告不会隐式执行 Agent build，也不会修改或覆盖现有 `dist/`。
 18. 本机 Skill 默认扫描范围由所有受支持 Agent Builders 声明的本机 Skill 目录并集生成；新增 Builder 后，其目录自动进入扫描范围，无需修改固定目录列表。
 19. `--local-root AGENT=PATH` 可以覆盖或补充非标准安装目录；重复、嵌套及软链接别名路径会安全去重并保留 Builder 归属。
+20. Markdown 与 JSON 报告展示完整绝对路径且仅限本机用户读取；命令接口不包含路径脱敏选项。
+21. Skill 同步成功但报告刷新失败时，保留同步结果并明确输出 `report_status: stale`、上一份报告路径和重试命令，不回滚已完成的同步。
 
 ## 11. 建议实施顺序
 
@@ -444,5 +448,3 @@ python3 skills/sync-skills/scripts/skill_sync.py diff android-release-train --ro
 ## 12. 待确认项
 
 1. 其他项目是否只展示显式登记的项目，还是允许配置一个父目录批量发现项目？本 PRD 建议只使用显式登记，避免扫描范围过大。
-2. 关系文档是否需要隐藏绝对路径中的用户名？本 PRD 默认完整显示，因为文件仅本机可读；如需要分享，可增加 `--redact-paths`。
-3. 同步成功但报告刷新失败时，是否接受“同步成功 + 报告 stale”的结果？本 PRD 建议接受并明确告警，避免为派生报告回滚已完成同步。
