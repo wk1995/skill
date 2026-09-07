@@ -812,6 +812,7 @@ def command_rollback(args: argparse.Namespace) -> int:
     state_dir = Path(args.state_dir).resolve()
     registry = load_registry(state_dir)
     key, group = get_group(registry, args.group)
+    group["roles"] = validate_role_paths(group.get("roles", {}))
     snapshot_dir = state_dir / "snapshots" / key / args.snapshot
     if not snapshot_dir.is_dir():
         raise SystemExit(f"snapshot not found: {args.snapshot}")

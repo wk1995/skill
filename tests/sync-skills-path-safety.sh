@@ -117,6 +117,22 @@ with tempfile.TemporaryDirectory() as raw_tmp:
     )
     assert (dangerous_source / "SKILL.md").is_file(), "sync rejection must preserve the nested source"
 
+    rollback_snapshot = dangerous_state / "snapshots" / "dangerous" / "rollback-fixture"
+    skill(rollback_snapshot / "local", "dangerous")
+    unselected_content = dangerous_source / "unselected.txt"
+    unselected_content.write_text("must survive rejected rollback\n", encoding="utf-8")
+    rejects(
+        [
+            "--state-dir", str(dangerous_state), "rollback", "dangerous",
+            "--snapshot", "rollback-fixture", "--roles", "local",
+        ],
+        "is inside role",
+    )
+    assert unselected_content.read_text(encoding="utf-8") == "must survive rejected rollback\n"
+    assert {path.name for path in rollback_snapshot.parent.iterdir()} == {"rollback-fixture"}, (
+        "rollback rejection must happen before creating a pre-rollback snapshot"
+    )
+
     try:
         skill_sync.copy_skill_tree(dangerous_source, dangerous_parent)
     except SystemExit as exc:

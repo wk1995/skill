@@ -114,6 +114,31 @@ assert "Built for demo by new-agent." in generated
 assert not (output / "skills" / "demo" / "agent-builds").exists()
 manifest = json.loads((output / ".agent-build.json").read_text(encoding="utf-8"))
 assert manifest["skills"][0]["version"] == "2.3.4"
+
+for unsafe in (".git", "scripts", ".skill-sync", "README.md", "dist"):
+    try:
+        agent_build.safe_output(fixture_root / unsafe)
+    except agent_build.BuildError as error:
+        assert "repository" in str(error) or "dist" in str(error), str(error)
+    else:
+        raise AssertionError(f"repository output must be rejected: {unsafe}")
+
+unrecognized = fixture_root.parent / "unrecognized-output"
+unrecognized.mkdir()
+sentinel = unrecognized / "keep.txt"
+sentinel.write_text("keep\n", encoding="utf-8")
+try:
+    agent_build.build("new-agent", [], str(unrecognized), True)
+except agent_build.BuildError as error:
+    assert ".agent-build.json" in str(error), str(error)
+else:
+    raise AssertionError("--force must reject an existing directory that is not a generated artifact")
+assert sentinel.read_text(encoding="utf-8") == "keep\n"
+
+first_manifest = (output / ".agent-build.json").read_text(encoding="utf-8")
+rebuilt = agent_build.build("new-agent", [], None, True)
+assert rebuilt == output
+assert (rebuilt / ".agent-build.json").read_text(encoding="utf-8") == first_manifest
 print("PASS: a new Agent is added by one platform directory without builder or Skill changes")
 PY
 

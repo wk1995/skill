@@ -12,7 +12,9 @@ version, date, and a change summary.
 
 - Safety: reject copies when the source is nested inside the target, preventing target cleanup from deleting the source before iteration begins.
 - Safety: validate all persisted role paths before `sync` creates snapshots or copies files, so malformed legacy registries fail without modifying either Skill.
+- Safety: apply the same persisted-path validation before `rollback` creates a pre-rollback snapshot or restores any role, preventing a parent restore from overwriting an unselected nested role.
 - Tests: exercise both the low-level reverse-nesting guard and a stateful `sync` against an unsafe persisted registry.
+- Tests: cover a stateful single-role `rollback` against an unsafe persisted registry and verify that no content or snapshot is changed.
 
 ## [0.0.4] - 2026-09-04
 

@@ -2,7 +2,7 @@
 
 ## [Unreleased]
 
-- No unreleased changes.
+- Builder safety: repository-local output is restricted to `dist/`, and `--force` replaces only a validated Codex build artifact.
 
 ## [1.0.0] - 2026-09-07
 

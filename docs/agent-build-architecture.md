@@ -41,7 +41,7 @@ Every adapter is discovered by scanning `platforms/*/adapter.json`; there is no 
 
 Adapter fragments may use `{{skill_name}}`, `{{adapter_id}}`, `{{adapter_version}}`, and `{{artifact_version}}`. A Skill override may contain a `SKILL.append.md` fragment and any files that should overlay the built Skill. The reserved fragment is appended rather than copied.
 
-Build inputs must be regular files and directories. Symbolic links and parent-traversal paths are rejected. The builder stages the complete artifact before replacing an explicitly selected existing output.
+Build inputs must be regular files and directories. Symbolic links and parent-traversal paths are rejected. Repository-local outputs must be children of `dist/`. With `--force`, the builder replaces only a directory whose regular `.agent-build.json` identifies it as an artifact for the selected platform; unrelated directories and files are preserved. The builder stages the complete artifact before replacing a validated existing output.
 
 ## Build Flow
 

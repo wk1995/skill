@@ -181,22 +181,49 @@ def digest_tree(root: Path) -> str:
 
 
 def safe_output(output: Path) -> Path:
+    root = ROOT.resolve()
+    default_output_dir = DEFAULT_OUTPUT_DIR.resolve()
     expanded = output.expanduser()
     require(not expanded.is_symlink(), "output must not be a symbolic link")
     resolved = expanded.resolve()
-    require(resolved != ROOT, "output must not be the repository root")
-    require(not any(resolved == path or resolved.is_relative_to(path) for path in (SKILLS_DIR, PLATFORMS_DIR)),
-            "output must not be skills/, platforms/, or a child of those paths")
-    require(not ROOT.is_relative_to(resolved), "output must not contain the repository root")
+    require(resolved != root, "output must not be the repository root")
+    require(not root.is_relative_to(resolved), "output must not contain the repository root")
+    if resolved.is_relative_to(root):
+        require(
+            resolved != default_output_dir and resolved.is_relative_to(default_output_dir),
+            "output inside the repository must be a child of dist/",
+        )
     return resolved
+
+
+def validate_replacement(output: Path, platform: str, force: bool) -> None:
+    """Allow replacement only for a build artifact owned by this platform."""
+    if not output.exists():
+        return
+    require(force, f"output already exists: {output}; pass --force to replace it")
+    require(output.is_dir(), f"refusing to replace non-directory output: {output}")
+    manifest_path = output / ".agent-build.json"
+    require(
+        manifest_path.is_file() and not manifest_path.is_symlink(),
+        f"refusing to replace unrecognized output without a regular .agent-build.json: {output}",
+    )
+    try:
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as error:
+        raise BuildError(f"cannot validate existing build output {output}: {error}") from error
+    require(isinstance(manifest, dict), f"existing build manifest must contain a JSON object: {manifest_path}")
+    require(manifest.get("schema_version") == 1, f"unsupported existing build manifest: {manifest_path}")
+    require(
+        manifest.get("platform") == platform,
+        f"existing output belongs to platform {manifest.get('platform')!r}, not {platform!r}: {output}",
+    )
 
 
 def build(platform: str, skill_names: list[str], output_arg: str | None, force: bool) -> Path:
     platform_dir, config = read_adapter(platform)
     skills = selected_skills(skill_names)
     output = safe_output(Path(output_arg) if output_arg else DEFAULT_OUTPUT_DIR / platform)
-    if output.exists() and not force:
-        raise BuildError(f"output already exists: {output}; pass --force to replace it")
+    validate_replacement(output, platform, force)
     output.parent.mkdir(parents=True, exist_ok=True)
     staging = Path(tempfile.mkdtemp(prefix=f".{output.name}-build-", dir=output.parent))
     try:
@@ -250,11 +277,7 @@ def build(platform: str, skill_names: list[str], output_arg: str | None, force: 
         )
 
         if output.exists():
-            require(force, f"output already exists: {output}")
-            if output.is_dir():
-                shutil.rmtree(output)
-            else:
-                output.unlink()
+            shutil.rmtree(output)
         os.replace(staging, output)
         return output
     finally:
