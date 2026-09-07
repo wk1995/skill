@@ -3,7 +3,7 @@ name: sync-skills
 description: Use when linking, converting, synchronizing, versioning, auditing, or rolling back multiple copies of the same Agent Skill across repository, project, machine-wide, or explicitly provided external locations.
 metadata:
   sync_id: "sync-skills"
-  version: "0.0.6"
+  version: "0.1.0"
   urls:
     - type: repository
       value: https://github.com/wk1995/skill.git
@@ -14,6 +14,7 @@ metadata:
       - The user asks to link, convert, synchronize, audit, version, compare, or roll back Skill copies.
       - The task involves local, project-level, repository-level, or external copies of the same Skill.
       - The task needs Skill provenance URLs, version history, content digests, snapshots, or difference reports.
+      - The user needs to migrate legacy repository-local Skill synchronization state.
     exclude:
       - The user is only asking to use a Skill for its domain workflow rather than manage Skill copies.
       - The task is ordinary code editing and does not involve Skill synchronization, conversion, auditing, or rollback.
@@ -31,6 +32,7 @@ Use this skill to keep equivalent Skill directories connected across this reposi
 2. Inspect each copy's complete directory tree, including `SKILL.md`, scripts, references, assets, executable extensions, and any build-adapter inputs, before mutating anything.
 3. Read `references/sync-model.md` when designing a new sync group, resolving a conflict, changing version policy, or performing a rollback.
 4. Use `scripts/skill_sync.py` for deterministic operations whenever copying, snapshotting, status checking, or rollback is needed.
+5. Keep runtime state outside the repository. The default is an XDG state directory isolated by checkout; migrate a legacy `.skill-sync/` directory before its tracked files are removed.
 
 ## Location Roles
 
@@ -44,6 +46,14 @@ Use these role names consistently:
 A group may contain any subset of these roles. Do not invent paths; resolve each role to an absolute path before linking.
 
 ## Common Operations
+
+Copy legacy repository-local state to the external default without deleting the source:
+
+```bash
+python skills/sync-skills/scripts/skill_sync.py migrate-state
+```
+
+The command verifies the copied tree, preserves file modes, refuses symlinks and path overlap, stops on a differing destination, and is idempotent when the destination already matches. Keep `.skill-sync/` in place until every collaborator has migrated or backed it up and the dedicated stop-tracking change is ready to merge.
 
 Create or update a sync group using the immutable ID declared in `SKILL.md`:
 
@@ -117,7 +127,8 @@ python skills/sync-skills/scripts/skill_sync.py diff my-skill-id --role local --
 - If versions are equal but digests differ, use normal conflict handling and require an explicit source unless only one linked role changed since the previous snapshot.
 - If two or more copies changed since the previous snapshot and no source was specified, stop and report the conflict instead of choosing silently.
 - Keep the immutable sync-group identity in `metadata.sync_id` and the logical Skill version in `metadata.version` in `SKILL.md`. New Skills must define a stable sync ID that does not change with `metadata.name`; `rename --to` is reserved for migrating legacy name-keyed registry entries and cannot change an existing stable ID.
-- Use this Skill's own sync ID as `sync-skills` and its version as `0.0.6`.
+- Use this Skill's own sync ID as `sync-skills` and its version as `0.1.0`.
+- Store registry and snapshot runtime state outside the repository. By default, use `$XDG_STATE_HOME/sync-skills/<checkout-id>/`, or `$HOME/.local/state/sync-skills/<checkout-id>/` when `XDG_STATE_HOME` is unset. Treat repository-local `.skill-sync/` as legacy migration input only.
 - Legacy registries keyed by a Skill name remain readable; run `rename <old-reference> --to <sync-id> --name <new-name>` to migrate the group and its snapshots before linking a renamed Skill.
 - Record Skill addresses in the registry: `skill_urls` for canonical repository/documentation/registry/source URLs, and `role_urls` for role-specific remote/source URLs.
 - If a role URL is not provided, infer it from `git remote get-url origin` when available.

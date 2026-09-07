@@ -85,7 +85,7 @@ necessary evidence, not proof that the review is complete. The agent must:
 11. Read every changed implementation file without truncated output. If a batched command truncates, reopen the affected files in bounded ranges and record them as reviewed.
 12. Report the adversarial cases actually exercised and any untested cases with reasons. Do not declare the review complete from CI status, the repository gate, or happy-path tests alone.
 
-The `skill-catalog` required status check invokes the same gate in GitHub Actions. Protected local state under `.skill-sync/` must have no net PR changes; stopping tracking or migrating it requires a separately designed migration rather than an ordinary cleanup commit.
+The `skill-catalog` required status check invokes the same gate in GitHub Actions. Runtime sync state belongs in the external XDG location selected by `sync-skills`. Legacy local state under `.skill-sync/` must have no net PR changes until every collaborator has migrated or backed it up; stopping tracking requires a dedicated migration change rather than an ordinary cleanup commit.
 
 ## Changelog Requirement
 

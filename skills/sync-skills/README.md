@@ -17,10 +17,13 @@ Synchronize the project and external copies from the repository version.
 Use the supplied script for deterministic changes:
 
 ```bash
+python skills/sync-skills/scripts/skill_sync.py migrate-state
 python skills/sync-skills/scripts/skill_sync.py status my-skill-id
 python skills/sync-skills/scripts/skill_sync.py sync my-skill-id --source repo
 python skills/sync-skills/scripts/skill_sync.py rename old-skill-name --to my-skill-id --name new-skill-name
 ```
+
+Runtime registry and snapshot data defaults to an XDG state directory outside the repository, isolated per checkout. Run `migrate-state` once in a checkout with legacy `.skill-sync/` data; it copies and verifies the complete tree without deleting the source and can be rerun safely. Do not remove the legacy directory until every collaborator has migrated or backed it up.
 
 The `--to` option is for migrating a legacy name-keyed registry. For an existing stable group, keep `--to` equal to its current ID and use `--name` for display or trigger-name changes; stable IDs cannot be changed.
 
@@ -32,7 +35,8 @@ Use this skill when the request:
 
 - links, converts, synchronizes, versions, audits, compares, or rolls back Skill copies;
 - involves repository, project, machine-wide user, or external copies of the same Skill; or
-- needs Skill provenance URLs, version history, content digests, snapshots, or difference reports.
+- needs Skill provenance URLs, version history, content digests, snapshots, or difference reports; or
+- migrates legacy repository-local Skill synchronization state to machine-local storage.
 
 ## When It Does Not Trigger
 

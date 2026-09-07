@@ -1,0 +1,14 @@
+{
+  "backup_confirmations": {
+    "chengpeng": "2026-09-07T08:07:26Z"
+  },
+  "expected_base_tree": "5ea365261f4f07d83df06cfe81def2581506da51",
+  "legacy_path": ".skill-sync",
+  "migration": "skill-sync-xdg-state-v1",
+  "required_backup_confirmations": [
+    "chengpeng",
+    "wangkang"
+  ],
+  "schema_version": 1,
+  "status": "awaiting-backups"
+}

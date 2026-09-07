@@ -12,6 +12,7 @@ import re
 import shutil
 import subprocess
 import sys
+import tempfile
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -20,7 +21,8 @@ from typing import Any
 IGNORE_DIRS = {".git", "node_modules", "dist", "__pycache__", ".pytest_cache"}
 IGNORE_FILES = {".DS_Store"}
 BYTECODE_SUFFIXES = {".pyc", ".pyo"}
-DEFAULT_STATE_DIR = ".skill-sync"
+LEGACY_STATE_DIR = ".skill-sync"
+STATE_APP_DIR = "sync-skills"
 ROLE_FLAGS = ("repo", "local", "project", "external")
 SYNC_ID = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
 
@@ -66,6 +68,41 @@ def resolve_path(path: str | None) -> str | None:
     if not path:
         return None
     return str(Path(path).expanduser().resolve())
+
+
+def find_repository_root(start: Path | None = None) -> Path:
+    """Find a checkout root without depending on the git executable."""
+    current = (start or Path.cwd()).expanduser().resolve()
+    for candidate in (current, *current.parents):
+        if (candidate / ".git").exists():
+            return candidate
+    return current
+
+
+def default_state_dir(
+    start: Path | None = None,
+    environment: dict[str, str] | None = None,
+) -> Path:
+    """Return a machine-local XDG state path isolated per checkout."""
+    env = os.environ if environment is None else environment
+    configured = env.get("XDG_STATE_HOME")
+    if configured:
+        state_home = Path(configured).expanduser()
+        if not state_home.is_absolute():
+            raise SystemExit("XDG_STATE_HOME must be an absolute path")
+    else:
+        home = env.get("HOME")
+        if not home:
+            raise SystemExit("HOME is required when XDG_STATE_HOME is not set")
+        state_home = Path(home).expanduser() / ".local" / "state"
+
+    repository = find_repository_root(start)
+    slug = re.sub(r"[^a-zA-Z0-9._-]+", "-", repository.name).strip("-.") or "repository"
+    identity = hashlib.sha256(os.fsencode(str(repository))).hexdigest()[:16]
+    state_dir = (state_home / STATE_APP_DIR / f"{slug}-{identity}").resolve()
+    if path_is_within(state_dir, repository):
+        raise SystemExit("default sync state directory must be outside the repository")
+    return state_dir
 
 
 def should_ignore(path: Path) -> bool:
@@ -371,6 +408,99 @@ def save_registry(state_dir: Path, registry: dict[str, Any]) -> None:
     state_dir.mkdir(parents=True, exist_ok=True)
     registry_path = state_dir / "registry.json"
     registry_path.write_text(json.dumps(registry, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+
+
+def sha256_file(path: Path) -> str:
+    hasher = hashlib.sha256()
+    with path.open("rb") as stream:
+        for chunk in iter(lambda: stream.read(1024 * 1024), b""):
+            hasher.update(chunk)
+    return hasher.hexdigest()
+
+
+def state_tree_manifest(root: Path) -> dict[str, dict[str, Any]]:
+    """Describe a state tree without following links or accepting special files."""
+    if root.is_symlink():
+        raise SystemExit(f"state directory must not be a symlink: {root}")
+    if not root.exists():
+        raise SystemExit(f"state directory does not exist: {root}")
+    if not root.is_dir():
+        raise SystemExit(f"state path is not a directory: {root}")
+
+    manifest: dict[str, dict[str, Any]] = {}
+    for current, directory_names, file_names in os.walk(root, followlinks=False):
+        current_path = Path(current)
+        for name in sorted(directory_names):
+            path = current_path / name
+            relative = path.relative_to(root).as_posix()
+            if path.is_symlink():
+                raise SystemExit(f"state tree contains a symlink: {relative}")
+            if not path.is_dir():
+                raise SystemExit(f"state tree contains a special entry: {relative}")
+            manifest[f"{relative}/"] = {
+                "type": "directory",
+                "mode": path.stat().st_mode & 0o7777,
+            }
+        for name in sorted(file_names):
+            path = current_path / name
+            relative = path.relative_to(root).as_posix()
+            if path.is_symlink():
+                raise SystemExit(f"state tree contains a symlink: {relative}")
+            if not path.is_file():
+                raise SystemExit(f"state tree contains a special entry: {relative}")
+            manifest[relative] = {
+                "type": "file",
+                "mode": path.stat().st_mode & 0o7777,
+                "size": path.stat().st_size,
+                "sha256": sha256_file(path),
+            }
+    return manifest
+
+
+def migrate_state_tree(source: Path, destination: Path) -> str:
+    """Copy legacy state atomically, preserving the source for Git migration safety."""
+    source = source.expanduser().absolute()
+    destination = destination.expanduser().absolute()
+    if paths_refer_to_same_location(source, destination):
+        raise SystemExit(f"legacy and destination state directories are the same: {source}")
+    if path_is_within(destination, source):
+        raise SystemExit(f"destination state directory is inside the legacy state directory: {destination}")
+    if path_is_within(source, destination):
+        raise SystemExit(f"legacy state directory is inside the destination state directory: {source}")
+
+    source_manifest = state_tree_manifest(source)
+    if destination.exists() or destination.is_symlink():
+        destination_manifest = state_tree_manifest(destination)
+        if destination_manifest == source_manifest:
+            return "already-migrated"
+        raise SystemExit(
+            f"destination state directory already exists with different content: {destination}"
+        )
+
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    staging_root = Path(tempfile.mkdtemp(prefix=".sync-skills-migrate-", dir=destination.parent))
+    staging_payload = staging_root / "state"
+    try:
+        shutil.copytree(source, staging_payload, copy_function=shutil.copy2)
+        if state_tree_manifest(staging_payload) != source_manifest:
+            raise SystemExit("copied state failed verification; legacy state was preserved")
+        os.replace(staging_payload, destination)
+    finally:
+        shutil.rmtree(staging_root, ignore_errors=True)
+    return "migrated"
+
+
+def command_migrate_state(args: argparse.Namespace) -> int:
+    source = Path(args.legacy_state_dir)
+    destination = Path(args.state_dir)
+    result = migrate_state_tree(source, destination)
+    print(json.dumps({
+        "destination": str(destination.expanduser().resolve()),
+        "legacy_source": str(source.expanduser().resolve()),
+        "source_preserved": True,
+        "status": result,
+    }, indent=2, sort_keys=True))
+    return 0
 
 
 def validate_sync_id(sync_id: str) -> str:
@@ -1061,8 +1191,23 @@ def split_version_suffix(value: str) -> list[tuple[int, int | str]]:
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Synchronize linked Agent Skill directory copies.")
-    parser.add_argument("--state-dir", default=DEFAULT_STATE_DIR, help="Registry and snapshot directory. Default: .skill-sync")
+    parser.add_argument(
+        "--state-dir",
+        default=str(default_state_dir()),
+        help="Registry and snapshot directory. Default: an XDG state directory isolated per checkout.",
+    )
     subparsers = parser.add_subparsers(dest="command", required=True)
+
+    migrate_state = subparsers.add_parser(
+        "migrate-state",
+        help="Copy legacy repository-local state to --state-dir without deleting the source.",
+    )
+    migrate_state.add_argument(
+        "--legacy-state-dir",
+        default=LEGACY_STATE_DIR,
+        help="Legacy repository-local state directory. Default: .skill-sync",
+    )
+    migrate_state.set_defaults(func=command_migrate_state)
 
     link = subparsers.add_parser("link", help="Create or update a linked skill group.")
     link.add_argument("group", help="Stable metadata.sync_id (legacy group names remain valid as aliases).")

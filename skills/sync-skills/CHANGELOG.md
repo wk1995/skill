@@ -8,6 +8,14 @@ version, date, and a change summary.
 
 - No unreleased changes.
 
+## [0.1.0] - 2026-09-07
+
+- State isolation: default registry and snapshot storage now uses an XDG state directory outside the repository, namespaced by checkout identity.
+- Migration: add an idempotent `migrate-state` command that copies and verifies legacy `.skill-sync/` data without deleting its source or overwriting a different destination.
+- Safety: reject symlinks, special files, same-path aliases, and both source/target nesting directions before migration mutates the destination.
+- Compatibility: callers can continue to select an explicit location with `--state-dir`; legacy repository-local state remains available as migration input.
+- Tests: cover successful migration, malformed state preservation, file-mode fidelity, repeat execution, destination conflicts, interrupted copies, path overlap, case aliases, symlinks, missing sources, file targets, and missing optional executables.
+
 ## [0.0.6] - 2026-09-07
 
 - Safety: compare existing paths by filesystem identity as well as resolved spelling, preventing case-only aliases on case-insensitive filesystems from bypassing self-copy and role-path validation.

@@ -17,10 +17,13 @@
 需要确定性变更时使用随附脚本：
 
 ```bash
+python skills/sync-skills/scripts/skill_sync.py migrate-state
 python skills/sync-skills/scripts/skill_sync.py status my-skill-id
 python skills/sync-skills/scripts/skill_sync.py sync my-skill-id --source repo
 python skills/sync-skills/scripts/skill_sync.py rename old-skill-name --to my-skill-id --name new-skill-name
 ```
+
+运行期 registry 和快照数据默认存放在仓库外、按 checkout 隔离的 XDG state 目录。对于仍有 `.skill-sync/` 旧状态的 checkout，应先运行一次 `migrate-state`；它会完整复制并校验数据、保留源目录，且可安全重复执行。在所有协作者都完成迁移或备份前，不要删除旧目录。
 
 `--to` 仅用于迁移按名称作为键的旧 registry。对于已有稳定同步组，`--to` 必须保持为当前 ID；如需修改展示或触发名称，请使用 `--name`，稳定 ID 不可变。
 
@@ -32,7 +35,8 @@ python skills/sync-skills/scripts/skill_sync.py rename old-skill-name --to my-sk
 
 - 需要链接、转换、同步、记录版本、审计、比较或回滚 Skill 副本；
 - 涉及同一个 Skill 的仓库、项目、本机用户目录或外部副本；
-- 需要处理 Skill 的来源 URL、版本历史、内容摘要、快照或差异报告。
+- 需要处理 Skill 的来源 URL、版本历史、内容摘要、快照或差异报告；
+- 需要把仓库内旧版 Skill 同步状态迁移到本机状态目录。
 
 ## 何时不触发
 
