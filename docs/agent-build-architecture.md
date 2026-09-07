@@ -35,6 +35,7 @@ Every adapter is discovered by scanning `platforms/*/adapter.json`; there is no 
 - `version`: adapter implementation/configuration version.
 - `artifact_version`: version of the generated distributable bundle.
 - `skills_path`: relative directory in the artifact where Skills are written; `.` is allowed.
+- `local_skill_roots`: non-empty list of declarative, side-effect-free local installation resolvers. `home-relative` resolves below the current user's home; optional or required `env` reads one named absolute-path environment variable.
 - `root_overlay`: optional directory copied once to the artifact root.
 - `skill_overlay`: optional directory copied into every generated Skill.
 - `skill_append`: optional Markdown fragment appended to every generated `SKILL.md`.
@@ -60,7 +61,9 @@ For each selected Skill, the builder:
 2. applies the adapter-wide Skill overlay;
 3. applies `agent-builds/<agent>/` for that Skill;
 4. appends adapter-wide and per-Skill instruction fragments;
-5. records core versions and output digests in `.agent-build.json`.
+5. records stable sync IDs, core versions, portable source digests, output digests, and safe relative artifact paths in `.agent-build.json` schema v2.
+
+The manifest-v2 identity chain allows relationship reporting to compare portable source to build and then compare a local installation only to the corresponding same-Agent build. A schema-v1 artifact may be inspected as legacy output but is not trusted for installation repair because it lacks stable identity and portable provenance.
 
 Codex builds also copy `.codex-plugin/plugin.json` from the adapter root overlay. This follows the official OpenAI plugin package boundary: a plugin has a root manifest and can bundle Skills under `skills/`; a generated Skill may contain `agents/openai.yaml` for its own Codex interface metadata.
 
@@ -97,3 +100,5 @@ dist/workbuddy/
 ```
 
 Generated output is ignored by Git. Installation commands belong to their adapter documentation or packaging layer; portable Skill READMEs describe how to use the workflow, not how a specific Agent installs it.
+
+After a successful build, the builder prints the machine-local `skill_sync.py relationships` refresh command. Report generation never invokes a build implicitly.

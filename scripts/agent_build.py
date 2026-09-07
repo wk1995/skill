@@ -20,7 +20,11 @@ PLATFORMS_DIR = ROOT / "platforms"
 DEFAULT_OUTPUT_DIR = ROOT / "dist"
 NAME_PATTERN = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
 VERSION_PATTERN = re.compile(r"^\d+\.\d+\.\d+(?:[-+][0-9A-Za-z.-]+)?$")
+ENV_NAME_PATTERN = re.compile(r"^[A-Z_][A-Z0-9_]*$")
 RESERVED_OVERRIDE_FILES = {"SKILL.append.md"}
+TRANSIENT_DIRECTORY_NAMES = {".git", "dist", "node_modules", "__pycache__", ".pytest_cache"}
+TRANSIENT_FILE_NAMES = {".DS_Store"}
+TRANSIENT_SUFFIXES = {".pyc", ".pyo"}
 
 
 class BuildError(Exception):
@@ -65,6 +69,23 @@ def read_adapter(platform: str) -> tuple[Path, dict[str, object]]:
                       changelog_content, flags=re.MULTILINE) is not None,
             f"{changelog.relative_to(ROOT)} must document adapter version {config['version']}")
     relative_path(config.get("skills_path"), "skills_path", allow_dot=True)
+    local_skill_roots = config.get("local_skill_roots")
+    require(isinstance(local_skill_roots, list) and local_skill_roots,
+            f"{config_path.relative_to(ROOT)} local_skill_roots must be a non-empty array")
+    for index, resolver in enumerate(local_skill_roots):
+        field = f"local_skill_roots[{index}]"
+        require(isinstance(resolver, dict), f"{field} must be an object")
+        resolver_type = resolver.get("type")
+        if resolver_type == "home-relative":
+            require(set(resolver) == {"type", "path"}, f"{field} has unsupported fields")
+            relative_path(resolver.get("path"), f"{field}.path")
+        elif resolver_type == "env":
+            require(set(resolver).issubset({"type", "name", "required"}), f"{field} has unsupported fields")
+            require(isinstance(resolver.get("name"), str) and ENV_NAME_PATTERN.fullmatch(resolver["name"]) is not None,
+                    f"{field}.name must be an uppercase environment variable name")
+            require(isinstance(resolver.get("required", False), bool), f"{field}.required must be boolean")
+        else:
+            raise BuildError(f"{field}.type must be 'home-relative' or 'env'")
     for field in ("root_overlay", "skill_overlay", "skill_append"):
         if field in config:
             configured = platform_dir / relative_path(config[field], field)
@@ -90,7 +111,7 @@ def platform_names() -> list[str]:
     ]
 
 
-def skill_metadata(skill_dir: Path) -> tuple[str, str]:
+def skill_metadata(skill_dir: Path) -> tuple[str, str, str]:
     skill_file = skill_dir / "SKILL.md"
     require(skill_file.is_file(), f"{skill_dir.relative_to(ROOT)} is missing SKILL.md")
     content = skill_file.read_text(encoding="utf-8")
@@ -98,25 +119,29 @@ def skill_metadata(skill_dir: Path) -> tuple[str, str]:
     require(frontmatter is not None, f"{skill_file.relative_to(ROOT)} has invalid frontmatter")
     name_match = re.search(r"^name:\s*[\"']?([^\"'\n]+)[\"']?\s*$", frontmatter.group(1), re.MULTILINE)
     version_match = re.search(r"^\s+version:\s*[\"']?([^\"'\n]+)[\"']?\s*$", frontmatter.group(1), re.MULTILINE)
+    sync_id_match = re.search(r"^\s+sync_id:\s*[\"']?([^\"'\n]+)[\"']?\s*$", frontmatter.group(1), re.MULTILINE)
     require(name_match is not None, f"{skill_file.relative_to(ROOT)} is missing name")
+    require(sync_id_match is not None, f"{skill_file.relative_to(ROOT)} is missing metadata.sync_id")
     require(version_match is not None, f"{skill_file.relative_to(ROOT)} is missing metadata.version")
     name = name_match.group(1).strip()
+    sync_id = sync_id_match.group(1).strip()
     version = version_match.group(1).strip()
     require(name == skill_dir.name, f"{skill_file.relative_to(ROOT)} name must match its directory")
+    require(NAME_PATTERN.fullmatch(sync_id) is not None, f"{skill_file.relative_to(ROOT)} sync_id must be lowercase hyphenated")
     require(VERSION_PATTERN.fullmatch(version) is not None, f"{skill_file.relative_to(ROOT)} version must be SemVer")
     require((skill_dir / "agent-builds").is_dir(), f"{skill_dir.relative_to(ROOT)} is missing agent-builds/")
-    return name, version
+    return name, sync_id, version
 
 
-def selected_skills(names: list[str]) -> list[tuple[Path, str, str]]:
+def selected_skills(names: list[str]) -> list[tuple[Path, str, str, str]]:
     requested = set(names)
-    discovered: list[tuple[Path, str, str]] = []
+    discovered: list[tuple[Path, str, str, str]] = []
     for skill_dir in sorted(SKILLS_DIR.iterdir()):
         if not skill_dir.is_dir() or skill_dir.name.startswith("."):
             continue
-        name, version = skill_metadata(skill_dir)
+        name, sync_id, version = skill_metadata(skill_dir)
         if not requested or name in requested:
-            discovered.append((skill_dir, name, version))
+            discovered.append((skill_dir, name, sync_id, version))
             requested.discard(name)
     require(not requested, f"unknown Skill(s): {', '.join(sorted(requested))}")
     require(discovered, "no Skills selected")
@@ -137,7 +162,13 @@ def copy_tree(
     skipped_names = skip_names or set()
     for path in sorted(source.rglob("*")):
         relative = path.relative_to(source)
-        if relative.parts[0] in skipped_top or any(part in skipped_names for part in relative.parts):
+        if (
+            relative.parts[0] in skipped_top
+            or any(part in skipped_names for part in relative.parts)
+            or any(part in TRANSIENT_DIRECTORY_NAMES for part in relative.parts[:-1])
+            or path.name in TRANSIENT_FILE_NAMES
+            or path.suffix in TRANSIENT_SUFFIXES
+        ):
             continue
         require(not path.is_symlink(), f"build inputs must not contain symbolic links: {path}")
         destination = target / relative
@@ -186,12 +217,20 @@ def append_instructions(target: Path, fragments: list[Path], values: dict[str, s
     target.write_text(core + "\n\n" + "\n\n".join(additions) + "\n", encoding="utf-8")
 
 
-def digest_tree(root: Path) -> str:
+def digest_tree(root: Path, *, skip_top: set[str] | None = None) -> str:
     digest = hashlib.sha256()
     for path in sorted(root.rglob("*")):
         if not path.is_file():
             continue
-        relative = path.relative_to(root).as_posix().encode("utf-8")
+        relative_path = path.relative_to(root)
+        if (
+            (skip_top and relative_path.parts[0] in skip_top)
+            or any(part in TRANSIENT_DIRECTORY_NAMES for part in relative_path.parts[:-1])
+            or path.name in TRANSIENT_FILE_NAMES
+            or path.suffix in TRANSIENT_SUFFIXES
+        ):
+            continue
+        relative = relative_path.as_posix().encode("utf-8")
         digest.update(len(relative).to_bytes(4, "big"))
         digest.update(relative)
         data = path.read_bytes()
@@ -232,7 +271,7 @@ def validate_replacement(output: Path, platform: str, force: bool) -> None:
     except (OSError, json.JSONDecodeError) as error:
         raise BuildError(f"cannot validate existing build output {output}: {error}") from error
     require(isinstance(manifest, dict), f"existing build manifest must contain a JSON object: {manifest_path}")
-    require(manifest.get("schema_version") == 1, f"unsupported existing build manifest: {manifest_path}")
+    require(manifest.get("schema_version") in {1, 2}, f"unsupported existing build manifest: {manifest_path}")
     require(
         manifest.get("platform") == platform,
         f"existing output belongs to platform {manifest.get('platform')!r}, not {platform!r}: {output}",
@@ -255,7 +294,7 @@ def build(platform: str, skill_names: list[str], output_arg: str | None, force: 
         skills_root = staging / relative_path(config["skills_path"], "skills_path", allow_dot=True)
         skills_root.mkdir(parents=True, exist_ok=True)
         manifest_skills: list[dict[str, str]] = []
-        for skill_dir, name, version in skills:
+        for skill_dir, name, sync_id, version in skills:
             target = skills_root / name
             copy_tree(skill_dir, target, skip_top={"agent-builds"})
 
@@ -283,10 +322,17 @@ def build(platform: str, skill_names: list[str], output_arg: str | None, force: 
                     "artifact_version": str(config["artifact_version"]),
                 },
             )
-            manifest_skills.append({"name": name, "version": version, "digest": digest_tree(target)})
+            manifest_skills.append({
+                "name": name,
+                "sync_id": sync_id,
+                "core_version": version,
+                "portable_digest": digest_tree(skill_dir, skip_top={"agent-builds"}),
+                "output_digest": digest_tree(target),
+                "path": (relative_path(config["skills_path"], "skills_path", allow_dot=True) / name).as_posix(),
+            })
 
         manifest = {
-            "schema_version": 1,
+            "schema_version": 2,
             "platform": platform,
             "adapter_version": config["version"],
             "artifact_version": config["artifact_version"],
@@ -314,7 +360,10 @@ def validate_all() -> None:
         platform_dir, _ = read_adapter(name)
         validate_tree(platform_dir)
     known = set(names)
-    for skill_dir, _, _ in skills:
+    sync_ids: set[str] = set()
+    for skill_dir, _, sync_id, _ in skills:
+        require(sync_id not in sync_ids, f"duplicate metadata.sync_id across Skills: {sync_id}")
+        sync_ids.add(sync_id)
         for override in sorted((skill_dir / "agent-builds").iterdir()):
             if override.name.startswith("."):
                 continue
@@ -350,6 +399,10 @@ def main() -> int:
         require(args.platform is not None, "platform is required unless --list or --check is used")
         output = build(args.platform, args.skill, args.output, args.force)
         print(f"Built {args.platform} artifact at {output}")
+        print(
+            "Refresh local relationships with: "
+            "python3 skills/sync-skills/scripts/skill_sync.py relationships"
+        )
         return 0
     except BuildError as error:
         print(f"FAIL: {error}", file=sys.stderr)

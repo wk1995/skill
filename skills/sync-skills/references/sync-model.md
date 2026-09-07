@@ -27,6 +27,24 @@ Use stable role names:
 
 Additional role names are allowed only when the user explicitly needs more than one location of the same category, such as `external-docs` or `project-client-a`.
 
+New multi-location records use stable Location IDs such as `repo:current`, `local:codex`, and `project:app-a`. Related projects are registered one at a time; never register a parent directory for implicit project discovery. Legacy `roles` remain readable and are converted to an in-memory location view during reporting.
+
+## Relationship And Agent Build Policy
+
+Supported AI Agent Builders are the valid manifests under `platforms/*/adapter.json`. Each adapter declares one or more local Skill root resolvers. The relationship report scans their resolved union, the current project's portable Skills, and only explicitly registered related-project roots.
+
+Use this comparison chain:
+
+```text
+portable source -> manifest-v2 Agent build -> same-Agent local install
+```
+
+An Agent build manifest records `sync_id`, core version, portable digest, adapter and artifact versions, output digest, and safe output path. Do not compare Codex and WorkBuddy output digests: their overlays intentionally differ.
+
+If a registered Agent install lacks `metadata.sync_id`, keep it visible as `registered-incomplete` and `missing-sync-id`. A trustworthy repair requires a matching same-Agent manifest-v2 build, a verified snapshot, staged installation, post-install identity/digest verification, registry provenance update, and report refresh. Preserve a divergent local copy unless the user explicitly authorizes replacement. A second repair of the same current build must not create another snapshot or change content.
+
+Ordinary `sync --source repo` must stop before its first mutation when a target is an Agent installation. Portable sources are not installable Agent outputs.
+
 ## URL Policy
 
 Record addresses separately from local paths:

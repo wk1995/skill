@@ -18,6 +18,20 @@ from pathlib import Path
 from typing import Any
 
 
+SCRIPT_DIR = Path(__file__).resolve().parent
+if str(SCRIPT_DIR) not in sys.path:
+    sys.path.insert(0, str(SCRIPT_DIR))
+
+from skill_relationships import (  # noqa: E402
+    RelationshipError,
+    digest_tree as relationship_digest_tree,
+    generate_and_write,
+    load_adapters,
+    normalized_absolute,
+    read_builds,
+)
+
+
 IGNORE_DIRS = {".git", "node_modules", "dist", "__pycache__", ".pytest_cache"}
 IGNORE_FILES = {".DS_Store"}
 BYTECODE_SUFFIXES = {".pyc", ".pyo"}
@@ -410,6 +424,58 @@ def save_registry(state_dir: Path, registry: dict[str, Any]) -> None:
     registry_path.write_text(json.dumps(registry, indent=2, sort_keys=True) + "\n", encoding="utf-8")
 
 
+def relationship_project_root(args: argparse.Namespace) -> Path:
+    configured = getattr(args, "project_root", None)
+    return Path(configured).expanduser().resolve() if configured else find_repository_root()
+
+
+def refresh_relationship_report(
+    args: argparse.Namespace,
+    registry: dict[str, Any],
+) -> tuple[int, dict[str, Any]]:
+    state_dir = Path(args.state_dir).expanduser().resolve()
+    project_root = relationship_project_root(args)
+    retry = (
+        f"python3 {project_root / 'skills/sync-skills/scripts/skill_sync.py'} "
+        f"--state-dir {state_dir} --project-root {project_root} relationships"
+    )
+    try:
+        report, paths = generate_and_write(
+            project_root=project_root,
+            state_dir=state_dir,
+            registry=registry,
+        )
+        return 0, {
+            "report_status": "fresh",
+            "report_paths": paths,
+            "report_input_fingerprint": report["input_fingerprint"],
+            "report_issue_count": report["summary"]["issue_count"],
+        }
+    except (OSError, RelationshipError, json.JSONDecodeError) as error:
+        reports_dir = state_dir / "reports"
+        previous = {
+            output_format: str(path.resolve())
+            for output_format, path in {
+                "json": reports_dir / "skill-relationships.json",
+                "markdown": reports_dir / "skill-relationships.md",
+            }.items()
+            if path.is_file() and not path.is_symlink()
+        }
+        return 2, {
+            "report_status": "stale",
+            "report_error": str(error),
+            "previous_report_paths": previous,
+            "report_retry_command": retry,
+        }
+
+
+def finish_mutation(args: argparse.Namespace, registry: dict[str, Any], result: dict[str, Any]) -> int:
+    code, report_result = refresh_relationship_report(args, registry)
+    result.update(report_result)
+    print(json.dumps(result, indent=2, sort_keys=True))
+    return code
+
+
 def sha256_file(path: Path) -> str:
     hasher = hashlib.sha256()
     with path.open("rb") as stream:
@@ -765,8 +831,7 @@ def command_link(args: argparse.Namespace) -> int:
 
     update_group_state(group)
     save_registry(state_dir, registry)
-    print(json.dumps({"group": key, "name": group_name(key, group), "sync_id": expected_id, "created_at": group["created_at"], "updated_at": group["updated_at"], "roles": group["roles"], "role_urls": group.get("role_urls", {}), "skill_urls": group.get("skill_urls", []), "state_dir": str(state_dir)}, indent=2, sort_keys=True))
-    return 0
+    return finish_mutation(args, registry, {"group": key, "name": group_name(key, group), "sync_id": expected_id, "created_at": group["created_at"], "updated_at": group["updated_at"], "roles": group["roles"], "role_urls": group.get("role_urls", {}), "skill_urls": group.get("skill_urls", []), "state_dir": str(state_dir)})
 
 
 def command_convert(args: argparse.Namespace) -> int:
@@ -847,8 +912,7 @@ def command_convert(args: argparse.Namespace) -> int:
     }
     update_group_state(group)
     save_registry(state_dir, registry)
-    print(json.dumps({"group": key, "name": group_name(key, group), "sync_id": expected_id, "source": args.source_role, "target": args.target_role, "target_path": str(target), "snapshot": snapshot_id, "updated_at": operation_at, "skill_urls": group.get("skill_urls", []), "source_url": group.get("role_urls", {}).get(args.source_role), "target_url": group.get("role_urls", {}).get(args.target_role)}, indent=2, sort_keys=True))
-    return 0
+    return finish_mutation(args, registry, {"group": key, "name": group_name(key, group), "sync_id": expected_id, "source": args.source_role, "target": args.target_role, "target_path": str(target), "snapshot": snapshot_id, "updated_at": operation_at, "skill_urls": group.get("skill_urls", []), "source_url": group.get("role_urls", {}).get(args.source_role), "target_url": group.get("role_urls", {}).get(args.target_role)})
 
 
 def command_status(args: argparse.Namespace) -> int:
@@ -905,6 +969,8 @@ def command_sync(args: argparse.Namespace) -> int:
     if source_role not in current:
         raise SystemExit(f"source role is not linked or does not exist: {source_role}")
 
+    refuse_portable_sync_to_agent_install(args, group, current, source_role)
+
     source_path = Path(str(current[source_role]["path"]))
     snapshot_id = create_snapshot(state_dir, key, group, "sync", source_role)
     snapshot_dir = state_dir / "snapshots" / key / snapshot_id
@@ -927,8 +993,7 @@ def command_sync(args: argparse.Namespace) -> int:
     }
     update_group_state(group)
     save_registry(state_dir, registry)
-    print(json.dumps({"group": key, "name": group_name(key, group), "sync_id": group_id(key, group), "source": source_role, "snapshot": snapshot_id, "updated_roles": updated_roles, "updated_at": operation_at, "differences_by_role": differences_by_role}, indent=2, sort_keys=True))
-    return 0
+    return finish_mutation(args, registry, {"group": key, "name": group_name(key, group), "sync_id": group_id(key, group), "source": source_role, "snapshot": snapshot_id, "updated_roles": updated_roles, "updated_at": operation_at, "differences_by_role": differences_by_role})
 
 
 def command_diff(args: argparse.Namespace) -> int:
@@ -994,8 +1059,7 @@ def command_rollback(args: argparse.Namespace) -> int:
     }
     update_group_state(group)
     save_registry(state_dir, registry)
-    print(json.dumps({"group": key, "name": group_name(key, group), "sync_id": group_id(key, group), "rolled_back_to": args.snapshot, "pre_rollback_snapshot": pre_rollback, "restored_roles": restored, "updated_at": operation_at}, indent=2, sort_keys=True))
-    return 0
+    return finish_mutation(args, registry, {"group": key, "name": group_name(key, group), "sync_id": group_id(key, group), "rolled_back_to": args.snapshot, "pre_rollback_snapshot": pre_rollback, "restored_roles": restored, "updated_at": operation_at})
 
 
 def get_group(registry: dict[str, Any], reference: str) -> tuple[str, dict[str, Any]]:
@@ -1055,8 +1119,7 @@ def command_rename(args: argparse.Namespace) -> int:
         groups[new_id] = group
 
     save_registry(state_dir, registry)
-    print(json.dumps({"from": old_key, "group": new_id, "name": group["name"], "sync_id": new_id, "aliases": group["aliases"], "state_dir": str(state_dir)}, indent=2, sort_keys=True))
-    return 0
+    return finish_mutation(args, registry, {"from": old_key, "group": new_id, "name": group["name"], "sync_id": new_id, "aliases": group["aliases"], "state_dir": str(state_dir)})
 
 
 def resolve_diff_path(state_dir: Path, group_name: str, group: dict[str, Any], role: str, explicit_path: str | None, snapshot: str | None, current: bool) -> Path:
@@ -1189,12 +1252,382 @@ def split_version_suffix(value: str) -> list[tuple[int, int | str]]:
     return [(0, int(part)) if part.isdigit() else (1, part) for part in parts]
 
 
+def command_relationships(args: argparse.Namespace) -> int:
+    state_dir = Path(args.state_dir).expanduser().resolve()
+    project_root = relationship_project_root(args)
+    registry = load_registry(state_dir)
+    try:
+        report, paths = generate_and_write(
+            project_root=project_root,
+            state_dir=state_dir,
+            registry=registry,
+            local_root_args=args.local_root,
+            project_args=args.project,
+            output_dir=Path(args.output_dir).expanduser().absolute() if args.output_dir else None,
+            output_format=args.format,
+        )
+    except RelationshipError as error:
+        raise SystemExit(str(error)) from error
+    result = {
+        "report_status": "fresh",
+        "report_paths": paths,
+        "input_fingerprint": report["input_fingerprint"],
+        "summary": report["summary"],
+    }
+    print(json.dumps(result, indent=2, sort_keys=True))
+    if args.strict:
+        non_clean = any(
+            status not in {"synced"}
+            for skill in report["skills"]
+            for status in skill["statuses"]
+        ) or bool(report["issues"] or report["unlinked_local_skills"])
+        return 2 if non_clean else 0
+    return 0
+
+
+def validate_location_identity(
+    registry: dict[str, Any],
+    sync_id: str,
+    candidate_path: Path,
+) -> None:
+    candidate = candidate_path.expanduser().absolute()
+    for key, group in registry.get("groups", {}).items():
+        if not isinstance(group, dict):
+            continue
+        other_sync_id = group_id(key, group)
+        raw_paths = list(group.get("roles", {}).values())
+        raw_paths.extend(
+            location.get("path")
+            for location in group.get("locations", {}).values()
+            if isinstance(location, dict) and location.get("path")
+        )
+        for raw_path in raw_paths:
+            existing = Path(str(raw_path)).expanduser().absolute()
+            if other_sync_id != sync_id and paths_refer_to_same_location(candidate, existing):
+                raise SystemExit(
+                    f"location path is already registered to {other_sync_id!r}: {candidate}"
+                )
+            if other_sync_id == sync_id and (
+                path_is_within(candidate, existing) or path_is_within(existing, candidate)
+            ) and not paths_refer_to_same_location(candidate, existing):
+                raise SystemExit(
+                    f"location paths for one Skill must not be nested: {candidate}, {existing}"
+                )
+
+
+def command_link_location(args: argparse.Namespace) -> int:
+    state_dir = Path(args.state_dir).expanduser().resolve()
+    registry = load_registry(state_dir)
+    key, group = get_group(registry, args.group)
+    sync_id = group_id(key, group)
+    path = Path(args.path).expanduser().absolute()
+    validate_location_identity(registry, sync_id, path)
+    if path.exists():
+        skill_dir = require_skill_dir(str(path), args.location_id)
+        metadata = read_skill_metadata(skill_dir)
+        actual_sync_id = metadata.get("sync_id")
+        if actual_sync_id and actual_sync_id != sync_id:
+            raise SystemExit(
+                f"location metadata.sync_id {actual_sync_id!r} does not match group {sync_id!r}"
+            )
+        if not actual_sync_id and args.kind != "local":
+            raise SystemExit("project and external locations must define metadata.sync_id")
+
+    if args.kind == "project" and not args.project_id:
+        raise SystemExit("--project-id is required for project locations")
+    if args.kind == "local" and not args.agent_id:
+        raise SystemExit("--agent-id is required for local locations")
+    if args.kind == "external" and not args.source_id:
+        raise SystemExit("--source-id is required for external locations")
+
+    location: dict[str, Any] = {
+        "kind": args.kind,
+        "path": normalized_absolute(path),
+    }
+    if args.kind == "project":
+        location["project_id"] = args.project_id
+        project = registry.setdefault("projects", {}).setdefault(args.project_id, {})
+        roots = set(project.get("skill_roots", []))
+        roots.add(normalized_absolute(path.parent))
+        project["skill_roots"] = sorted(roots)
+        if args.adapter_root:
+            adapter_root = Path(args.adapter_root).expanduser().absolute()
+            project["adapter_root"] = normalized_absolute(adapter_root)
+    elif args.kind == "local":
+        location["agent_id"] = args.agent_id
+        location["derived_from"] = args.derived_from or f"build:{args.agent_id}"
+    else:
+        location["source_id"] = args.source_id
+
+    locations = group.setdefault("locations", {})
+    existing = locations.get(args.location_id)
+    if existing and existing != location:
+        raise SystemExit(f"location ID already exists with different data: {args.location_id}")
+    locations[args.location_id] = location
+    registry["schema_version"] = max(2, int(registry.get("schema_version", 1)))
+    operation_at = now_iso()
+    group["updated_at"] = operation_at
+    save_registry(state_dir, registry)
+    return finish_mutation(args, registry, {
+        "group": key,
+        "sync_id": sync_id,
+        "location_id": args.location_id,
+        "location": location,
+        "updated_at": operation_at,
+    })
+
+
+def adapter_roots_for_project(args: argparse.Namespace) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+    try:
+        adapters, _ = load_adapters(relationship_project_root(args), [])
+    except RelationshipError as error:
+        raise SystemExit(str(error)) from error
+    roots = []
+    for adapter in adapters:
+        for root in adapter["local_skill_roots"]:
+            if root.get("path"):
+                roots.append({**root, "agent_id": adapter["id"]})
+    return adapters, roots
+
+
+def refuse_portable_sync_to_agent_install(
+    args: argparse.Namespace,
+    group: dict[str, Any],
+    current: dict[str, dict[str, Any]],
+    source_role: str,
+) -> None:
+    if source_role != "repo":
+        return
+    _, roots = adapter_roots_for_project(args)
+    explicit_local_paths = {
+        str(Path(location["path"]).expanduser().resolve())
+        for location in group.get("locations", {}).values()
+        if isinstance(location, dict) and location.get("kind") == "local" and location.get("path")
+    }
+    for role, info in current.items():
+        if role == source_role:
+            continue
+        target = Path(str(info["path"])).expanduser().resolve()
+        matching_agents = sorted({
+            root["agent_id"]
+            for root in roots
+            if path_is_within(target, Path(root["path"]))
+        })
+        if str(target) in explicit_local_paths or matching_agents:
+            agent_hint = matching_agents[0] if matching_agents else "the registered Agent"
+            raise SystemExit(
+                f"refusing portable repo sync into Agent install role {role!r}: {target}; "
+                f"build {agent_hint} and use repair-agent-install instead"
+            )
+
+
+def registered_agent_install(
+    group: dict[str, Any],
+    agent_id: str,
+    roots: list[dict[str, Any]],
+) -> tuple[str, Path]:
+    matches: list[tuple[str, Path]] = []
+    for location_id, location in group.get("locations", {}).items():
+        if not isinstance(location, dict) or location.get("kind") != "local":
+            continue
+        if location.get("agent_id") == agent_id and location.get("path"):
+            matches.append((location_id, Path(str(location["path"])).expanduser().absolute()))
+    legacy_local = group.get("roles", {}).get("local")
+    if legacy_local:
+        path = Path(str(legacy_local)).expanduser().absolute()
+        belongs = any(
+            root["agent_id"] == agent_id and path_is_within(path, Path(root["path"]))
+            for root in roots
+        )
+        if belongs and not any(paths_refer_to_same_location(path, match[1]) for match in matches):
+            matches.append((f"local:{agent_id}", path))
+    if not matches:
+        raise SystemExit(f"no registered local install for Agent {agent_id!r}")
+    if len(matches) > 1 and not all(paths_refer_to_same_location(matches[0][1], match[1]) for match in matches[1:]):
+        raise SystemExit(f"multiple registered local installs for Agent {agent_id!r}; select one with link-location first")
+    return matches[0]
+
+
+def create_agent_install_snapshot(
+    state_dir: Path,
+    group_key: str,
+    agent_id: str,
+    local_path: Path,
+    build: dict[str, Any],
+) -> str:
+    base = utc_snapshot_id()
+    snapshot_id = base
+    snapshot_dir = state_dir / "snapshots" / group_key / snapshot_id
+    sequence = 2
+    while snapshot_dir.exists():
+        snapshot_id = f"{base}-{sequence}"
+        snapshot_dir = state_dir / "snapshots" / group_key / snapshot_id
+        sequence += 1
+    snapshot_dir.mkdir(parents=True, exist_ok=False)
+    try:
+        copy_skill_tree(local_path, snapshot_dir / f"local-{agent_id}")
+        manifest = {
+            "group": group_key,
+            "created_at": now_iso(),
+            "operation": "repair-agent-install",
+            "agent_id": agent_id,
+            "original_path": normalized_absolute(local_path),
+            "original_digest": relationship_digest_tree(local_path),
+            "derived_from": build["build_id"],
+            "build_digest": build["output_digest"],
+        }
+        (snapshot_dir / "manifest.json").write_text(
+            json.dumps(manifest, indent=2, sort_keys=True) + "\n",
+            encoding="utf-8",
+        )
+        if relationship_digest_tree(snapshot_dir / f"local-{agent_id}") != manifest["original_digest"]:
+            raise SystemExit("Agent install snapshot failed digest verification")
+        return snapshot_id
+    except BaseException:
+        shutil.rmtree(snapshot_dir, ignore_errors=True)
+        raise
+
+
+def atomic_install_build(build_path: Path, target: Path, sync_id: str, expected_digest: str) -> None:
+    if target.is_symlink():
+        raise SystemExit(f"refusing to replace a symbolic-link Agent install: {target}")
+    if target.exists() and not target.is_dir():
+        raise SystemExit(f"Agent install target is not a directory: {target}")
+    target.parent.mkdir(parents=True, exist_ok=True)
+    staging_root = Path(tempfile.mkdtemp(prefix=f".{target.name}-install-", dir=target.parent))
+    staged = staging_root / "new"
+    previous = staging_root / "previous"
+    failed = staging_root / "failed"
+    try:
+        shutil.copytree(build_path, staged)
+        metadata = read_skill_metadata(staged)
+        if metadata.get("sync_id") != sync_id:
+            raise SystemExit("staged Agent install does not contain the expected metadata.sync_id")
+        if relationship_digest_tree(staged) != expected_digest:
+            raise SystemExit("staged Agent install failed build digest verification")
+        had_target = target.exists()
+        if had_target:
+            os.replace(target, previous)
+        installed = False
+        try:
+            os.replace(staged, target)
+            installed = True
+            if relationship_digest_tree(target) != expected_digest:
+                raise SystemExit("installed Agent Skill failed post-install digest verification")
+        except BaseException:
+            if installed and target.exists():
+                os.replace(target, failed)
+            if had_target and previous.exists() and not target.exists():
+                os.replace(previous, target)
+            raise
+    finally:
+        shutil.rmtree(staging_root, ignore_errors=True)
+
+
+def command_repair_agent_install(args: argparse.Namespace) -> int:
+    state_dir = Path(args.state_dir).expanduser().resolve()
+    registry = load_registry(state_dir)
+    key, group = get_group(registry, args.group)
+    sync_id = group_id(key, group)
+    adapters, roots = adapter_roots_for_project(args)
+    known_agents = {adapter["id"] for adapter in adapters}
+    if args.agent not in known_agents:
+        raise SystemExit(f"unsupported Agent Builder: {args.agent}")
+    location_id, target = registered_agent_install(group, args.agent, roots)
+    matching_roots = [
+        Path(root["path"])
+        for root in roots
+        if root["agent_id"] == args.agent
+    ]
+    if not matching_roots or not any(path_is_within(target, root) for root in matching_roots):
+        raise SystemExit(f"registered install is outside the {args.agent} adapter roots: {target}")
+
+    try:
+        builds, build_issues, _ = read_builds(relationship_project_root(args), adapters)
+    except RelationshipError as error:
+        raise SystemExit(str(error)) from error
+    build = builds.get(sync_id, {}).get(args.agent)
+    if build is None:
+        details = "; ".join(issue["message"] for issue in build_issues if issue.get("agent_id") == args.agent)
+        raise SystemExit(
+            f"no trusted {args.agent} manifest v2 build for {sync_id!r}"
+            + (f": {details}" if details else "")
+        )
+    build_path = Path(build["path"])
+    if target.exists():
+        require_skill_dir(str(target), f"local:{args.agent}")
+        local_digest = relationship_digest_tree(target)
+        local_metadata = read_skill_metadata(target)
+        if local_digest == build["output_digest"] and local_metadata.get("sync_id") == sync_id:
+            location = {
+                "kind": "local",
+                "agent_id": args.agent,
+                "derived_from": build["build_id"],
+                "path": normalized_absolute(target),
+            }
+            group.setdefault("locations", {})[location_id] = location
+            registry["schema_version"] = max(2, int(registry.get("schema_version", 1)))
+            save_registry(state_dir, registry)
+            return finish_mutation(args, registry, {
+                "group": key,
+                "sync_id": sync_id,
+                "agent_id": args.agent,
+                "target_path": normalized_absolute(target),
+                "snapshot": None,
+                "status": "already-current",
+            })
+        if not args.discard_local_changes:
+            raise SystemExit(
+                "local Agent install differs from its trusted build; the existing copy was preserved. "
+                "Export its changes or rerun with --discard-local-changes to authorize snapshot and replacement."
+            )
+
+    snapshot_id = None
+    if target.exists():
+        snapshot_id = create_agent_install_snapshot(state_dir, key, args.agent, target, build)
+    atomic_install_build(build_path, target, sync_id, build["output_digest"])
+    location = {
+        "kind": "local",
+        "agent_id": args.agent,
+        "derived_from": build["build_id"],
+        "path": normalized_absolute(target),
+    }
+    group.setdefault("locations", {})[location_id] = location
+    if snapshot_id:
+        group.setdefault("snapshots", []).append(snapshot_id)
+    operation_at = now_iso()
+    group["last_agent_install_repair"] = {
+        "at": operation_at,
+        "agent_id": args.agent,
+        "derived_from": build["build_id"],
+        "snapshot": snapshot_id,
+        "target_path": normalized_absolute(target),
+    }
+    group["updated_at"] = operation_at
+    registry["schema_version"] = max(2, int(registry.get("schema_version", 1)))
+    save_registry(state_dir, registry)
+    return finish_mutation(args, registry, {
+        "group": key,
+        "sync_id": sync_id,
+        "agent_id": args.agent,
+        "target_path": normalized_absolute(target),
+        "snapshot": snapshot_id,
+        "status": "reinstalled",
+        "updated_at": operation_at,
+    })
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Synchronize linked Agent Skill directory copies.")
     parser.add_argument(
         "--state-dir",
         default=str(default_state_dir()),
         help="Registry and snapshot directory. Default: an XDG state directory isolated per checkout.",
+    )
+    parser.add_argument(
+        "--project-root",
+        default=str(find_repository_root()),
+        help="Skill-management project root used for adapters, portable Skills, and reports.",
     )
     subparsers = parser.add_subparsers(dest="command", required=True)
 
@@ -1208,6 +1641,57 @@ def build_parser() -> argparse.ArgumentParser:
         help="Legacy repository-local state directory. Default: .skill-sync",
     )
     migrate_state.set_defaults(func=command_migrate_state)
+
+    relationships = subparsers.add_parser(
+        "relationships",
+        help="Generate machine-local JSON and Markdown Skill relationship reports.",
+    )
+    relationships.add_argument(
+        "--local-root",
+        action="append",
+        default=[],
+        metavar="AGENT=PATH",
+        help="Override or supplement one supported Builder's local Skill root.",
+    )
+    relationships.add_argument(
+        "--project",
+        action="append",
+        default=[],
+        metavar="NAME=PATH",
+        help="Scan one explicitly named related-project Skill root.",
+    )
+    relationships.add_argument("--format", choices=("markdown", "json", "both"), default="both")
+    relationships.add_argument("--output-dir", help="Report directory; must remain outside the repository.")
+    relationships.add_argument("--strict", action="store_true", help="Return 2 when the report contains non-clean findings.")
+    relationships.set_defaults(func=command_relationships)
+
+    link_location = subparsers.add_parser(
+        "link-location",
+        help="Explicitly register another project, local Agent install, or external Skill location.",
+    )
+    link_location.add_argument("group", help="Existing sync ID, Skill name, or alias.")
+    link_location.add_argument("--location-id", required=True)
+    link_location.add_argument("--kind", choices=("project", "local", "external"), required=True)
+    link_location.add_argument("--path", required=True)
+    link_location.add_argument("--project-id")
+    link_location.add_argument("--agent-id")
+    link_location.add_argument("--derived-from")
+    link_location.add_argument("--source-id")
+    link_location.add_argument("--adapter-root")
+    link_location.set_defaults(func=command_link_location)
+
+    repair_install = subparsers.add_parser(
+        "repair-agent-install",
+        help="Snapshot and reinstall a registered local Agent Skill from its trusted manifest v2 build.",
+    )
+    repair_install.add_argument("group", help="Existing sync ID, Skill name, or alias.")
+    repair_install.add_argument("--agent", required=True, help="Supported Agent Builder ID.")
+    repair_install.add_argument(
+        "--discard-local-changes",
+        action="store_true",
+        help="After snapshotting, replace a local install that differs from the trusted build.",
+    )
+    repair_install.set_defaults(func=command_repair_agent_install)
 
     link = subparsers.add_parser("link", help="Create or update a linked skill group.")
     link.add_argument("group", help="Stable metadata.sync_id (legacy group names remain valid as aliases).")

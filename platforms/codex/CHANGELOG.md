@@ -4,6 +4,10 @@
 
 - No unreleased changes.
 
+## [1.1.0] - 2026-09-07
+
+- Declared the machine-local Codex Skill root for adapter-driven relationship inventory.
+
 ## [1.0.1] - 2026-09-07
 
 - Builder safety: repository-local output is restricted to `dist/`, and `--force` replaces only a validated Codex build artifact.

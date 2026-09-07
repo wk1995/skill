@@ -89,7 +89,7 @@ Agent Skills 规范只要求 `SKILL.md`，但本仓库额外要求双语使用�
 | `android-code-release-train` | `android-code-release-train` 约束 Android 需求从功能分支、版本集成和发布提升，到形成已评审源码提交及不可变 Tag 的完整代码链路。它不构建、签名、打包或上传发布产物。 | [README](skills/android-code-release-train/README.zh-CN.md) |
 | `build-pipeline-engineering` | `build-pipeline-engineering` 用于配置和执行可复现的可分发构建流水线：从一个确定源码引用完成 build variant 选择、环境配置、签名、打包、校验与输出上传。对于支持 variant 的目标，未指定时默认使用 `release`；在 GitHub Actions 中，构建输出默认上传到 GitHub Actions Artifacts。 | [README](skills/build-pipeline-engineering/README.zh-CN.md) |
 | `choose-project-doc-location` | `choose-project-doc-location` 用于在创建或修改项目文档前，判断内容应放在仓库 README、受版本控制的仓库文档，还是 GitHub Wiki 中。 | [README](skills/choose-project-doc-location/README.zh-CN.md) |
-| `sync-skills` | `sync-skills` 用于管理同一个 Agent Skill 在仓库、项目、本机用户目录和明确指定的外部路径中的等价副本。它支持链接、转换、比较、同步、版本记录、快照、审计和回滚。 | [README](skills/sync-skills/README.zh-CN.md) |
+| `sync-skills` | `sync-skills` 用于管理同一个 Agent Skill 在仓库、项目、本机 Agent 安装目录、Agent 构建产物和明确指定的外部路径中的等价副本。它还会按项目支持的全部 AI Agent Builders 生成本机关系报告，并安全修复身份不完整的 Agent 安装副本。 | [README](skills/sync-skills/README.zh-CN.md) |
 <!-- skills-catalog:end -->
 
 本机 Skill 清单与跨项目映射见 [Skill 关系报告 PRD](docs/skill-relationship-report-prd.zh-CN.md)、随仓库维护的[技术设计](docs/skill-relationship-report-technical-design.zh-CN.md)和[测试计划](docs/skill-relationship-report-test-plan.zh-CN.md)。实际生成的关系报告仍只保存在本机；当前机器可读契约见 [skill-relationships.schema.json](schemas/skill-relationships.schema.json)。

@@ -2,14 +2,14 @@
 
 ## 1. 文档信息
 
-- 状态：设计完成，待分阶段实现。
+- 状态：首版已实现。
 - 日期：2026-09-07。
 - 对应需求：[Skill 关系报告 PRD](skill-relationship-report-prd.zh-CN.md)。
 - 数据契约：[Skill 关系报告 JSON Schema](../schemas/skill-relationships.schema.json)。
 - 测试策略：[Skill 关系报告测试计划](skill-relationship-report-test-plan.zh-CN.md)。
 - 范围：`sync-skills` 的只读盘点、报告生成、同步后刷新，以及 Agent 安装副本安全修复所需的数据链路。
 
-本文描述目标实现，不表示当前 `skill_sync.py` 已提供 `relationships` 或 `link-location` 命令。当前阶段只落地 JSON Schema、独立契约校验器和契约测试；命令、扫描器与修复器按本文分阶段实现。
+本文同时描述首版实现边界。当前 `skill_sync.py` 已提供 `relationships`、`link-location` 和 `repair-agent-install`；JSON Schema、独立契约校验器、扫描/渲染模块及端到端测试均已落地。
 
 ## 2. 设计原则
 
@@ -23,25 +23,18 @@
 
 ## 3. 组件与数据流
 
-建议把关系报告实现拆出 `skill_sync.py`，避免继续扩大当前单文件命令实现：
+关系报告实现已拆出 `skill_sync.py`，避免继续扩大命令入口文件：
 
 ```text
 skill_sync.py / agent_build.py
         |
         v
-relationships/service.py          编排一次只读扫描和刷新
+skill_relationships.py           Builder/registry/inventory/build/graph/render/writer
         |
-        +-- adapters.py            动态发现 Builder、解析本机根目录
-        +-- registry_view.py       registry v1 roles -> 内存 Location 视图
-        +-- inventory.py           扫描当前项目、本机根目录、显式关联项目
-        +-- build_manifests.py     校验 .agent-build.json 和产物身份
-        +-- graph.py               按 sync_id 建图并计算状态
-        +-- contract.py            生成并校验 JSON 数据模型
-        +-- render_markdown.py     从模型渲染单主表 Markdown
-        `-- writer.py              路径防护、权限和原子替换
+        `-- validate_skill_relationship_report.py  独立结构与语义契约校验
 ```
 
-这些模块放在 `skills/sync-skills/scripts/relationships/`，只依赖 Python 标准库。入口脚本继续可被直接执行；共享模块不能依赖调用者先执行单独的 `--check`。
+实现只依赖 Python 标准库。入口脚本继续可被直接执行；共享模块不依赖调用者先执行单独的 `--check`。首版保持一个内聚模块，后续只有在各子域继续增长时再按上述责任拆包。
 
 一次生成过程固定为：
 
@@ -118,7 +111,7 @@ adapter 的目录名必须等于 `id`，ID 必须为小写连字符形式并在�
 
 ### 5.2 `local_skill_roots` 扩展
 
-当前 adapter 尚未声明本机安装目录，实现关系扫描前需把 adapter schema 升级为支持 `local_skill_roots`。首版只接受无副作用的声明式 resolver：
+当前 adapter 已声明本机安装目录，关系扫描支持以下无副作用的 `local_skill_roots` resolver：
 
 ```json
 {
@@ -181,7 +174,7 @@ adapter 的目录名必须等于 `id`，ID 必须为小写连字符形式并在�
 
 ## 7. Build manifest 契约
 
-现有 `.agent-build.json` schema v1 只有 Skill 名称、版本和输出 digest，不能安全证明 `sync_id` 或 portable 来源。目标 manifest 升级为 v2，每个 Skill 至少记录：
+`.agent-build.json` 已升级为 schema v2，每个 Skill 至少记录：
 
 ```json
 {
@@ -293,13 +286,13 @@ JSON 和 Markdown 是一对输出。先完成两份 staging 与校验，再依�
 
 ## 15. 实施拆分
 
-1. 以当前 Schema、契约校验器和契约测试固定 report v1。
-2. 扩展 adapter schema 与 adapter 校验，补 Codex/WorkBuddy 的声明式本机根。
-3. 将 agent build manifest 升级为 v2，并保留 v1 只读兼容。
-4. 实现 registry 内存 Location 视图、显式项目登记与动态 Builder/inventory 扫描。
-5. 实现关系图、状态计算、canonical JSON 和单主表 Markdown。
-6. 实现安全 writer 与 `relationships` 命令。
-7. 接入 mutation/build 后刷新和 stale 退出语义。
-8. 单独实现 Agent install 修复入口及其快照、冲突和幂等测试。
+1. 已完成：以 Schema、契约校验器和契约测试固定 report v1。
+2. 已完成：扩展 adapter 校验并补 Codex/WorkBuddy 声明式本机根。
+3. 已完成：将 Agent build manifest 升级为 v2；v1 可识别为旧产物，但不能作为安装修复可信源。
+4. 已完成：registry 内存 Location 视图、显式项目登记与动态 Builder/inventory 扫描。
+5. 已完成：关系图、状态计算、canonical JSON 和单主表 Markdown。
+6. 已完成：安全 writer 与 `relationships` 命令。
+7. 已完成：mutation 后刷新、Agent build 刷新提示和 stale 退出语义。
+8. 已完成：Agent install 修复入口及其快照、冲突和幂等测试。
 
 每一步合并前都按测试计划增加回归用例；涉及覆盖、移动、同步或安装的入口还必须执行项目 PR review playbook 的路径身份、首次修改前校验、缺失依赖和多次调用检查。

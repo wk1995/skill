@@ -307,7 +307,7 @@ def validate_report(report: dict[str, Any], schema_path: Path = DEFAULT_SCHEMA) 
         builds = validator.object(skill.get("agent_builds"), f"{path}.agent_builds", set(builder_ids), set(builder_ids))
         present_versions: list[str] = []
         present_count = 0
-        present_build_ids: set[str] = set()
+        build_stale = False
         if builds is not None:
             if list(builds) != sorted(builds):
                 validator.error(f"{path}.agent_builds", "Builder keys must use canonical sort order")
@@ -334,14 +334,12 @@ def validate_report(report: dict[str, Any], schema_path: Path = DEFAULT_SCHEMA) 
                 build_id = validator.string(build.get("build_id"), f"{build_path}.build_id")
                 if build_id != f"build:{agent_id}":
                     validator.error(f"{build_path}.build_id", "must equal build:<agent_id>")
-                if build_id:
-                    present_build_ids.add(build_id)
                 core_version = validator.semver(build.get("core_version"), f"{build_path}.core_version")
                 if core_version:
                     present_versions.append(core_version)
                 actual_portable_digest = validator.digest(build.get("portable_digest"), f"{build_path}.portable_digest")
                 if portable_digest and actual_portable_digest and actual_portable_digest != portable_digest:
-                    validator.error(f"{build_path}.portable_digest", "must match the portable source digest")
+                    build_stale = True
                 adapter_version = validator.semver(build.get("adapter_version"), f"{build_path}.adapter_version")
                 artifact_version = validator.semver(build.get("artifact_version"), f"{build_path}.artifact_version")
                 expected_versions = builder_versions.get(agent_id)
@@ -362,15 +360,17 @@ def validate_report(report: dict[str, Any], schema_path: Path = DEFAULT_SCHEMA) 
             partial_count += 1
             if "agent-build-partial" not in statuses:
                 validator.error(f"{path}.statuses", "must contain agent-build-partial for partial Builder coverage")
-        elif builder_count and portable_version and all(version == portable_version for version in present_versions):
+        elif builder_count and portable_version and all(version == portable_version for version in present_versions) and not build_stale:
             complete_count += 1
         if len(set(present_versions)) > 1:
             agent_version_diverged_count += 1
             if "agent-version-diverged" not in statuses:
                 validator.error(f"{path}.statuses", "must contain agent-version-diverged for different Builder core versions")
         if portable_version and any(version != portable_version for version in present_versions):
+            build_stale = True
+        if build_stale:
             if "agent-build-stale" not in statuses:
-                validator.error(f"{path}.statuses", "must contain agent-build-stale when a build core version differs from portable")
+                validator.error(f"{path}.statuses", "must contain agent-build-stale when a build source differs from portable")
 
         installs = validator.array(skill.get("local_installs"), f"{path}.local_installs") or []
         validator.sorted_unique(installs, f"{path}.local_installs", lambda item: (item["agent_id"], item["path"]))
@@ -390,8 +390,6 @@ def validate_report(report: dict[str, Any], schema_path: Path = DEFAULT_SCHEMA) 
             derived_from = validator.string(install.get("derived_from"), f"{install_path}.derived_from")
             if agent_id and derived_from != f"build:{agent_id}":
                 validator.error(f"{install_path}.derived_from", "must reference the build for the same Agent")
-            if derived_from not in present_build_ids:
-                validator.error(f"{install_path}.derived_from", "must reference a present trusted Agent build")
             install_statuses = validator.statuses(install.get("statuses"), f"{install_path}.statuses")
             install_sync_id = install.get("sync_id")
             if install_sync_id is None:

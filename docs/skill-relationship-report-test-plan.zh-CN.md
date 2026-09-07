@@ -5,17 +5,18 @@
 本计划验证 [Skill 关系报告 PRD](skill-relationship-report-prd.zh-CN.md) 和[技术设计](skill-relationship-report-technical-design.zh-CN.md)。测试分两类：
 
 - 已落地的契约测试：固定 report v1 的 JSON 结构、动态 Builder、身份派生链、状态语义、绝对路径、canonical 顺序和派生 summary。
-- 随实现逐步落地的行为测试：adapter resolver、只读扫描、registry 兼容、Markdown 渲染、安全写入、命令接入、stale 语义和 Agent 安装修复。
+- 已落地的行为测试：adapter resolver、只读扫描、registry 兼容、Markdown 渲染、安全写入、命令接入、stale 语义和 Agent 安装修复；矩阵中标为“部分落地”或“实现阶段”的扩展对抗组合继续作为回归建设项。
 
-仓库当前还没有 `relationships`/`link-location` 命令，因此本次不添加 skip、expected-failure 或永远失败的端到端占位测试。下文标为“实现阶段”的用例必须与对应实现同一提交落地；在此之前由设计评审跟踪，不进入 CI 假装已覆盖。
+仓库现已实现 `relationships`、`link-location` 和 `repair-agent-install`。契约测试与端到端行为测试都进入 CI；没有 skip、expected-failure 或永远失败的占位用例。
 
 当前可直接运行：
 
 ```bash
 bash tests/skill-relationship-report-contract.sh
+bash tests/skill-relationships.sh
 ```
 
-该脚本由 `tests/pr-review-gate.sh` 的 `tests/*.sh` 自动发现，无需维护第二份测试列表。它只使用 Python 标准库，不要求安装 `jsonschema`。
+这些脚本由 `tests/pr-review-gate.sh` 的 `tests/*.sh` 自动发现，无需维护第二份测试列表。实现和测试只使用 Python 标准库，不要求安装 `jsonschema`。
 
 ## 2. 测试分层
 
@@ -61,33 +62,33 @@ bash tests/skill-relationship-report-contract.sh
 | C05 | 契约 / 已落地 | 多 Builder core 版本不同而缺少 `agent-version-diverged` 失败；build core 不等于 portable 而缺少 stale 状态失败。 | 14, 15 |
 | C06 | 契约 / 已落地 | 仅部分 Builder 有 build 而未标 `agent-build-partial` 失败；所有 Builder 缺失时必须标 missing。 | 13 |
 | C07 | 契约 / 已落地 | 所有已解析 path 必须为规范化绝对路径；Skill/Builder/status/source 顺序稳定；summary 必须由明细推导。 | 9, 20 |
-| A01 | 单元 / adapter 实现阶段 | 从临时 `platforms/*/adapter.json` 发现 Codex、WorkBuddy 和第三方 Builder；`dist/` 不能反向声明支持。adapter ID 重复、目录不匹配、manifest 损坏分别报错。 | 13, 16, 17 |
-| A02 | 单元 / adapter 实现阶段 | `home-relative`、可选/必需 `env` resolver；缺失根为 `missing-root`，不可解析为 `unresolved-root`。`--local-root` 可覆盖/补充但不写 adapter。 | 18, 19 |
-| A03 | 单元 / adapter 实现阶段 | 多 Builder 声明同一根、重复路径、嵌套根和软链接别名只扫描一次，同时保留所有 Builder 归属。 | 18, 19 |
-| B01 | 单元 / manifest v2 阶段 | build manifest 的 sync ID、portable digest、core/adapter/artifact 版本、output digest 和相对产物路径全部核对；platform 错配、路径逃逸、重复 Skill 无效。 | 13, 15, 17, 23 |
-| B02 | 单元 / manifest v2 阶段 | v1 manifest 可读但标身份不完整，不能作为安装修复可信源；重新 build 生成 v2 后才可用。 | 23, 24, 25 |
-| I01 | 单元 / inventory 阶段 | 扫描当前项目全部 portable Skill、本机 roots 全部直接子 Skill、两个逐个登记的项目；未登记父目录中的项目永不进入结果。 | 2, 3, 22 |
-| I02 | 单元 / inventory 阶段 | 缺失 `SKILL.md`、frontmatter 损坏、缺失路径、扫描中变化分别成为 issue/状态，其他 Skill 仍正常生成。 | 5, 10 |
-| I03 | 单元 / registry view 阶段 | 旧 `roles` registry 在内存映射为等价 locations；只生成报告不改变 registry 字节和 mtime，多次调用不隐式迁移。 | 8, 12 |
-| G01 | 单元 / graph 阶段 | 相同 `sync_id` 连接本机、当前项目、两个其他项目；同名不同 ID、同 digest 无 ID、同 URL 不同 ID 都不自动关联。 | 3, 6 |
-| G02 | 单元 / graph 阶段 | 版本相同 digest 不同、版本不同、缺失 copy、重复 ID、同物理目录多 ID、不安全路径分别得到正确状态和优先级。 | 4, 5 |
-| G03 | 单元 / graph 阶段 | `portable -> build -> local` 两段分别比较；跨 Agent digest 不比较；local 与同 Agent build 不同才产生 install divergence。 | 15, 23 |
-| R01 | 单元 / renderer 阶段 | Markdown 只有一张常规主表，Builder 动态列顺序与 JSON 一致；列表展示跨项目、未关联本机、问题、扫描来源和完整绝对路径。 | 2, 3, 4, 13, 14, 20 |
-| R02 | 单元 / renderer 阶段 | 同一固定输入生成两次，去除 `generated_at` 后 JSON/Markdown 字节一致，input fingerprint 一致。 | 9 |
-| W01 | 单元 / writer 阶段 | 新建 reports 权限 `0700`、文件 `0600`；临时文件写完、fsync、校验后替换。报告不进入 registry、snapshot 或任何 Skill。 | 7, 8 |
-| W02 | 单元 / writer 实现阶段 | 已有报告后注入 JSON 写失败、Markdown 写失败、fsync/replace 失败、扫描异常；旧完整报告不被截断，临时文件清理。 | 10 |
-| W03 | 对抗 / writer 实现阶段 | output 是软链接、目录、FIFO、registry、snapshot、仓库/Skill 内部、互相嵌套、反向包含、case-only alias 时首次写入前失败。 | 7, 10, 20 |
-| CLI01 | 组件 / relationships 阶段 | 手动命令生成 JSON/Markdown 并输出两个绝对路径；`--format`、重复 `--project`、`--local-root`、`--output-dir` 生效。 | 1, 2, 3, 7, 19 |
-| CLI02 | 组件 / relationships 阶段 | 普通报告含诊断仍为 0；`--strict` 生成报告后为 2；运行失败为 1。报告过程不调用 build，不改变 `dist/`。 | 8, 17 |
-| CLI03 | 状态化 / relationships 阶段 | 连续调用覆盖：首次状态、已有合法报告、已有损坏报告、旧 registry、malformed registry、并发刷新和锁超时。 | 9, 10, 12 |
-| M01 | 集成 / mutation 接入阶段 | `sync`、`link`、`convert`、`rename`、`rollback` 成功后各刷新一次；mutation 失败不刷新。 | 1, 8 |
-| M02 | 集成 / stale 阶段 | 先完成一次真实同步，再注入报告刷新失败；Skill 与 registry 保留新状态，旧报告保留，返回 2 并输出 `report_status: stale`、旧路径和重试命令。 | 21 |
-| M03 | 集成 / build 接入阶段 | Agent build 成功后刷新；刷新失败不删除 build 并返回部分成功。报告自身绝不隐式 build 或覆盖 `dist/`。 | 17, 21 |
-| F01 | 安装修复 / 实现阶段 | 已登记 local 缺身份：没有可信同 Agent manifest v2 时失败关闭，不创建安装结果；只手工补字段仍因 digest/adapter 文件不完整而不算成功。 | 24, 25, 27 |
-| F02 | 安装修复 / 实现阶段 | 有可信 build 时，先验证快照，再 staging 安装和原子替换；最终 sync ID、core 版本、digest、registry 派生来源及报告全部一致。 | 24, 25, 27 |
-| F03 | 安装修复 / 实现阶段 | local 有额外修改时不覆盖，保留现场并提示导出或明确重装；快照/源均可复核。 | 25, 27 |
-| F04 | 安装修复 / 实现阶段 | 修复成功后原参数第二次执行：不产生内容变化、不新增快照，报告仍一致。 | 27 |
-| F05 | 安装修复 / 实现阶段 | 普通 `sync --source repo` 指向或解析到 Agent install 目录时，在 snapshot、清空、复制前失败并提示 build/install 流程。 | 26 |
+| A01 | 单元 / 已落地 | 从临时 `platforms/*/adapter.json` 发现 Codex、WorkBuddy 和第三方 Builder；`dist/` 不能反向声明支持。adapter ID 重复、目录不匹配、manifest 损坏分别报错。 | 13, 16, 17 |
+| A02 | 单元 / 已落地 | `home-relative`、可选/必需 `env` resolver；缺失根为 `missing-root`，不可解析为 `unresolved-root`。`--local-root` 可覆盖/补充但不写 adapter。 | 18, 19 |
+| A03 | 单元 / 部分落地 | 多 Builder 声明同一根和重复路径时只扫描一次，同时保留所有 Builder 归属；嵌套根和软链接别名组合继续扩充。 | 18, 19 |
+| B01 | 单元 / 已落地 | build manifest 的 sync ID、portable digest、core/adapter/artifact 版本、output digest 和相对产物路径全部核对；platform 错配、路径逃逸、重复 Skill 无效。 | 13, 15, 17, 23 |
+| B02 | 单元 / 已落地 | v1 manifest 被报告为身份不完整的无效 build，不能作为安装修复可信源；重新 build 生成 v2 后才可用。 | 23, 24, 25 |
+| I01 | 单元 / 已落地 | 扫描当前项目全部 portable Skill、本机 roots 全部直接子 Skill、两个逐个登记的项目；未登记父目录中的项目永不进入结果。 | 2, 3, 22 |
+| I02 | 单元 / 部分落地 | 缺失 `SKILL.md`、frontmatter 损坏和缺失路径成为 issue/状态且其他 Skill 仍正常生成；扫描中变化的确定性故障注入继续扩充。 | 5, 10 |
+| I03 | 单元 / 已落地 | 旧 `roles` registry 在内存映射为等价 locations；只生成报告不改变 registry 字节，多次调用不隐式迁移。 | 8, 12 |
+| G01 | 单元 / 部分落地 | 相同 `sync_id` 连接本机、当前项目和两个其他项目；同名不同 ID、同 digest 无 ID、同 URL 不同 ID 的组合继续扩充。 | 3, 6 |
+| G02 | 单元 / 部分落地 | 版本相同 digest 不同、版本不同、缺失 copy 和重复 ID 得到状态；同物理目录多 ID及更多不安全路径组合继续扩充。 | 4, 5 |
+| G03 | 单元 / 已落地 | `portable -> build -> local` 两段分别比较；跨 Agent digest 不比较；local 与同 Agent build 不同才产生 install divergence。 | 15, 23 |
+| R01 | 单元 / 已落地 | Markdown 只有一张常规主表，Builder 动态列顺序与 JSON 一致；列表展示跨项目、未关联本机、问题、扫描来源和完整绝对路径。 | 2, 3, 4, 13, 14, 20 |
+| R02 | 单元 / 部分落地 | canonical 顺序与 input fingerprint 已由契约覆盖；固定时间下连续两次 JSON/Markdown 字节对比继续扩充。 | 9 |
+| W01 | 单元 / 已落地 | 新建 reports 权限 `0700`、文件 `0600`；临时文件写完、fsync、校验后替换。报告不进入 registry、snapshot 或任何 Skill。 | 7, 8 |
+| W02 | 单元 / 部分落地 | 已有报告后注入第二文件 replace 失败，首文件恢复且旧报告完整；JSON staging、fsync 和扫描阶段的独立故障点继续扩充。 | 10 |
+| W03 | 对抗 / 部分落地 | 仓库内部 output、软链接 output、FIFO target 和并发 writer 在首次替换前失败；snapshot/registry 交叠、反向包含和 case-only alias 继续扩充。 | 7, 10, 20 |
+| CLI01 | 组件 / 已落地 | 命令生成 JSON/Markdown 并输出绝对路径；`--project`、`--output-dir`、`--strict` 生效，底层组件覆盖 `--format` 和 `--local-root`。 | 1, 2, 3, 7, 19 |
+| CLI02 | 组件 / 已落地 | 普通报告含诊断仍为 0；`--strict` 生成报告后为 2；运行失败为 1。报告过程不调用 build，不改变 `dist/`。 | 8, 17 |
+| CLI03 | 状态化 / 部分落地 | 覆盖首次状态、已有合法报告、旧 registry 和并发刷新失败；已有损坏报告、malformed registry 的连续 CLI 组合继续扩充。 | 9, 10, 12 |
+| M01 | 集成 / 部分落地 | 所有 mutation 入口已接入统一刷新，现有命令回归验证其可运行；逐入口的“成功恰好刷新一次、失败不刷新”注入断言继续扩充。 | 1, 8 |
+| M02 | 集成 / 已落地 | 先完成一次真实同步，再注入报告刷新失败；Skill 与 registry 保留新状态，旧报告保留，返回 2 并输出 `report_status: stale`、旧路径和重试命令。 | 21 |
+| M03 | 集成 / 已落地 | Agent build 成功后输出显式刷新命令；报告自身绝不隐式 build 或覆盖 `dist/`。 | 17, 21 |
+| F01 | 安装修复 / 已落地 | 已登记 local 缺身份：没有可信同 Agent manifest v2 时失败关闭，不创建安装结果；只手工补字段仍因 digest/adapter 文件不完整而不算成功。 | 24, 25, 27 |
+| F02 | 安装修复 / 已落地 | 有可信 build 时，先验证快照，再 staging 安装和原子替换；最终 sync ID、core 版本、digest、registry 派生来源及报告全部一致。 | 24, 25, 27 |
+| F03 | 安装修复 / 已落地 | local 有额外修改时不覆盖，保留现场并提示导出或明确重装；快照/源均可复核。 | 25, 27 |
+| F04 | 安装修复 / 已落地 | 修复成功后原参数第二次执行：不产生内容变化、不新增快照，报告仍一致。 | 27 |
+| F05 | 安装修复 / 已落地 | 普通 `sync --source repo` 指向或解析到 Agent install 目录时，在 snapshot、清空、复制前失败并提示 build/install 流程。 | 26 |
 | X01 | 跨平台 / 实现阶段 | macOS 与 Linux 运行核心测试；在大小写不敏感卷测试 case-only alias。当前卷无法表示时使用受控 identity comparator 替身并在结果中声明限制。 | 11 |
 | X02 | 依赖降级 / 实现阶段 | 使用只含 Python/必要系统命令的受控 `PATH` 隐藏 Git；报告仍用 filesystem 时间或明确失败，安全检查不能静默消失。 | 11 |
 

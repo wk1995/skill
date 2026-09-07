@@ -8,6 +8,16 @@ version, date, and a change summary.
 
 - No unreleased changes.
 
+## [0.2.0] - 2026-09-07
+
+- Relationship reporting: generate canonical machine-local JSON and a single-table Markdown report across portable Skills, dynamic Agent Builders, local installs, and explicitly registered projects.
+- Builder discovery: resolve local Skill inventory roots from declarative adapters and support future Builders without a fixed Agent list.
+- Provenance: upgrade Agent build manifests to v2 with stable sync IDs, portable digests, output digests, core versions, and safe artifact paths.
+- Registry: add explicit multi-project/local/external locations while retaining read compatibility with legacy `roles`.
+- Safety: atomically write private reports outside the repository, preserve completed mutations when refresh becomes stale, and reject portable sync into Agent install roots before snapshot or overwrite.
+- Repair: snapshot and atomically reinstall incomplete Agent installations from a trusted same-Agent build, preserve divergent local changes by default, and make repeated repair idempotent.
+- Tests: cover dynamic coverage, version divergence, unlinked local Skills, explicit projects, stable rendering, output permissions, replacement failure recovery, stale refresh, sync rejection, repair success, conflict preservation, and idempotency.
+
 ## [0.1.0] - 2026-09-07
 
 - State isolation: default registry and snapshot storage now uses an XDG state directory outside the repository, namespaced by checkout identity.
