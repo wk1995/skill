@@ -184,9 +184,9 @@ def safe_output(output: Path) -> Path:
     expanded = output.expanduser()
     require(not expanded.is_symlink(), "output must not be a symbolic link")
     resolved = expanded.resolve()
-    forbidden = (ROOT, SKILLS_DIR, PLATFORMS_DIR)
-    require(not any(resolved == path or resolved.is_relative_to(path) for path in forbidden),
-            "output must not be the repository root, skills/, platforms/, or a child of those paths")
+    require(resolved != ROOT, "output must not be the repository root")
+    require(not any(resolved == path or resolved.is_relative_to(path) for path in (SKILLS_DIR, PLATFORMS_DIR)),
+            "output must not be skills/, platforms/, or a child of those paths")
     require(not ROOT.is_relative_to(resolved), "output must not contain the repository root")
     return resolved
 

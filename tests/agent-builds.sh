@@ -108,7 +108,7 @@ agent_build.SKILLS_DIR = fixture_root / "skills"
 agent_build.PLATFORMS_DIR = fixture_root / "platforms"
 agent_build.DEFAULT_OUTPUT_DIR = fixture_root / "dist"
 agent_build.validate_all()
-output = agent_build.build("new-agent", [], str(fixture_root / "output"), False)
+output = agent_build.build("new-agent", [], None, False)
 generated = (output / "skills" / "demo" / "SKILL.md").read_text(encoding="utf-8")
 assert "Built for demo by new-agent." in generated
 assert not (output / "skills" / "demo" / "agent-builds").exists()
