@@ -156,6 +156,8 @@ skills/example-skill/
 
 These conventions are shared across Skills and management tools. They should be reflected in schemas, registries, CLI output, and MCP resources as those pieces are implemented.
 
+The proposed machine-local inventory and cross-project mapping output is specified in the [Skill Relationship Report PRD](docs/skill-relationship-report-prd.zh-CN.md). The PRD is versioned with the repository; generated relationship reports remain local-only.
+
 ### Stable Skill information
 
 Keep stable self-description in `SKILL.md`:
