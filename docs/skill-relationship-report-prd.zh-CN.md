@@ -34,6 +34,7 @@
 - 每次成功执行 `sync` 后，自动刷新一份本机 Markdown 关系文档。
 - 提供独立命令，允许不执行同步也能重新扫描并生成关系文档。
 - 展示配置范围内的全部本机 Skill，包括尚未关联当前项目的 Skill。
+- 本机 Skill 扫描范围由当前项目支持的 AI Agent Builders 各自声明的本机 Skill 目录自动组成。
 - 展示当前项目的全部 Skill，包括没有本机副本的 Skill。
 - 展示当前项目 Skill 与多个其他项目 Skill 的关联。
 - 按当前项目动态发现的 Agent adapter，展示每个 Skill 的 Agent 构建覆盖矩阵。
@@ -64,7 +65,7 @@
 | Current Project Copy | 当前执行目录所属项目中的 Skill 副本。 |
 | Related Project Copy | 显式登记的其他项目中的 Skill 副本。 |
 | Relationship | 多个 Skill Copy 因具有同一 `sync_id` 而属于同一个 Logical Skill。 |
-| Inventory Root | 用户允许扫描的本机 Skill 或项目 Skill 根目录。 |
+| Inventory Root | 由受支持 Agent Builder 声明或由用户显式补充的本机 Skill / 项目 Skill 根目录。 |
 | Agent Target | 由 `platforms/<agent>/adapter.json` 声明的构建目标，例如 `codex`、`workbuddy`。 |
 | Agent Build Copy | 某个 Logical Skill 针对一个 Agent Target 生成的产物，以 `.agent-build.json` 为清单依据。 |
 | Core Version | portable `SKILL.md` 中的 `metadata.version`，描述跨 Agent 的 Skill 行为版本。 |
@@ -111,15 +112,17 @@ Logical Skill: demo ─────┼─ Current project: ./skills/demo
 系统从四类来源构建关系图：
 
 1. **现有 registry**：读取已经登记的角色、路径、URL、版本历史与最近同步状态。
-2. **本机 Inventory Roots**：扫描用户配置的 Agent Skill 根目录；默认候选可包括当前 Agent 的用户级 Skill 目录。
+2. **本机 Inventory Roots**：读取当前项目支持的每个 AI Agent Builder 所声明的本机 Skill 目录并扫描其并集；例如 Codex adapter 可声明 Codex 的用户级 Skill 目录。用户显式传入的目录只作为补充或覆盖。
 3. **项目 Inventory Roots**：扫描当前项目的 `skills/`，以及用户显式登记的其他项目 Skill 根目录。
 4. **Agent adapter 与构建清单**：动态扫描当前项目 `platforms/*/adapter.json`，并读取已配置构建输出中的 `.agent-build.json`；不得把 `codex`、`workbuddy` 写死为唯一支持列表。关联项目如显式登记了 adapter root，也使用同一规则扫描；未登记时显示为 `unknown`，不得根据目录名猜测。
 
-“全部本机 Skill”定义为：全部已配置 Inventory Roots 中能够识别的 Skill，而不是整个文件系统中的所有目录。
+“全部本机 Skill”定义为：当前项目全部受支持 Agent Builders 所声明的本机 Skill 目录，加上用户显式补充的 Inventory Roots，其中能够识别的全部 Skill；不是整个文件系统中的所有目录。
 
 扫描规则：
 
 - 默认只检查根目录的直接子目录；扩展布局必须由适配器声明。
+- 每个自动发现的本机根目录必须保留 `agent_id`，使报告能够区分 Skill 安装于哪个 Agent Builder；同一路径由多个 Builder 声明时按文件系统身份去重，但保留全部 Builder 归属。
+- adapter 声明的目录无法解析或不存在时，记录 `unresolved-root` 或 `missing-root`，不得静默忽略对应 Builder。
 - 不递归跟随目录软链接；软链接作为单独 Copy 记录，并解析真实路径用于去重和安全检查。
 - 每个候选目录必须包含可读取的 `SKILL.md`。
 - 缺少 `metadata.sync_id` 的 Skill 可以展示，但状态必须是 `missing-sync-id`，不能自动关联。
@@ -190,7 +193,9 @@ Agent 构建不是普通同步 Copy：同一个 Agent Build Copy 仍归属于对
 ### 6.4 Agent 构建覆盖与版本判定
 
 - 当前项目支持的 AI Agent Builder 种类以 `platforms/<agent>/adapter.json` 为唯一事实来源。不要再维护第二份手写 Builder 列表，也不要把已生成的 `dist/` 当成“项目支持”的声明。
-- 每个有效 adapter 清单至少记录 `id`、`version`、`artifact_version` 和 `skills_path`；目录名必须与 `id` 相同，`id` 在项目内唯一。
+- 每个有效 adapter 清单至少记录 `id`、`version`、`artifact_version`、`skills_path`，并通过 `local_skill_roots` 或等价的 adapter resolver 声明该 Builder 的本机 Skill 安装目录；目录名必须与 `id` 相同，`id` 在项目内唯一。
+- adapter 中的本机目录声明必须使用用户主目录、环境变量或产品配置解析规则，不得把某台机器的用户名或绝对路径提交到仓库；解析后的绝对路径只写入本机派生报告。
+- 本机 Inventory Roots 默认等于所有受支持 Builder 的 `local_skill_roots` 并集。`--local-root AGENT=PATH` 只用于覆盖无法自动解析的安装位置或补充非标准安装，不取代 adapter 驱动的默认发现。
 - 关系报告把这些清单派生为项目级 `agent_builders` 列表；例如当前项目会得到 `codex`、`workbuddy`。将来新增 `platforms/claude/adapter.json` 后，下一次生成报告会自动出现 `claude`，不需要修改关系报告代码或注册中心。
 - `.agent-build.json` 只记录“实际上构建了什么”，不能反向声明“项目支持什么”。因此即使 `dist/workbuddy` 不存在，WorkBuddy 仍是已支持但尚未生成产物的 Builder。
 - 关联项目可以在本机外置 registry 中显式登记 `adapter_root`。能读取时展示其 Builder 列表；无法读取或未登记时标记 `unknown`，不影响当前项目报告生成。
@@ -216,12 +221,14 @@ Agent 构建不是普通同步 Copy：同一个 Agent Build Copy 仍归属于对
       "id": "codex",
       "adapter_version": "1.0.1",
       "artifact_version": "0.1.0",
+      "local_skill_roots": ["/Users/example/.codex/skills"],
       "source": "platforms/codex/adapter.json"
     },
     {
       "id": "workbuddy",
       "adapter_version": "1.0.1",
       "artifact_version": "0.1.0",
+      "local_skill_roots": ["/configured/workbuddy/skills"],
       "source": "platforms/workbuddy/adapter.json"
     }
   ]
@@ -298,7 +305,7 @@ python3 skills/sync-skills/scripts/skill_sync.py relationships \
 
 | 参数 | 说明 |
 | --- | --- |
-| `--local-root NAME=PATH` | 增加一个本机 Skill 根目录，可重复。 |
+| `--local-root AGENT=PATH` | 覆盖或补充指定 Builder 由 adapter 声明的本机 Skill 根目录，可重复；默认无需传入。 |
 | `--project NAME=PATH` | 增加一个关联项目 Skill 根目录，可重复。 |
 | `--format markdown\|json\|both` | 默认 `both`。 |
 | `--output-dir PATH` | 覆盖默认 reports 目录，但仍必须位于仓库外。 |
@@ -327,7 +334,7 @@ python3 skills/sync-skills/scripts/skill_sync.py link-location demo \
 - 生成时间：2026-09-07T08:30:00Z
 - 当前项目：`personal-skills`
 - 项目路径：`/projects/skill`
-- 数据范围：2 个本机根目录、当前项目、2 个关联项目
+- 数据范围：2 个受支持 Builder 声明的本机根目录、当前项目、2 个关联项目
 - 项目支持的 Agent Builders：`codex`（adapter `1.0.1`，artifact `0.1.0`）、`workbuddy`（adapter `1.0.1`，artifact `0.1.0`）
 - 汇总：本机 Skill 12；当前项目 Skill 4；其他项目 2；构建完整 1；构建部分缺失 1；Builder 版本分歧 1；全部构建缺失 1；关系分歧或错误 2
 
@@ -389,6 +396,8 @@ python3 skills/sync-skills/scripts/skill_sync.py diff android-release-train --ro
 - 文件在扫描过程中变化：该 Copy 标记为 `scan-unstable`，不输出可能错误的 `synced`。
 - 报告目标已存在且是软链接、目录或特殊文件：拒绝覆盖并保留旧报告。
 - 两个扫描根目录互相嵌套：去重后扫描，禁止重复计数。
+- 多个受支持 Builder 声明同一本机 Skill 根目录：只扫描一次，但每个 Skill 保留全部 Builder 归属。
+- 受支持 Builder 的本机 Skill 根目录缺失或无法解析：在扫描来源中显示 `missing-root` 或 `unresolved-root`，不得把该 Builder 从统计中移除。
 - 大小写不敏感文件系统中的路径别名：按文件系统身份去重。
 - 仅 Codex 或仅 WorkBuddy 构建存在：标记 `agent-build-partial`，并明确缺失的 Agent，不视为普通同步失败。
 - 两个 Agent 构建都存在但 core 版本不同：标记 `agent-version-diverged`，保留每个 Agent 的实际版本，不自动选择较高版本覆盖。
@@ -415,23 +424,25 @@ python3 skills/sync-skills/scripts/skill_sync.py diff android-release-train --ro
 15. 报告分别展示 core、adapter、artifact 三类版本；不同 Agent 的 digest 不会被误判为 portable 内容分歧。
 16. 新增 adapter 后，无需修改关系报告的 Agent 枚举即可自动出现在矩阵中。
 17. 生成关系报告不会隐式执行 Agent build，也不会修改或覆盖现有 `dist/`。
+18. 本机 Skill 默认扫描范围由所有受支持 Agent Builders 声明的本机 Skill 目录并集生成；新增 Builder 后，其目录自动进入扫描范围，无需修改固定目录列表。
+19. `--local-root AGENT=PATH` 可以覆盖或补充非标准安装目录；重复、嵌套及软链接别名路径会安全去重并保留 Builder 归属。
 
 ## 11. 建议实施顺序
 
 1. 定义 `Project`、`Location`、`AgentTarget`、`AgentBuildCopy` 和关系报告 JSON schema。
-2. 实现 Inventory Root 配置与只读扫描器。
-3. 实现 adapter 动态发现与 `.agent-build.json` 只读解析。
-4. 将旧 `roles` 转换为兼容的内存 Location 视图。
-5. 实现关系图、Agent 构建矩阵、状态计算与冲突检测。
-6. 实现稳定 JSON 输出和 Markdown renderer。
-7. 实现安全、原子的本机报告写入。
-8. 增加 `relationships` 与 `link-location` 命令。
-9. 在 `sync`、`link`、`convert`、`rename`、`rollback` 成功后自动刷新，并为 Agent build 提供刷新衔接。
-10. 补齐状态化、路径安全、跨项目、多 Agent、多次调用和缺失依赖测试。
+2. 扩展 adapter 的本机 Skill 目录声明/解析约定，实现受支持 Builder 驱动的 Inventory Root 发现。
+3. 实现 Inventory Root 覆盖配置、路径去重与只读扫描器。
+4. 实现 adapter 动态发现与 `.agent-build.json` 只读解析。
+5. 将旧 `roles` 转换为兼容的内存 Location 视图。
+6. 实现关系图、Agent 构建矩阵、状态计算与冲突检测。
+7. 实现稳定 JSON 输出和 Markdown renderer。
+8. 实现安全、原子的本机报告写入。
+9. 增加 `relationships` 与 `link-location` 命令。
+10. 在 `sync`、`link`、`convert`、`rename`、`rollback` 成功后自动刷新，并为 Agent build 提供刷新衔接。
+11. 补齐状态化、路径安全、跨项目、多 Agent、多次调用和缺失依赖测试。
 
 ## 12. 待确认项
 
-1. “全部本机 Skill”的默认扫描根目录是否只包含 `~/.codex/skills` 与 `~/.agents/skills`，还是还要允许 Agent adapter 声明额外的已安装 Skill 目录？本 PRD 已确定项目构建目标从 adapter 动态发现，但本机安装目录仍需单独确认。
-2. 其他项目是否只展示显式登记的项目，还是允许配置一个父目录批量发现项目？本 PRD 建议只使用显式登记，避免扫描范围过大。
-3. 关系文档是否需要隐藏绝对路径中的用户名？本 PRD 默认完整显示，因为文件仅本机可读；如需要分享，可增加 `--redact-paths`。
-4. 同步成功但报告刷新失败时，是否接受“同步成功 + 报告 stale”的结果？本 PRD 建议接受并明确告警，避免为派生报告回滚已完成同步。
+1. 其他项目是否只展示显式登记的项目，还是允许配置一个父目录批量发现项目？本 PRD 建议只使用显式登记，避免扫描范围过大。
+2. 关系文档是否需要隐藏绝对路径中的用户名？本 PRD 默认完整显示，因为文件仅本机可读；如需要分享，可增加 `--redact-paths`。
+3. 同步成功但报告刷新失败时，是否接受“同步成功 + 报告 stale”的结果？本 PRD 建议接受并明确告警，避免为派生报告回滚已完成同步。
