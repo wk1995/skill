@@ -1,6 +1,8 @@
 # Skill Contribution Guide
 
-This file governs every new or substantially updated Skill under `skills/`.
+This file governs all repository work. Its Skill structure rules apply to every
+new or substantially updated Skill under `skills/`, and its PR review procedure
+applies to every pull request reviewed or fixed in this repository.
 
 ## Required Structure
 
@@ -66,7 +68,9 @@ See [docs/agent-build-architecture.md](docs/agent-build-architecture.md) for the
 
 ## Required PR Review Procedure
 
-Before declaring a PR review or PR fix complete, the agent must:
+Before declaring a PR review or PR fix complete, the agent must follow
+[docs/pr-review-playbook.md](docs/pr-review-playbook.md). A green test suite is
+necessary evidence, not proof that the review is complete. The agent must:
 
 1. Work from a clean, committed worktree and compare the complete PR with its base branch using `git diff --name-status --find-renames <base>...HEAD`.
 2. Inspect deletions, renames, executable-bit changes, generated files, and newly tracked ignored files. A review based only on reading changed source lines is incomplete.
@@ -74,6 +78,12 @@ Before declaring a PR review or PR fix complete, the agent must:
 4. Exercise stateful commands across multiple invocations, including existing or malformed persisted state, rather than testing only a fresh single command.
 5. Add a regression test for every confirmed review defect. Auto-fix behavior requires negative, fix-success, and idempotency coverage.
 6. Verify external product claims against current authoritative documentation and, when behavior is version-dependent, a versioned product configuration. State the scope instead of generalizing one installation.
+7. Inventory every changed entry point that can delete, overwrite, move, synchronize, generate, or persist data. For each one, trace `entry point -> validation -> first mutation`; direct execution must not rely on a separate `--check` command having run first.
+8. Test path-sensitive mutations against the playbook's identity and containment matrix, including same path, symlink alias, both nesting directions, case-only aliases on a case-insensitive filesystem, file-versus-directory targets, and repository-internal versus external paths. If the current filesystem cannot represent a case, use a controlled substitute and state that limitation.
+9. Test reserved names, ignore rules, overlays, and exclusions at both top level and nested depth. A rule based only on a path's first component is not evidence that recursive inputs are safe.
+10. Test missing optional and required executables with a controlled `PATH`. A required safety check must fail closed or use a tested fallback; it must not silently disappear when a command is unavailable.
+11. Read every changed implementation file without truncated output. If a batched command truncates, reopen the affected files in bounded ranges and record them as reviewed.
+12. Report the adversarial cases actually exercised and any untested cases with reasons. Do not declare the review complete from CI status, the repository gate, or happy-path tests alone.
 
 The `skill-catalog` required status check invokes the same gate in GitHub Actions. Protected local state under `.skill-sync/` must have no net PR changes; stopping tracking or migrating it requires a separately designed migration rather than an ordinary cleanup commit.
 

@@ -6,6 +6,7 @@ README="$ROOT/README.md"
 README_ZH="$ROOT/README.zh-CN.md"
 SPEC="$ROOT/docs/superpowers/specs/2026-07-10-skill-management-architecture-design.md"
 AGENT_BUILD_DOC="$ROOT/docs/agent-build-architecture.md"
+PR_REVIEW_PLAYBOOK="$ROOT/docs/pr-review-playbook.md"
 AGENTS="$ROOT/AGENTS.md"
 CATALOG_SCRIPT="$ROOT/scripts/skill_catalog.py"
 AGENT_BUILD_SCRIPT="$ROOT/scripts/agent_build.py"
@@ -17,7 +18,7 @@ fail() {
   exit 1
 }
 
-for file in "$README" "$README_ZH" "$SPEC" "$AGENT_BUILD_DOC" "$AGENTS" "$CATALOG_SCRIPT" "$AGENT_BUILD_SCRIPT" "$CATALOG_WORKFLOW" "$PR_REVIEW_GATE"; do
+for file in "$README" "$README_ZH" "$SPEC" "$AGENT_BUILD_DOC" "$PR_REVIEW_PLAYBOOK" "$AGENTS" "$CATALOG_SCRIPT" "$AGENT_BUILD_SCRIPT" "$CATALOG_WORKFLOW" "$PR_REVIEW_GATE"; do
   [[ -f "$file" ]] || fail "missing file: $file"
 done
 
@@ -167,8 +168,14 @@ for skill_dir in "$ROOT"/skills/*; do
 done
 
 grep -Eq '## Required Structure' "$AGENTS" || fail "missing Skill structure guidance"
+grep -Fq 'applies to every pull request reviewed or fixed in this repository' "$AGENTS" || fail "AGENTS.md does not apply review rules to every PR"
 grep -Eq '## Required PR Review Procedure' "$AGENTS" || fail "missing required PR review procedure"
+grep -Fq 'docs/pr-review-playbook.md' "$AGENTS" || fail "AGENTS.md does not require the PR review playbook"
 grep -Eq 'tests/pr-review-gate.sh' "$AGENTS" || fail "AGENTS.md does not require the PR review gate"
+grep -Fq 'entry point -> validation -> first mutation' "$AGENTS" || fail "AGENTS.md does not require mutation call-path review"
+grep -Fq 'case-only aliases' "$AGENTS" || fail "AGENTS.md does not require case-insensitive path review"
+grep -Fq 'controlled `PATH`' "$AGENTS" || fail "AGENTS.md does not require missing-executable review"
+grep -Fq 'without truncated output' "$AGENTS" || fail "AGENTS.md does not reject truncated review coverage"
 grep -Eq '`README.md`' "$AGENTS" || fail "AGENTS.md does not require README.md"
 grep -Eq 'When It Triggers' "$AGENTS" || fail "AGENTS.md does not require trigger documentation"
 grep -Eq 'When It Does Not Trigger' "$AGENTS" || fail "AGENTS.md does not require non-trigger documentation"
@@ -218,6 +225,10 @@ done
 
 grep -Fq 'platforms/*/adapter.json' "$AGENT_BUILD_DOC" || fail "Agent build doc does not define adapter discovery"
 grep -Fq 'must not bump the portable Skill version' "$AGENT_BUILD_DOC" || fail "Agent build doc does not separate versions"
+grep -Fq 'same spelling, symlink alias, case-only alias' "$PR_REVIEW_PLAYBOOK" || fail "PR review playbook lacks the filesystem identity matrix"
+grep -Fq 'entry point -> mandatory validation -> first mutation' "$PR_REVIEW_PLAYBOOK" || fail "PR review playbook lacks entry-point validation tracing"
+grep -Fq 'controlled `PATH`' "$PR_REVIEW_PLAYBOOK" || fail "PR review playbook lacks dependency degradation tests"
+grep -Fq 'Do not declare a review complete merely because CI is green' "$PR_REVIEW_PLAYBOOK" || fail "PR review playbook treats CI as sufficient evidence"
 python3 "$AGENT_BUILD_SCRIPT" --check
 
 printf 'PASS: bilingual skill architecture docs\n'
