@@ -62,6 +62,62 @@ with tempfile.TemporaryDirectory() as raw_tmp:
         "roles resolve to the same path",
     )
 
+    case_root = tmp / "case-probe"
+    case_lower = skill(case_root / "lower", "case-demo")
+    case_variant = case_root / "LOWER"
+    original_samefile = skill_sync.os.path.samefile
+    simulated_case_insensitive = not case_variant.exists()
+    if simulated_case_insensitive:
+        skill(case_variant, "case-demo")
+        aliased_paths = {str(case_lower.resolve()), str(case_variant.resolve())}
+
+        def case_insensitive_samefile(first, second):
+            resolved = {str(Path(first).resolve()), str(Path(second).resolve())}
+            if resolved == aliased_paths:
+                return True
+            return original_samefile(first, second)
+
+        skill_sync.os.path.samefile = case_insensitive_samefile
+    else:
+        assert original_samefile(case_lower, case_variant)
+
+    case_sentinel = case_lower / "must-survive.txt"
+    case_sentinel.write_text("preserve case-aliased source\n", encoding="utf-8")
+    case_issues = skill_sync.role_path_issues(
+        {"repo": str(case_lower), "local": str(case_variant)}
+    )
+    assert any("roles resolve to the same path" in issue for issue in case_issues), case_issues
+    assert skill_sync.path_is_within(case_variant / "child", case_lower)
+    try:
+        skill_sync.copy_skill_tree(case_lower, case_variant)
+    except SystemExit as exc:
+        assert "onto itself" in str(exc), str(exc)
+    else:
+        raise AssertionError("copy_skill_tree must reject case-aliased paths")
+    assert case_sentinel.read_text(encoding="utf-8") == "preserve case-aliased source\n"
+
+    case_state = tmp / "case-state"
+    skill_sync.save_registry(
+        case_state,
+        {
+            "groups": {
+                "case-demo": {
+                    "sync_id": "case-demo",
+                    "name": "case-demo",
+                    "roles": {"repo": str(case_lower), "local": str(case_variant)},
+                }
+            }
+        },
+    )
+    case_status_code, case_status_output = run(
+        ["--state-dir", str(case_state), "status", "case-demo"]
+    )
+    case_status = json.loads(case_status_output)
+    assert case_status_code == 2
+    assert case_status["clean"] is False
+    assert any("same path" in issue for issue in case_status["path_issues"])
+    skill_sync.os.path.samefile = original_samefile
+
     parent = skill(tmp / "parent", "nested")
     child = skill(parent / "child", "nested")
     nested_state = tmp / "nested-state"
@@ -141,5 +197,5 @@ with tempfile.TemporaryDirectory() as raw_tmp:
         raise AssertionError("copy_skill_tree must reject a source nested inside its target")
     assert (dangerous_source / "SKILL.md").is_file(), "copy rejection must preserve the nested source"
 
-print("PASS: sync-skills rejects persisted, symlinked, and nested path conflicts")
+print("PASS: sync-skills rejects persisted, symlinked, case-aliased, and nested path conflicts")
 PY

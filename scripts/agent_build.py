@@ -9,6 +9,7 @@ import json
 import os
 import re
 import shutil
+import sys
 import tempfile
 from pathlib import Path, PurePosixPath
 
@@ -122,14 +123,21 @@ def selected_skills(names: list[str]) -> list[tuple[Path, str, str]]:
     return discovered
 
 
-def copy_tree(source: Path, target: Path, *, skip_top: set[str] | None = None) -> None:
+def copy_tree(
+    source: Path,
+    target: Path,
+    *,
+    skip_top: set[str] | None = None,
+    skip_names: set[str] | None = None,
+) -> None:
     if not source.exists():
         return
     require(source.is_dir() and not source.is_symlink(), f"overlay must be a regular directory: {source}")
-    skipped = skip_top or set()
+    skipped_top = skip_top or set()
+    skipped_names = skip_names or set()
     for path in sorted(source.rglob("*")):
         relative = path.relative_to(source)
-        if relative.parts[0] in skipped:
+        if relative.parts[0] in skipped_top or any(part in skipped_names for part in relative.parts):
             continue
         require(not path.is_symlink(), f"build inputs must not contain symbolic links: {path}")
         destination = target / relative
@@ -147,6 +155,18 @@ def validate_tree(root: Path) -> None:
     for path in sorted(root.rglob("*")):
         require(not path.is_symlink(), f"build inputs must not contain symbolic links: {path}")
         require(path.is_dir() or path.is_file(), f"unsupported build input: {path}")
+
+
+def validate_override_tree(root: Path) -> None:
+    """Validate one per-Skill override and its reserved append fragment."""
+    validate_tree(root)
+    for path in sorted(root.rglob("*")):
+        if path.name not in RESERVED_OVERRIDE_FILES:
+            continue
+        require(
+            path.parent == root and path.is_file(),
+            f"reserved override file must be a regular file at the override root: {path}",
+        )
 
 
 def append_instructions(target: Path, fragments: list[Path], values: dict[str, str]) -> None:
@@ -220,6 +240,7 @@ def validate_replacement(output: Path, platform: str, force: bool) -> None:
 
 
 def build(platform: str, skill_names: list[str], output_arg: str | None, force: bool) -> Path:
+    validate_all()
     platform_dir, config = read_adapter(platform)
     skills = selected_skills(skill_names)
     output = safe_output(Path(output_arg) if output_arg else DEFAULT_OUTPUT_DIR / platform)
@@ -245,7 +266,7 @@ def build(platform: str, skill_names: list[str], output_arg: str | None, force: 
             override = skill_dir / "agent-builds" / platform
             require(not (override / "SKILL.md").exists(),
                     f"{override.relative_to(ROOT)}/SKILL.md must not replace the portable core; use SKILL.append.md")
-            copy_tree(override, target, skip_top=RESERVED_OVERRIDE_FILES)
+            copy_tree(override, target, skip_names=RESERVED_OVERRIDE_FILES)
 
             fragments: list[Path] = []
             skill_append = config.get("skill_append")
@@ -301,7 +322,7 @@ def validate_all() -> None:
             require(override.name in known, f"{override.relative_to(ROOT)} has no matching platform adapter")
             require(not (override / "SKILL.md").exists(),
                     f"{override.relative_to(ROOT)}/SKILL.md must not replace the portable core; use SKILL.append.md")
-            validate_tree(override)
+            validate_override_tree(override)
 
 
 def main() -> int:
@@ -331,7 +352,7 @@ def main() -> int:
         print(f"Built {args.platform} artifact at {output}")
         return 0
     except BuildError as error:
-        print(f"FAIL: {error}", file=os.sys.stderr)
+        print(f"FAIL: {error}", file=sys.stderr)
         return 1
 
 

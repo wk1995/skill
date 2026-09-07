@@ -39,9 +39,9 @@ Every adapter is discovered by scanning `platforms/*/adapter.json`; there is no 
 - `skill_overlay`: optional directory copied into every generated Skill.
 - `skill_append`: optional Markdown fragment appended to every generated `SKILL.md`.
 
-Adapter fragments may use `{{skill_name}}`, `{{adapter_id}}`, `{{adapter_version}}`, and `{{artifact_version}}`. A Skill override may contain a `SKILL.append.md` fragment and any files that should overlay the built Skill. The reserved fragment is appended rather than copied.
+Adapter fragments may use `{{skill_name}}`, `{{adapter_id}}`, `{{adapter_version}}`, and `{{artifact_version}}`. A Skill override may contain one top-level `SKILL.append.md` fragment and any files that should overlay the built Skill. The reserved fragment is appended rather than copied; nested files with that reserved name are rejected.
 
-Build inputs must be regular files and directories. Symbolic links and parent-traversal paths are rejected. Repository-local outputs must be children of `dist/`. With `--force`, the builder replaces only a directory whose regular `.agent-build.json` identifies it as an artifact for the selected platform; unrelated directories and files are preserved. The builder stages the complete artifact before replacing a validated existing output.
+Build inputs must be regular files and directories. Symbolic links, undeclared Agent override directories, nested reserved append fragments, and parent-traversal paths are rejected by both `--check` and direct builds. Repository-local outputs must be children of `dist/`. With `--force`, the builder replaces only a directory whose regular `.agent-build.json` identifies it as an artifact for the selected platform; unrelated directories and files are preserved. The builder stages the complete artifact before replacing a validated existing output.
 
 ## Build Flow
 

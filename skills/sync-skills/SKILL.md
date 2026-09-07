@@ -3,7 +3,7 @@ name: sync-skills
 description: Use when linking, converting, synchronizing, versioning, auditing, or rolling back multiple copies of the same Agent Skill across repository, project, machine-wide, or explicitly provided external locations.
 metadata:
   sync_id: "sync-skills"
-  version: "0.0.5"
+  version: "0.0.6"
   urls:
     - type: repository
       value: https://github.com/wk1995/skill.git
@@ -109,7 +109,7 @@ python skills/sync-skills/scripts/skill_sync.py diff my-skill-id --role local --
 
 - Always snapshot all existing linked copies before overwriting any target.
 - Treat `SKILL.md` as required. A path without `SKILL.md` is not a valid source copy.
-- Refuse to link two roles that resolve to the same path, or one role nested inside another. A symlinked local directory pointing at the repository copy is already identical to its target, so register only real copies; linking it as a separate role would make a later sync copy the directory onto itself and destroy it.
+- Refuse to link two roles that resolve to the same filesystem location, or one role nested inside another, including case-only path aliases on case-insensitive filesystems. A symlinked or case-aliased local directory pointing at the repository copy is already identical to its target, so register only real copies; linking it as a separate role would make a later sync copy the directory onto itself and destroy it.
 - Preserve each Skill as a directory tree. Copy `SKILL.md`, `agent-builds/`, `scripts/`, `references/`, `assets/`, `extensions.yaml`, `src/`, and `tests/` when present. Platform-specific materialized files belong in build artifacts, not the portable source tree.
 - Exclude transient directories and files such as `.git`, `node_modules`, `dist`, `.DS_Store`, `__pycache__`, and Python bytecode.
 - When the skill-management repository is on `master` or its configured default branch, compare linked copies by `metadata.version`; if versions differ, synchronize and let the higher version replace the lower version.
@@ -117,7 +117,7 @@ python skills/sync-skills/scripts/skill_sync.py diff my-skill-id --role local --
 - If versions are equal but digests differ, use normal conflict handling and require an explicit source unless only one linked role changed since the previous snapshot.
 - If two or more copies changed since the previous snapshot and no source was specified, stop and report the conflict instead of choosing silently.
 - Keep the immutable sync-group identity in `metadata.sync_id` and the logical Skill version in `metadata.version` in `SKILL.md`. New Skills must define a stable sync ID that does not change with `metadata.name`; `rename --to` is reserved for migrating legacy name-keyed registry entries and cannot change an existing stable ID.
-- Use this Skill's own sync ID as `sync-skills` and its version as `0.0.5`.
+- Use this Skill's own sync ID as `sync-skills` and its version as `0.0.6`.
 - Legacy registries keyed by a Skill name remain readable; run `rename <old-reference> --to <sync-id> --name <new-name>` to migrate the group and its snapshots before linking a renamed Skill.
 - Record Skill addresses in the registry: `skill_urls` for canonical repository/documentation/registry/source URLs, and `role_urls` for role-specific remote/source URLs.
 - If a role URL is not provided, infer it from `git remote get-url origin` when available.

@@ -41,7 +41,7 @@ done
 [[ -f "$codex_output/skills/sync-skills/agents/openai.yaml" ]] || fail "Codex override was not materialized"
 grep -Fq '## Codex Sync Adaptation' "$codex_output/skills/sync-skills/SKILL.md" || fail "per-Skill Codex instructions were not appended"
 grep -Fq '## WorkBuddy Sync Adaptation' "$workbuddy_output/sync-skills/SKILL.md" || fail "per-Skill WorkBuddy instructions were not appended"
-grep -Fq '"adapter_version": "1.0.0"' "$codex_output/.agent-build.json" || fail "adapter version missing from build manifest"
+grep -Fq '"adapter_version": "1.0.1"' "$codex_output/.agent-build.json" || fail "adapter version missing from build manifest"
 grep -Fq '"artifact_version": "0.1.0"' "$codex_output/.agent-build.json" || fail "artifact version missing from build manifest"
 
 PYTHONDONTWRITEBYTECODE=1 python3 - "$ROOT/platforms/codex/adapter.json" "$codex_output/.codex-plugin/plugin.json" <<'PY'
@@ -136,6 +136,37 @@ else:
 assert sentinel.read_text(encoding="utf-8") == "keep\n"
 
 first_manifest = (output / ".agent-build.json").read_text(encoding="utf-8")
+
+rogue_override = fixture_root / "skills" / "demo" / "agent-builds" / "rogue-agent"
+rogue_override.mkdir()
+(rogue_override / "unexpected.txt").write_text("must not be ignored\n", encoding="utf-8")
+try:
+    agent_build.build("new-agent", [], None, True)
+except agent_build.BuildError as error:
+    assert "has no matching platform adapter" in str(error), str(error)
+else:
+    raise AssertionError("direct builds must validate and reject undeclared Agent overrides")
+assert (output / ".agent-build.json").read_text(encoding="utf-8") == first_manifest
+(rogue_override / "unexpected.txt").unlink()
+rogue_override.rmdir()
+
+nested_fragment = (
+    fixture_root / "skills" / "demo" / "agent-builds" / "new-agent" / "nested" / "SKILL.append.md"
+)
+nested_fragment.parent.mkdir(parents=True)
+nested_fragment.write_text("Leaked {{skill_name}} instructions.\n", encoding="utf-8")
+try:
+    agent_build.build("new-agent", [], None, True)
+except agent_build.BuildError as error:
+    assert "reserved override file" in str(error), str(error)
+else:
+    raise AssertionError("direct builds must reject nested reserved append fragments")
+assert not (output / "skills" / "demo" / "nested" / "SKILL.append.md").exists()
+assert (output / ".agent-build.json").read_text(encoding="utf-8") == first_manifest
+nested_fragment.unlink()
+nested_fragment.parent.rmdir()
+(nested_fragment.parent.parent).rmdir()
+
 rebuilt = agent_build.build("new-agent", [], None, True)
 assert rebuilt == output
 assert (rebuilt / ".agent-build.json").read_text(encoding="utf-8") == first_manifest

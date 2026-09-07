@@ -90,11 +90,11 @@ def require_skill_dir(path: str, role: str) -> Path:
 def copy_skill_tree(source: Path, target: Path) -> None:
     source_real = source.resolve()
     target_real = target.resolve()
-    if source_real == target_real:
+    if paths_refer_to_same_location(source_real, target_real):
         raise SystemExit(f"refusing to copy a skill onto itself: {source_real}")
-    if is_relative_to(target_real, source_real):
+    if path_is_within(target_real, source_real):
         raise SystemExit(f"refusing to copy a skill into its own subtree: {target_real} is inside {source_real}")
-    if is_relative_to(source_real, target_real):
+    if path_is_within(source_real, target_real):
         raise SystemExit(f"refusing to copy a skill from inside its target: {source_real} is inside {target_real}")
     if target.exists() and not target.is_dir():
         raise SystemExit(f"target exists and is not a directory: {target}")
@@ -130,6 +130,30 @@ def is_relative_to(child: Path, parent: Path) -> bool:
         return False
 
 
+def paths_refer_to_same_location(first: Path, second: Path) -> bool:
+    """Compare resolved paths by spelling and, when possible, filesystem identity."""
+    first_real = first.expanduser().resolve()
+    second_real = second.expanduser().resolve()
+    if first_real == second_real:
+        return True
+    try:
+        return first_real.exists() and second_real.exists() and os.path.samefile(first_real, second_real)
+    except OSError:
+        return False
+
+
+def path_is_within(child: Path, parent: Path) -> bool:
+    """Return whether child is below parent, including case-insensitive aliases."""
+    child_real = child.expanduser().resolve()
+    parent_real = parent.expanduser().resolve()
+    if is_relative_to(child_real, parent_real):
+        return True
+    return any(
+        paths_refer_to_same_location(candidate, parent_real)
+        for candidate in child_real.parents
+    )
+
+
 def normalized_role_paths(roles: dict[str, str]) -> dict[str, str]:
     """Resolve every registered role path for stable equality checks."""
     return {
@@ -146,16 +170,18 @@ def role_path_issues(roles: dict[str, str]) -> list[str]:
     issues: list[str] = []
     for index, (role_a, path_a) in enumerate(items):
         for role_b, path_b in items[index + 1:]:
-            if path_a == path_b:
+            path_a_obj = Path(path_a)
+            path_b_obj = Path(path_b)
+            if paths_refer_to_same_location(path_a_obj, path_b_obj):
                 issues.append(
                     "roles resolve to the same path: "
                     f"{role_a}, {role_b} -> {path_a}"
                 )
-            elif is_relative_to(Path(path_b), Path(path_a)):
+            elif path_is_within(path_b_obj, path_a_obj):
                 issues.append(
                     f"role {role_b} is inside role {role_a}: {path_b} is inside {path_a}"
                 )
-            elif is_relative_to(Path(path_a), Path(path_b)):
+            elif path_is_within(path_a_obj, path_b_obj):
                 issues.append(
                     f"role {role_a} is inside role {role_b}: {path_a} is inside {path_b}"
                 )

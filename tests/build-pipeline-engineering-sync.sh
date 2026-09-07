@@ -33,7 +33,7 @@ done
 reference_count="$(find "$SKILL_DIR/references" -maxdepth 1 -type f -name '*.md' | wc -l | tr -d ' ')"
 [[ "$reference_count" == "6" ]] || fail "expected 6 references, found $reference_count"
 
-if rg -n 'release-publishing|Release Publishing|artifact-build-engineering|Artifact Build Engineering|release-build-engineering|Release Build Engineering' "$SKILL_DIR"; then
+if grep -R -n -E 'release-publishing|Release Publishing|artifact-build-engineering|Artifact Build Engineering|release-build-engineering|Release Build Engineering' "$SKILL_DIR"; then
   fail "old Skill name remains"
 fi
 

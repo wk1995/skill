@@ -8,6 +8,12 @@ version, date, and a change summary.
 
 - No unreleased changes.
 
+## [0.0.6] - 2026-09-07
+
+- Safety: compare existing paths by filesystem identity as well as resolved spelling, preventing case-only aliases on case-insensitive filesystems from bypassing self-copy and role-path validation.
+- Safety: apply filesystem-aware ancestor checks to paths that do not exist yet, so case-aliased nested targets are rejected before any directory is created or cleared.
+- Tests: cover copy rejection, status reporting, content preservation, and nested-path detection for real or simulated case-insensitive path aliases.
+
 ## [0.0.5] - 2026-09-07
 
 - Safety: reject copies when the source is nested inside the target, preventing target cleanup from deleting the source before iteration begins.
