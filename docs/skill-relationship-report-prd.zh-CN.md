@@ -4,7 +4,7 @@
 
 | 项目 | 内容 |
 | --- | --- |
-| 状态 | Draft，待需求确认 |
+| 状态 | 需求已确认，待实现 |
 | 日期 | 2026-09-07 |
 | 目标版本 | `sync-skills` 后续版本 |
 | PRD 属性 | 本文档提交到项目仓库并随实现接受评审 |
@@ -49,6 +49,7 @@
 ### 3.2 本期不实现
 
 - 不扫描整块磁盘寻找 Skill。
+- 不扫描项目父目录批量发现关联项目；其他项目必须逐个显式登记。
 - 不自动把“名称相同”的 Skill 建立为正式关系。
 - 不因生成报告而自动覆盖或同步任何 Skill。
 - 不把本机绝对路径、用户名或项目关系提交到 Git。
@@ -114,7 +115,7 @@ Logical Skill: demo ─────┼─ Current project: ./skills/demo
 
 1. **现有 registry**：读取已经登记的角色、路径、URL、版本历史与最近同步状态。
 2. **本机 Inventory Roots**：读取当前项目支持的每个 AI Agent Builder 所声明的本机 Skill 目录并扫描其并集；例如 Codex adapter 可声明 Codex 的用户级 Skill 目录。用户显式传入的目录只作为补充或覆盖。
-3. **项目 Inventory Roots**：扫描当前项目的 `skills/`，以及用户显式登记的其他项目 Skill 根目录。
+3. **项目 Inventory Roots**：扫描当前项目的 `skills/`，以及用户逐个显式登记的其他项目 Skill 根目录。不得配置父目录批量发现项目，也不得把父目录下的仓库自动纳入关系图。
 4. **Agent adapter 与构建清单**：动态扫描当前项目 `platforms/*/adapter.json`，并读取已配置构建输出中的 `.agent-build.json`；不得把 `codex`、`workbuddy` 写死为唯一支持列表。关联项目如显式登记了 adapter root，也使用同一规则扫描；未登记时显示为 `unknown`，不得根据目录名猜测。
 
 “全部本机 Skill”定义为：当前项目全部受支持 Agent Builders 所声明的本机 Skill 目录，加上用户显式补充的 Inventory Roots，其中能够识别的全部 Skill；不是整个文件系统中的所有目录。
@@ -430,6 +431,7 @@ python3 skills/sync-skills/scripts/skill_sync.py diff android-release-train --ro
 19. `--local-root AGENT=PATH` 可以覆盖或补充非标准安装目录；重复、嵌套及软链接别名路径会安全去重并保留 Builder 归属。
 20. Markdown 与 JSON 报告展示完整绝对路径且仅限本机用户读取；命令接口不包含路径脱敏选项。
 21. Skill 同步成功但报告刷新失败时，保留同步结果并明确输出 `report_status: stale`、上一份报告路径和重试命令，不回滚已完成的同步。
+22. 其他项目只有在逐个显式登记后才进入报告；父目录扫描不会自动发现或纳入任何项目。
 
 ## 11. 建议实施顺序
 
@@ -444,7 +446,3 @@ python3 skills/sync-skills/scripts/skill_sync.py diff android-release-train --ro
 9. 增加 `relationships` 与 `link-location` 命令。
 10. 在 `sync`、`link`、`convert`、`rename`、`rollback` 成功后自动刷新，并为 Agent build 提供刷新衔接。
 11. 补齐状态化、路径安全、跨项目、多 Agent、多次调用和缺失依赖测试。
-
-## 12. 待确认项
-
-1. 其他项目是否只展示显式登记的项目，还是允许配置一个父目录批量发现项目？本 PRD 建议只使用显式登记，避免扫描范围过大。
