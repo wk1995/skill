@@ -2,7 +2,7 @@
 
 语言：[English](README.md) | **中文**
 
-`sync-skills` 用于管理同一个 Agent Skill 在本仓库、项目目录、本机 Codex 或 WorkBuddy Skill 目录和明确指定的外部路径中的等价副本。它支持链接、转换、比较、同步、版本记录、快照、审计和回滚。
+`sync-skills` 用于管理同一个 Agent Skill 在仓库、项目、本机用户目录和明确指定的外部路径中的等价副本。它支持链接、转换、比较、同步、版本记录、快照、审计和回滚。
 
 ## 如何使用
 
@@ -10,11 +10,9 @@
 
 ```text
 比较 my-skill 的仓库副本和本机副本。
-将此 Skill 的仓库副本链接到当前所安装 WorkBuddy 产品实际使用的 Skill 目录。
+将此 Skill 的仓库副本链接到指定的本机 Skill 目录。
 以仓库版本为来源同步项目和外部副本。
 ```
-
-在 OpenAI Codex 中也可以显式用 `$sync-skills` 调用本 Skill。Codex 通常使用 `~/.codex/skills`；WorkBuddy 路径由产品配置决定（国内版通常为 `~/.workbuddy/skills`，WorkBuddy AI/海外版可能为 `~/.workbuddy-ai/skills`）。
 
 需要确定性变更时使用随附脚本：
 
@@ -33,7 +31,7 @@ python skills/sync-skills/scripts/skill_sync.py rename old-skill-name --to my-sk
 在以下情况使用此 Skill：
 
 - 需要链接、转换、同步、记录版本、审计、比较或回滚 Skill 副本；
-- 涉及同一个 Skill 的仓库、项目、本机 Codex/用户目录或 WorkBuddy 目录，或外部副本；
+- 涉及同一个 Skill 的仓库、项目、本机用户目录或外部副本；
 - 需要处理 Skill 的来源 URL、版本历史、内容摘要、快照或差异报告。
 
 ## 何时不触发

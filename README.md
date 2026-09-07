@@ -6,18 +6,18 @@ Personal Skills is a monorepo for managing personal Agent Skills. Each Skill own
 
 ## Current State
 
-- Done: repository purpose, target architecture, directory conventions, and the first local Skill.
-- Planned: Skill schemas, shared management packages, CLI, MCP server, Codex adapter, build, versioning, and publishing flows.
+- Done: repository purpose, portable Skill conventions, declarative Codex and WorkBuddy adapters, deterministic Agent builds, and PR validation.
+- Planned: shared management packages, CLI, MCP server, installation, registry publishing, and release automation.
 - Not yet available: project-level executable commands. Commands shown in this README describe the target interface.
 
-See the detailed architecture notes in [Skill management repository architecture design](docs/superpowers/specs/2026-07-10-skill-management-architecture-design.md).
+See [Agent Build Architecture](docs/agent-build-architecture.md) for the current adapter and version boundaries. The [original repository design](docs/superpowers/specs/2026-07-10-skill-management-architecture-design.md) remains as historical context.
 
 ## Design Principles
 
 - **Portable core:** Basic Skills follow the [Agent Skills Specification](https://agentskills.io/specification) and are not tied to a single agent product.
-- **Codex first adapter:** The first adapter targets the standard Codex plugin shape: `skills/`, `.codex-plugin/plugin.json`, and `.mcp.json`.
-- **Independent versions:** Each Skill keeps its SemVer value in its own `SKILL.md`.
-- **Progressive extension:** Documentation-only Skills need only `SKILL.md`; scripts, references, assets, CLI commands, and MCP tools are added only when useful.
+- **Open adapters:** Agent adapters are discovered from `platforms/*/adapter.json`; adding a default adapter does not require editing every Skill or a central switch.
+- **Independent versions:** Portable Skill, adapter, and generated artifact versions have separate lifecycles.
+- **Progressive extension:** Beyond the managed-file contract, scripts, references, assets, CLI commands, and MCP tools are added only when useful.
 - **One core, two interfaces:** The CLI and MCP server should reuse the same discovery, validation, installation, versioning, and publishing logic.
 - **Explicit trust:** Executable extensions from remote Skills are disabled by default and require clear user approval before they are loaded.
 
@@ -29,13 +29,15 @@ The tree below is planned architecture. It does not mean every file or directory
 skill/
 |-- README.md
 |-- README.zh-CN.md
-|-- skillset.yaml                 # Repository-level configuration, adapters, and trust policy
 |-- skills/
 |   `-- <skill-name>/
 |       |-- SKILL.md              # Required: portable agent entrypoint, version, and trigger rules
-|       |-- README.md             # Required: user guide, trigger cases, and non-trigger cases
-|       |-- agents/
-|       |   `-- openai.yaml       # Optional: Codex display metadata
+|       |-- README.md             # Required: English user guide
+|       |-- README.zh-CN.md       # Required: Chinese user guide
+|       |-- CHANGELOG.md          # Required: portable Skill changes
+|       |-- agent-builds/         # Required boundary; per-Agent overrides are optional
+|       |   `-- codex/
+|       |       `-- agents/openai.yaml
 |       |-- extensions.yaml       # Optional: CLI/MCP extension declaration
 |       |-- src/                  # Optional: extension implementation
 |       |   |-- core.ts
@@ -45,12 +47,21 @@ skill/
 |       |-- references/           # Optional: lazily loaded reference material
 |       |-- assets/               # Optional: templates and static assets
 |       `-- tests/                # Optional: behavior, script, and extension tests
-|-- packages/
+|-- platforms/
+|   |-- codex/
+|   |   |-- adapter.json          # Adapter and artifact versions, output layout
+|   |   |-- SKILL.append.md       # Codex-wide generated instructions
+|   |   `-- root/.codex-plugin/plugin.json
+|   `-- workbuddy/
+|       |-- adapter.json
+|       `-- SKILL.append.md
+|-- scripts/
+|   `-- agent_build.py            # Discovers and builds every platform adapter
+|-- packages/                     # Planned shared management runtime
 |   |-- core/                     # Skill discovery, validation, installation, and versioning
 |   |-- sdk/                      # Skill CLI/MCP extension API
 |   |-- cli/                      # Project-level CLI
-|   |-- mcp-server/               # Project-level MCP server
-|   `-- adapter-codex/            # Codex plugin build and install adapter
+|   `-- mcp-server/               # Project-level MCP server
 |-- schemas/                      # Skill frontmatter, skillset, and extensions JSON Schema
 |   |-- skill.schema.json
 |   |-- skillset.schema.json
@@ -65,7 +76,7 @@ skill/
 `-- dist/                         # Build output, not committed
 ```
 
-The Agent Skills specification requires `SKILL.md`. This repository additionally requires each managed Skill to include a user-facing `README.md`; see [AGENTS.md](AGENTS.md). Other directories are created only when the Skill needs them.
+The Agent Skills specification requires `SKILL.md`. This repository additionally requires bilingual user guides, a changelog, and the `agent-builds/` boundary; see [AGENTS.md](AGENTS.md). Platform subdirectories inside that boundary are created only when the Skill needs an override.
 
 ## Skills
 
@@ -77,8 +88,7 @@ Every Skill has a companion README with usage and trigger guidance. This table i
 | `android-code-release-train` | Orchestrate Android source code from a requirement branch through version-train integration, release promotion, default-branch synchronization, and an immutable source tag. Use for feature/bugfix branches, versioned dev and release PRs, code-readiness gates, version metadata, or source-release tags; do not use for APK/AAB/AAR builds, signing, packaging, or artifact uploads. | [README](skills/android-code-release-train/README.md) |
 | `build-pipeline-engineering` | Configure, validate, run, and troubleshoot reproducible distributable builds from an exact source ref, including CI environments, user-selected build variants, Android signing, APK/AAB/AAR or plugin packaging, output verification, manifests, checksums, and uploads. For variant-based builds default to release; for CI output default to GitHub Actions Artifacts. Do not use for requirement branches, PR integration, source version changes, or tag creation. | [README](skills/build-pipeline-engineering/README.md) |
 | `choose-project-doc-location` | Decide whether requested project documentation belongs in README, repository docs, or GitHub Wiki before creating or updating it. MUST use before editing documentation when the user asks to create, update, rewrite, or organize README/readme, Wiki/wiki, docs/doc, project documentation, project details, workflow/workflows, 流程, 项目文档, 项目说明, 仓库说明, 使用说明, skill 列表, skill 作用, skill 使用说明, architecture notes, onboarding guides, or repository documentation. Treat the user's words "README" and "Wiki" as tentative labels, not final placement decisions. | [README](skills/choose-project-doc-location/README.md) |
-| `sync-skills` | Use when linking, converting, synchronizing, versioning, auditing, or rolling back multiple copies of the same Agent Skill across this repository, project-level skill folders, local Codex/user skill folders, or arbitrary external paths. | [README](skills/sync-skills/README.md) |
-| `workbuddy-compat` | Use when adding, auditing, or converting an Agent Skill so it stays compatible with both OpenAI Codex and WorkBuddy; also use to check or auto-fix the `## Platform Compatibility` section and the Codex `$<skill>` invocation examples in a Skill's READMEs. | [README](skills/workbuddy-compat/README.md) |
+| `sync-skills` | Use when linking, converting, synchronizing, versioning, auditing, or rolling back multiple copies of the same Agent Skill across repository, project, machine-wide, or explicitly provided external locations. | [README](skills/sync-skills/README.md) |
 <!-- skills-catalog:end -->
 
 ## Pull Request Review Gate
@@ -87,11 +97,16 @@ Run `bash tests/pr-review-gate.sh origin/main` from a clean, committed worktree 
 
 ## Skill Structure And Versioning
 
-A minimal Skill:
+A minimal managed Skill:
 
 ```text
 skills/example-skill/
-`-- SKILL.md
+|-- SKILL.md
+|-- README.md
+|-- README.zh-CN.md
+|-- CHANGELOG.md
+`-- agent-builds/
+    `-- .gitkeep
 ```
 
 `SKILL.md` keeps portable metadata, independent versioning, and optional trigger rules:
@@ -119,6 +134,8 @@ metadata:
 ```
 
 `name`, `description`, `metadata.sync_id`, and `metadata.version` are the baseline contract. `metadata.sync_id` is the immutable identifier of the logical Skill used by `sync-skills`; choose it when the Skill is created and do not change it when the trigger name or directory changes. `description` remains the natural-language discovery text used by Agent Skills. `metadata.urls` is optional stable provenance information for the logical Skill, such as a source repository, documentation page, registry page, package page, or upstream project. `metadata.triggering` is this repository's structured supplement: `include` describes explicit trigger cases, and `exclude` describes explicit non-trigger cases. When `metadata.triggering` is not configured, it is equivalent to `include: []` and `exclude: []`. `exclude` takes priority over `include` to avoid accidental keyword-triggered activation.
+
+Keep Agent-specific invocation syntax, installation paths, UI metadata, and manifests out of portable `SKILL.md`. Put defaults in `platforms/<agent>/` and exceptional per-Skill files in `agent-builds/<agent>/`.
 
 A Skill with executable extensions may add:
 
@@ -227,7 +244,20 @@ The MCP server shares `packages/core` with the CLI and is planned to provide:
 
 Management tools use the `skills__<action>` namespace. Skill tools use `<skill-name>__<tool-name>`. The first version should use local stdio transport. Remote Streamable HTTP should be enabled only after authentication and origin restrictions exist.
 
-## Codex Adapter (Planned)
+## Agent Build Adapters
+
+Adapters are available now through the generic builder:
+
+```bash
+python3 scripts/agent_build.py --list
+python3 scripts/agent_build.py --check
+python3 scripts/agent_build.py codex
+python3 scripts/agent_build.py workbuddy
+```
+
+The builder scans `platforms/` instead of using a hard-coded Agent list. A new Agent with repository-wide defaults therefore adds one `platforms/<agent>/` directory. Existing Skills need a matching `agent-builds/<agent>/` only when they require an exception.
+
+## Codex Adapter
 
 The Codex adapter builds portable source content into a standard plugin artifact:
 
@@ -235,7 +265,7 @@ The Codex adapter builds portable source content into a standard plugin artifact
 dist/codex/
 |-- .codex-plugin/
 |   `-- plugin.json
-|-- .mcp.json
+|-- .agent-build.json
 |-- skills/
 |   `-- <skill-name>/
 |       |-- SKILL.md
@@ -243,10 +273,9 @@ dist/codex/
 |       |-- scripts/
 |       |-- references/
 |       `-- assets/
-`-- runtime/
 ```
 
-The Codex plugin has its own aggregate package version. It does not replace the independent version of each Skill. The plugin shape follows the [Codex plugin documentation](https://developers.openai.com/codex/plugins/build).
+The Codex plugin has its own artifact version, and the Codex adapter has its own version. Neither replaces or automatically bumps the independent version of each portable Skill. The plugin shape follows the [official OpenAI plugin documentation](https://developers.openai.com/plugins/build/plugins).
 
 ## Versioning And Releases (Planned)
 
@@ -254,7 +283,8 @@ The Codex plugin has its own aggregate package version. It does not replace the 
 - `.changes/` records the affected Skill, bump level, and change summary.
 - Skill release tags use `skill/<skill-name>/v<version>`.
 - Generated registry records include version, source, and SHA-256 content digest.
-- The root `package.json` maintains the shared CLI, MCP, and Codex bundle version.
+- Each `platforms/<agent>/adapter.json` maintains the adapter version and its generated artifact version.
+- Adding or changing Agent support does not bump `metadata.version` unless the portable Skill behavior also changes.
 - Published artifacts are stored as immutable copies under `<skill-name>/<version>`; source directories do not duplicate historical versions.
 
 ## Security And Trust
@@ -273,11 +303,11 @@ The Codex plugin has its own aggregate package version. It does not replace the 
 3. Implement `packages/core` and Skill validation.
 4. Implement the project-level CLI and custom Skill command SDK.
 5. Implement the local MCP server and Skill tool registration.
-6. Implement Codex build, installation, and integration tests.
+6. Extend declarative Agent builds with installation and registry publishing.
 7. Implement independent versioning, packaging, and publishing.
 
 ## References
 
 - [Agent Skills Specification](https://agentskills.io/specification)
-- [Codex plugin structure](https://developers.openai.com/codex/plugins/build)
+- [OpenAI plugin packaging](https://developers.openai.com/plugins/build/plugins)
 - [Model Context Protocol SDKs](https://modelcontextprotocol.io/docs/sdk)

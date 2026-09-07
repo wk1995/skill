@@ -5,8 +5,10 @@ ROOT="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd -P)"
 README="$ROOT/README.md"
 README_ZH="$ROOT/README.zh-CN.md"
 SPEC="$ROOT/docs/superpowers/specs/2026-07-10-skill-management-architecture-design.md"
+AGENT_BUILD_DOC="$ROOT/docs/agent-build-architecture.md"
 AGENTS="$ROOT/AGENTS.md"
 CATALOG_SCRIPT="$ROOT/scripts/skill_catalog.py"
+AGENT_BUILD_SCRIPT="$ROOT/scripts/agent_build.py"
 CATALOG_WORKFLOW="$ROOT/.github/workflows/skill-catalog.yml"
 PR_REVIEW_GATE="$ROOT/tests/pr-review-gate.sh"
 
@@ -15,7 +17,7 @@ fail() {
   exit 1
 }
 
-for file in "$README" "$README_ZH" "$SPEC" "$AGENTS" "$CATALOG_SCRIPT" "$CATALOG_WORKFLOW" "$PR_REVIEW_GATE"; do
+for file in "$README" "$README_ZH" "$SPEC" "$AGENT_BUILD_DOC" "$AGENTS" "$CATALOG_SCRIPT" "$AGENT_BUILD_SCRIPT" "$CATALOG_WORKFLOW" "$PR_REVIEW_GATE"; do
   [[ -f "$file" ]] || fail "missing file: $file"
 done
 
@@ -23,6 +25,7 @@ python3 "$CATALOG_SCRIPT" --check
 
 PYTHONDONTWRITEBYTECODE=1 python3 - "$CATALOG_SCRIPT" <<'PY'
 import importlib.util
+import shutil
 import sys
 import tempfile
 from pathlib import Path
@@ -36,6 +39,7 @@ spec.loader.exec_module(catalog)
 
 def write_fixture(skill: Path, changelog: str | None) -> None:
     skill.mkdir()
+    (skill / "agent-builds").mkdir()
     (skill / "SKILL.md").write_text(
         """---
 name: demo
@@ -111,9 +115,7 @@ with tempfile.TemporaryDirectory() as raw_tmp:
     else:
         raise AssertionError("missing CHANGELOG.md must fail validation")
 
-    for path in missing.iterdir():
-        path.unlink()
-    missing.rmdir()
+    shutil.rmtree(missing)
 
     mismatched = fixture_root / "demo"
     write_fixture(
@@ -151,6 +153,9 @@ for skill_dir in "$ROOT"/skills/*; do
   [[ -f "$skill_dir/README.md" ]] || fail "missing README.md in $skill_dir"
   [[ -f "$skill_dir/README.zh-CN.md" ]] || fail "missing Chinese README in $skill_dir"
   [[ -f "$skill_dir/CHANGELOG.md" ]] || fail "missing CHANGELOG.md in $skill_dir"
+  [[ -d "$skill_dir/agent-builds" ]] || fail "missing agent-builds in $skill_dir"
+  [[ ! -e "$skill_dir/agents" ]] || fail "platform-specific agents directory leaked into $skill_dir"
+  ! grep -Fq '## Platform Compatibility' "$skill_dir/SKILL.md" || fail "platform compatibility leaked into $skill_dir/SKILL.md"
 
   for section in '^## How To Use It$' '^## When It Triggers$' '^## When It Does Not Trigger$'; do
     grep -Eq "$section" "$skill_dir/README.md" || fail "missing README section $section in $skill_dir"
@@ -170,6 +175,8 @@ grep -Eq 'When It Does Not Trigger' "$AGENTS" || fail "AGENTS.md does not requir
 grep -Eq 'English by default' "$AGENTS" || fail "AGENTS.md does not define the default language"
 grep -Eq 'README.zh-CN.md' "$AGENTS" || fail "AGENTS.md does not define Chinese README support"
 grep -Eq 'metadata.sync_id' "$AGENTS" || fail "AGENTS.md does not require stable Skill sync IDs"
+grep -Eq '## Agent Adapter Rules' "$AGENTS" || fail "AGENTS.md does not define Agent adapter boundaries"
+grep -Fq 'platforms/<agent>/adapter.json' "$AGENTS" || fail "AGENTS.md does not define open adapter discovery"
 grep -Eq 'android-code-release-train/README.md' "$README" || fail "missing android-code-release-train README link"
 grep -Eq 'build-pipeline-engineering/README.md' "$README" || fail "missing build-pipeline-engineering README link"
 grep -Eq 'sync-skills/README.md' "$README" || fail "missing sync-skills README link"
@@ -184,7 +191,8 @@ grep -Eq '^## Current State$' "$README" || fail "missing English current-state s
 grep -Eq '^## Skill Structure And Versioning$' "$README" || fail "missing English Skill structure section"
 grep -Eq '^## CLI \(Planned\)$' "$README" || fail "missing English planned CLI section"
 grep -Eq '^## MCP Server \(Planned\)$' "$README" || fail "missing English planned MCP section"
-grep -Eq '^## Codex Adapter \(Planned\)$' "$README" || fail "missing English planned Codex section"
+grep -Eq '^## Agent Build Adapters$' "$README" || fail "missing English Agent build section"
+grep -Eq '^## Codex Adapter$' "$README" || fail "missing English Codex section"
 
 grep -Eq '^# Personal Skills$' "$README_ZH" || fail "missing Chinese README title"
 grep -Eq '语言：\[English\]\(README.md\) \| \*\*中文\*\*' "$README_ZH" || fail "missing English switch link in README.zh-CN.md"
@@ -192,7 +200,8 @@ grep -Eq '^## 当前状态$' "$README_ZH" || fail "missing Chinese current-state
 grep -Eq '^## Skill 结构与版本$' "$README_ZH" || fail "missing Chinese Skill structure section"
 grep -Eq '^## CLI（规划）$' "$README_ZH" || fail "missing Chinese planned CLI section"
 grep -Eq '^## MCP Server（规划）$' "$README_ZH" || fail "missing Chinese planned MCP section"
-grep -Eq '^## Codex 适配器（规划）$' "$README_ZH" || fail "missing Chinese planned Codex section"
+grep -Eq '^## Agent Build 适配器$' "$README_ZH" || fail "missing Chinese Agent build section"
+grep -Eq '^## Codex 适配器$' "$README_ZH" || fail "missing Chinese Codex section"
 
 for file in "$README" "$README_ZH"; do
   grep -Eq 'triggering:' "$file" || fail "missing triggering metadata in $file"
@@ -206,5 +215,9 @@ for file in "$README" "$README_ZH"; do
   grep -Eq 'skills__<action>' "$file" || fail "missing management MCP namespace in $file"
   grep -Eq '<skill-name>__<tool-name>' "$file" || fail "missing Skill MCP namespace in $file"
 done
+
+grep -Fq 'platforms/*/adapter.json' "$AGENT_BUILD_DOC" || fail "Agent build doc does not define adapter discovery"
+grep -Fq 'must not bump the portable Skill version' "$AGENT_BUILD_DOC" || fail "Agent build doc does not separate versions"
+python3 "$AGENT_BUILD_SCRIPT" --check
 
 printf 'PASS: bilingual skill architecture docs\n'

@@ -24,16 +24,6 @@ metadata:
 
 Turn one exact source ref and build variant into verified, traceable outputs. This Skill owns build environments, CI configuration, variant selection, packaging, signing, validation, manifests, checksums, retention, and uploads. It does not own how source code reaches that ref.
 
-
-## Platform Compatibility
-
-This skill is written to run in both OpenAI Codex and WorkBuddy.
-
-- **Codex**: user-level skills live under `$CODEX_HOME/skills` or `~/.codex/skills`; the agent interface is `agents/openai.yaml`; Codex uses `metadata.triggering` and the `$build-pipeline-engineering` invocation syntax, and Codex-specific artifacts include `agents/` and `extensions.yaml`.
-- **WorkBuddy**: WorkBuddy reads `SKILL.md` directly, triggers automatically from the `description` field, and ignores `agents/openai.yaml`. Its installed-Skill directory is product-configured: domestic builds commonly use `~/.workbuddy/skills`, while WorkBuddy AI/overseas builds may use `~/.workbuddy-ai/skills`. Import through WorkBuddy or use the directory configured by the installed product. No `$`-prefix is needed.
-
-When copying this skill to WorkBuddy, treat `SKILL.md` as the required file and copy `agents/`/`extensions.yaml` only when they exist.
-
 ## Boundary Contract
 
 Input:

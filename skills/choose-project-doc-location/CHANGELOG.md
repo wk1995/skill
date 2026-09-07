@@ -4,7 +4,7 @@ All notable changes to this Skill are documented here.
 
 ## [Unreleased]
 
-- Documented equivalent automatic triggering behavior for WorkBuddy.
+- No unreleased changes.
 
 ## [0.0.1] - 2026-09-04
 

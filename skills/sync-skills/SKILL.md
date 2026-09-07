@@ -1,6 +1,6 @@
 ---
 name: sync-skills
-description: Use when linking, converting, synchronizing, versioning, auditing, or rolling back multiple copies of the same Agent Skill across this repository, project-level skill folders, local Codex/user skill folders, or arbitrary external paths.
+description: Use when linking, converting, synchronizing, versioning, auditing, or rolling back multiple copies of the same Agent Skill across repository, project, machine-wide, or explicitly provided external locations.
 metadata:
   sync_id: "sync-skills"
   version: "0.0.5"
@@ -23,21 +23,12 @@ metadata:
 
 ## Overview
 
-Use this skill to keep equivalent Skill directories connected across locations such as this repository's `skills/`, a project's skill folder, a local Codex/user or WorkBuddy skill folder, and any external path. Treat one linked group as one logical Skill with multiple materialized copies.
-
-## Platform Compatibility
-
-This skill keeps Skill copies in sync across both OpenAI Codex and WorkBuddy.
-
-- **Codex**: user-level skills live under `$CODEX_HOME/skills` or `~/.codex/skills`; the agent interface is `agents/openai.yaml`; Codex-specific artifacts include `agents/` and `extensions.yaml`.
-- **WorkBuddy**: WorkBuddy reads `SKILL.md` directly and ignores `agents/openai.yaml`. Its installed-Skill directory is product-configured: domestic builds commonly use `~/.workbuddy/skills`, while WorkBuddy AI/overseas builds may use `~/.workbuddy-ai/skills`. Use the actual directory configured by the installed product. When syncing WorkBuddy copies, treat `SKILL.md` as the required file and copy `agents/`/`extensions.yaml` only when they exist.
-
-Triggering differs between the two runtimes: Codex uses `metadata.triggering` and the `$sync-skills` invocation, while WorkBuddy triggers from the `description` automatically, so no `$`-prefix is needed there. Resolve the real Skill directory for the installed product before linking it.
+Use this skill to keep equivalent Skill directories connected across this repository, project-owned locations, a machine-wide user location, and explicit external paths. Treat one linked group as one logical Skill with multiple materialized copies.
 
 ## Start Here
 
 1. Identify the stable `metadata.sync_id`, current Skill name, and every copy that should participate in the sync group. The sync ID is immutable; the Skill name may change.
-2. Inspect each copy's `SKILL.md`, `agents/openai.yaml` (Codex only; ignored by WorkBuddy), scripts, references, assets, and extension files before mutating anything.
+2. Inspect each copy's complete directory tree, including `SKILL.md`, scripts, references, assets, executable extensions, and any build-adapter inputs, before mutating anything.
 3. Read `references/sync-model.md` when designing a new sync group, resolving a conflict, changing version policy, or performing a rollback.
 4. Use `scripts/skill_sync.py` for deterministic operations whenever copying, snapshotting, status checking, or rollback is needed.
 
@@ -46,7 +37,7 @@ Triggering differs between the two runtimes: Codex uses `metadata.triggering` an
 Use these role names consistently:
 
 - `repo`: the canonical copy inside this repository, usually `skills/<skill-name>`.
-- `local`: a machine-wide copy. In OpenAI Codex this is usually under `$CODEX_HOME/skills` or `~/.codex/skills`; in WorkBuddy it is under the product-configured data directory's `skills/` folder.
+- `local`: a machine-wide user copy at an explicitly resolved path.
 - `project`: a project-specific copy owned by another workspace.
 - `external`: any other explicit path, such as a checked-out plugin, bundle, archive staging folder, or temporary migration location.
 
@@ -57,13 +48,13 @@ A group may contain any subset of these roles. Do not invent paths; resolve each
 Create or update a sync group using the immutable ID declared in `SKILL.md`:
 
 ```bash
-python skills/sync-skills/scripts/skill_sync.py link my-skill-id --repo skills/my-skill --local ~/.codex/skills/my-skill --external /path/to/my-skill --skill-url https://github.com/me/my-skill --repo-url https://github.com/me/skills-repo
+python skills/sync-skills/scripts/skill_sync.py link my-skill-id --repo skills/my-skill --local /absolute/path/to/my-skill --external /other/path/to/my-skill --skill-url https://github.com/me/my-skill --repo-url https://github.com/me/skills-repo
 ```
 
 Convert one physical copy into another location and link both:
 
 ```bash
-python skills/sync-skills/scripts/skill_sync.py convert my-skill-id --source-path ~/.codex/skills/my-skill --source-role local --source-url https://example.com/source --target-path skills/my-skill --target-role repo --target-url https://github.com/me/skills-repo
+python skills/sync-skills/scripts/skill_sync.py convert my-skill-id --source-path /absolute/path/to/my-skill --source-role local --source-url https://example.com/source --target-path skills/my-skill --target-role repo --target-url https://github.com/me/skills-repo
 
 # Migrate a legacy name-keyed registry and set its first stable ID.
 python skills/sync-skills/scripts/skill_sync.py rename old-skill-name --to my-skill-id --name new-skill-name
@@ -118,8 +109,8 @@ python skills/sync-skills/scripts/skill_sync.py diff my-skill-id --role local --
 
 - Always snapshot all existing linked copies before overwriting any target.
 - Treat `SKILL.md` as required. A path without `SKILL.md` is not a valid source copy.
-- Refuse to link two roles that resolve to the same path, or one role nested inside another. A symlinked copy such as `~/.workbuddy/skills/<name>` pointing at the repository copy is already identical to its target, so register only real copies; linking it as a separate role would make a later sync copy the directory onto itself and destroy it.
-- Preserve each Skill as a directory tree. Copy `SKILL.md`, `agents/` (Codex only), `scripts/`, `references/`, `assets/`, `extensions.yaml` (Codex only), `src/`, and `tests/` when present. WorkBuddy skills are defined entirely by `SKILL.md` and often contain none of the Codex-only `agents/` or `extensions.yaml` files, so copy them only when they exist.
+- Refuse to link two roles that resolve to the same path, or one role nested inside another. A symlinked local directory pointing at the repository copy is already identical to its target, so register only real copies; linking it as a separate role would make a later sync copy the directory onto itself and destroy it.
+- Preserve each Skill as a directory tree. Copy `SKILL.md`, `agent-builds/`, `scripts/`, `references/`, `assets/`, `extensions.yaml`, `src/`, and `tests/` when present. Platform-specific materialized files belong in build artifacts, not the portable source tree.
 - Exclude transient directories and files such as `.git`, `node_modules`, `dist`, `.DS_Store`, `__pycache__`, and Python bytecode.
 - When the skill-management repository is on `master` or its configured default branch, compare linked copies by `metadata.version`; if versions differ, synchronize and let the higher version replace the lower version.
 - When the repository is on any other branch, do not synchronize only because versions differ unless the user explicitly requests synchronization or the branch work requires updating the target copy.

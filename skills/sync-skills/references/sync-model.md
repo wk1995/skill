@@ -19,7 +19,7 @@ A sync group maps one logical Skill to one or more physical copies. The registry
 Use stable role names:
 
 - `repo`: copy inside the current skill-management repository.
-- `local`: machine-wide user copy (Codex commonly uses `~/.codex/skills`; WorkBuddy uses the installed product's configured data directory, commonly `~/.workbuddy/skills` for domestic builds or `~/.workbuddy-ai/skills` for WorkBuddy AI/overseas builds).
+- `local`: machine-wide user copy at an explicitly resolved path.
 - `project`: another workspace's project-level copy.
 - `external`: arbitrary copy outside the previous categories.
 
@@ -149,8 +149,9 @@ Documentation-only Skills can be copied after validation. Skills with executable
 
 - `scripts/`
 - `src/`
-- `extensions.yaml` (Codex only)
-- `.mcp.json` (WorkBuddy connectors)
+- `agent-builds/`
+- `extensions.yaml`
+- runtime connector manifests
 - package manager manifests
 - binaries or archives in `assets/`
 

@@ -24,13 +24,6 @@ metadata:
 
 Use this skill before editing project documentation when the requested destination may be README, GitHub Wiki, or detailed docs. The goal is to choose the right documentation surface first, then create or update the matching artifact.
 
-## Platform Compatibility
-
-This skill works in both OpenAI Codex and WorkBuddy.
-
-- **Codex**: triggered by `metadata.triggering` and the `$choose-project-doc-location` invocation; the agent interface is `agents/openai.yaml`.
-- **WorkBuddy**: triggered automatically from the `description` in SKILL.md frontmatter — no `$`-prefix or slash command is required. WorkBuddy reads `SKILL.md` directly and ignores `agents/openai.yaml`, so that file is optional for WorkBuddy-only use.
-
 ## Decision Workflow
 
 0. Announce that this skill is being used before inspecting or editing files.

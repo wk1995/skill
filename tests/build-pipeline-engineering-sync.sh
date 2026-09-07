@@ -10,7 +10,7 @@ fail() {
 }
 
 [[ -f "$SKILL_DIR/SKILL.md" ]] || fail "missing SKILL.md"
-[[ -f "$SKILL_DIR/agents/openai.yaml" ]] || fail "missing agents/openai.yaml"
+[[ -f "$SKILL_DIR/agent-builds/codex/agents/openai.yaml" ]] || fail "missing Codex agent-build override"
 
 name="$(sed -n 's/^name: //p' "$SKILL_DIR/SKILL.md" | head -n 1)"
 version="$(sed -n 's/^  version: "\([^"]*\)"/\1/p' "$SKILL_DIR/SKILL.md" | head -n 1)"
@@ -53,16 +53,19 @@ CODEX_HOME="$first_home" "$LINK_SCRIPT"
 target="$first_home/skills/build-pipeline-engineering"
 [[ -L "$target" ]] || fail "target is not a symbolic link"
 
-source_real="$(cd -- "$SKILL_DIR" && pwd -P)"
+source_real="$(cd -- "$first_home/.agent-builds/personal-skills-build-pipeline-engineering/skills/build-pipeline-engineering" && pwd -P)"
 target_real="$(cd -- "$target" && pwd -P)"
 [[ "$target_real" == "$source_real" ]] || fail "link resolves to $target_real"
+[[ -f "$target/agents/openai.yaml" ]] || fail "Codex metadata was not materialized"
+[[ ! -e "$target/agent-builds" ]] || fail "source-only agent-builds leaked into installed output"
+grep -Fq '## Codex Build Adaptation' "$target/SKILL.md" || fail "Codex instructions were not appended"
 
 CODEX_HOME="$first_home" "$LINK_SCRIPT"
 
 printf 'from-local-link\n' > "$target/.build-pipeline-engineering-sync-probe.$$"
-[[ "$(cat "$probe")" == "from-local-link" ]] || fail "local write was not visible in repository source"
-printf 'from-repository-source\n' > "$probe"
-[[ "$(cat "$target/.build-pipeline-engineering-sync-probe.$$")" == "from-repository-source" ]] || fail "repository write was not visible through local link"
+[[ ! -e "$probe" ]] || fail "generated installation wrote through to portable source"
+CODEX_HOME="$first_home" "$LINK_SCRIPT"
+[[ ! -e "$target/.build-pipeline-engineering-sync-probe.$$" ]] || fail "rebuild did not replace modified generated content"
 
 conflict_home="$tmp/conflict-home"
 mkdir -p "$conflict_home/skills"

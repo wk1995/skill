@@ -1,0 +1,9 @@
+{
+  "schema_version": 1,
+  "id": "codex",
+  "version": "1.0.0",
+  "artifact_version": "0.1.0",
+  "skills_path": "skills",
+  "root_overlay": "root",
+  "skill_append": "SKILL.append.md"
+}

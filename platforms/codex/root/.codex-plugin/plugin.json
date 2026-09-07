@@ -1,0 +1,6 @@
+{
+  "name": "personal-skills",
+  "version": "0.1.0",
+  "description": "Portable personal Agent Skills adapted for Codex",
+  "skills": "./skills/"
+}

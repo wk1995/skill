@@ -69,6 +69,11 @@ def validate_skill(skill_dir: Path) -> tuple[str, str, str]:
     for path in (skill_file, english_readme, chinese_readme, changelog):
         require(path.is_file(), f"{relative} is missing {path.name}")
 
+    agent_builds = skill_dir / "agent-builds"
+    require(agent_builds.is_dir(), f"{relative} is missing agent-builds/")
+    require(not (skill_dir / "agents").exists(),
+            f"{relative}/agents is platform-specific; move it under agent-builds/<agent>/")
+
     metadata = frontmatter(skill_file)
     require(metadata.get("name") == name, f"{relative}/SKILL.md name must match its directory")
     require(metadata.get("description"), f"{relative}/SKILL.md must define description")
@@ -85,6 +90,8 @@ def validate_skill(skill_dir: Path) -> tuple[str, str, str]:
             f"{relative}/CHANGELOG.md must document current metadata.version {metadata['version']} with a UTC date")
 
     skill_content = skill_file.read_text(encoding="utf-8")
+    require("## Platform Compatibility" not in skill_content,
+            f"{relative}/SKILL.md must keep platform compatibility in Agent adapters")
     require("triggering:" in skill_content and "include:" in skill_content and "exclude:" in skill_content,
             f"{relative}/SKILL.md must define metadata.triggering include and exclude rules")
 

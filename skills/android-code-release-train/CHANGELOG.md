@@ -4,7 +4,7 @@ All notable changes to this Skill are documented here.
 
 ## [Unreleased]
 
-- Documented equivalent invocation and safety behavior for WorkBuddy without changing the release workflow.
+- No unreleased changes.
 
 ## [2.0.0] - 2026-09-04
 

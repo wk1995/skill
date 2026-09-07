@@ -2,7 +2,7 @@
 
 Language: **English** | [中文](README.zh-CN.md)
 
-`sync-skills` manages equivalent copies of one Agent Skill across this repository, project directories, machine-wide Codex or WorkBuddy skill folders, and explicit external locations. It supports linking, converting, comparing, synchronizing, versioning, snapshotting, auditing, and rolling back those copies.
+`sync-skills` manages equivalent copies of one Agent Skill across repository, project, machine-wide, and explicit external locations. It supports linking, converting, comparing, synchronizing, versioning, snapshotting, auditing, and rolling back those copies.
 
 ## How To Use It
 
@@ -10,11 +10,9 @@ Use the immutable `metadata.sync_id` declared in each `SKILL.md`, along with the
 
 ```text
 Compare the repository and local copies of my-skill.
-Link this skill repository copy to the installed WorkBuddy product's Skill directory.
+Link this Skill's repository copy to a specified machine-wide Skill directory.
 Synchronize the project and external copies from the repository version.
 ```
-
-In OpenAI Codex you can also invoke the skill explicitly with `$sync-skills`. Codex commonly uses `~/.codex/skills`; WorkBuddy's path is product-configured (commonly `~/.workbuddy/skills` for domestic builds or `~/.workbuddy-ai/skills` for WorkBuddy AI/overseas builds).
 
 Use the supplied script for deterministic changes:
 
@@ -33,7 +31,7 @@ Each location has a role: `repo`, `local`, `project`, or `external`. The workflo
 Use this skill when the request:
 
 - links, converts, synchronizes, versions, audits, compares, or rolls back Skill copies;
-- involves repository, project, local Codex/user or WorkBuddy, or external copies of the same Skill; or
+- involves repository, project, machine-wide user, or external copies of the same Skill; or
 - needs Skill provenance URLs, version history, content digests, snapshots, or difference reports.
 
 ## When It Does Not Trigger

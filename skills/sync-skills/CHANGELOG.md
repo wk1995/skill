@@ -20,8 +20,6 @@ version, date, and a change summary.
   including roles saved by earlier commands and symlink-resolved paths.
 - Status: unsafe same-path or nested role registrations now report
   `path_issues` and make the group non-clean.
-- Compatibility: documented product-configured WorkBuddy Skill directories
-  instead of treating one domestic or overseas path as universal.
 - Data safety: documented that removal of legacy tracked `.skill-sync` state
   must be staged separately so merges cannot delete collaborators' snapshots.
 - Docs: updated the version-policy example and changelog requirement.
