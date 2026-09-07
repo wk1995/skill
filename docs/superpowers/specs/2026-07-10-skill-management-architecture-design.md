@@ -2,6 +2,8 @@
 
 日期：2026-07-10
 
+> 此文档保留最初的 monorepo 设计背景。Agent 适配层已由后续的声明式构建架构替代；当前约束、目录和版本策略以 [Agent Build Architecture](../../agent-build-architecture.md) 为准。
+
 ## 1. 背景
 
 本仓库用于长期管理个人使用的多个 Agent Skill。每个 Skill 必须能够独立演进和独立版本化；仓库同时提供统一 CLI 与 MCP Server，并允许单个 Skill 按需贡献自己的 CLI 命令和 MCP tools。

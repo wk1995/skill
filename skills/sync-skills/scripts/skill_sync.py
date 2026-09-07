@@ -88,6 +88,14 @@ def require_skill_dir(path: str, role: str) -> Path:
 
 
 def copy_skill_tree(source: Path, target: Path) -> None:
+    source_real = source.resolve()
+    target_real = target.resolve()
+    if paths_refer_to_same_location(source_real, target_real):
+        raise SystemExit(f"refusing to copy a skill onto itself: {source_real}")
+    if path_is_within(target_real, source_real):
+        raise SystemExit(f"refusing to copy a skill into its own subtree: {target_real} is inside {source_real}")
+    if path_is_within(source_real, target_real):
+        raise SystemExit(f"refusing to copy a skill from inside its target: {source_real} is inside {target_real}")
     if target.exists() and not target.is_dir():
         raise SystemExit(f"target exists and is not a directory: {target}")
     target.mkdir(parents=True, exist_ok=True)
@@ -120,6 +128,76 @@ def is_relative_to(child: Path, parent: Path) -> bool:
         return True
     except ValueError:
         return False
+
+
+def paths_refer_to_same_location(first: Path, second: Path) -> bool:
+    """Compare resolved paths by spelling and, when possible, filesystem identity."""
+    first_real = first.expanduser().resolve()
+    second_real = second.expanduser().resolve()
+    if first_real == second_real:
+        return True
+    try:
+        return first_real.exists() and second_real.exists() and os.path.samefile(first_real, second_real)
+    except OSError:
+        return False
+
+
+def path_is_within(child: Path, parent: Path) -> bool:
+    """Return whether child is below parent, including case-insensitive aliases."""
+    child_real = child.expanduser().resolve()
+    parent_real = parent.expanduser().resolve()
+    if is_relative_to(child_real, parent_real):
+        return True
+    return any(
+        paths_refer_to_same_location(candidate, parent_real)
+        for candidate in child_real.parents
+    )
+
+
+def normalized_role_paths(roles: dict[str, str]) -> dict[str, str]:
+    """Resolve every registered role path for stable equality checks."""
+    return {
+        role: str(Path(path).expanduser().resolve())
+        for role, path in roles.items()
+        if path
+    }
+
+
+def role_path_issues(roles: dict[str, str]) -> list[str]:
+    """Return same-path and nesting conflicts across all registered roles."""
+    normalized = normalized_role_paths(roles)
+    items = sorted(normalized.items())
+    issues: list[str] = []
+    for index, (role_a, path_a) in enumerate(items):
+        for role_b, path_b in items[index + 1:]:
+            path_a_obj = Path(path_a)
+            path_b_obj = Path(path_b)
+            if paths_refer_to_same_location(path_a_obj, path_b_obj):
+                issues.append(
+                    "roles resolve to the same path: "
+                    f"{role_a}, {role_b} -> {path_a}"
+                )
+            elif path_is_within(path_b_obj, path_a_obj):
+                issues.append(
+                    f"role {role_b} is inside role {role_a}: {path_b} is inside {path_a}"
+                )
+            elif path_is_within(path_a_obj, path_b_obj):
+                issues.append(
+                    f"role {role_a} is inside role {role_b}: {path_a} is inside {path_b}"
+                )
+    return issues
+
+
+def validate_role_paths(roles: dict[str, str]) -> dict[str, str]:
+    """Return normalized roles or refuse to persist an unsafe registry."""
+    normalized = normalized_role_paths(roles)
+    issues = role_path_issues(normalized)
+    if issues:
+        raise SystemExit(
+            "refusing unsafe role paths: " + "; ".join(issues)
+            + ". A symlinked copy is already identical to its target, so link only real copies."
+        )
+    return normalized
 
 
 def is_empty_dir(path: Path) -> bool:
@@ -525,7 +603,16 @@ def command_link(args: argparse.Namespace) -> int:
     apply_url_args(group, args)
 
     expected_id = group_id(key, group)
-    for role, path in paths.items():
+    resolved_roles: dict[str, str] = {}
+    for role in ROLE_FLAGS:
+        path = resolve_path(getattr(args, role))
+        if path:
+            require_skill_dir(path, role)
+            resolved_roles[role] = path
+
+    candidate_roles = dict(group.get("roles", {}))
+    candidate_roles.update(resolved_roles)
+    for role, path in resolved_roles.items():
         skill_dir = require_skill_dir(path, role)
         metadata = read_skill_metadata(skill_dir)
         if metadata.get("sync_id") and str(metadata["sync_id"]) != expected_id:
@@ -534,7 +621,7 @@ def command_link(args: argparse.Namespace) -> int:
             )
         if not metadata.get("sync_id") and not legacy_group:
             read_sync_metadata(skill_dir, role)
-        group["roles"][role] = path
+    group["roles"] = validate_role_paths(candidate_roles)
 
     group["sync_id"] = expected_id
     if args.name:
@@ -602,8 +689,10 @@ def command_convert(args: argparse.Namespace) -> int:
     if target.exists() and not is_empty_dir(target):
         require_skill_dir(str(target), args.target_role)
 
-    group["roles"][args.source_role] = str(source)
-    group["roles"][args.target_role] = str(target)
+    candidate_roles = dict(group.get("roles", {}))
+    candidate_roles[args.source_role] = str(source)
+    candidate_roles[args.target_role] = str(target)
+    group["roles"] = validate_role_paths(candidate_roles)
     if args.source_url:
         group.setdefault("role_urls", {})[args.source_role] = args.source_url
     if args.target_url:
@@ -636,6 +725,7 @@ def command_status(args: argparse.Namespace) -> int:
     state_dir = Path(args.state_dir).resolve()
     registry = load_registry(state_dir)
     key, group = get_group(registry, args.group)
+    path_issues = role_path_issues(group.get("roles", {}))
     current = build_member_state(group)
     validate_group_members(group, current)
     digests = {info["digest"] for info in current.values()}
@@ -643,8 +733,9 @@ def command_status(args: argparse.Namespace) -> int:
         "group": args.group,
         "sync_id": group_id(key, group),
         "name": group_name(key, group),
-        "clean": len(digests) <= 1,
+        "clean": len(digests) <= 1 and not path_issues,
         "members": current,
+        "path_issues": path_issues,
         "role_urls": group.get("role_urls", {}),
         "skill_urls": group.get("skill_urls", []),
     }
@@ -674,6 +765,7 @@ def command_sync(args: argparse.Namespace) -> int:
     state_dir = Path(args.state_dir).resolve()
     registry = load_registry(state_dir)
     key, group = get_group(registry, args.group)
+    group["roles"] = validate_role_paths(group.get("roles", {}))
     current = build_member_state(group)
     validate_group_members(group, current)
     if len(current) < 2:
@@ -746,6 +838,7 @@ def command_rollback(args: argparse.Namespace) -> int:
     state_dir = Path(args.state_dir).resolve()
     registry = load_registry(state_dir)
     key, group = get_group(registry, args.group)
+    group["roles"] = validate_role_paths(group.get("roles", {}))
     snapshot_dir = state_dir / "snapshots" / key / args.snapshot
     if not snapshot_dir.is_dir():
         raise SystemExit(f"snapshot not found: {args.snapshot}")

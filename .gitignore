@@ -1,2 +1,7 @@
 .worktrees/
 .skill-sync/
+.workbuddy/
+.workbuddy-ai/
+dist/
+__pycache__/
+*.py[cod]

@@ -6,18 +6,18 @@ Personal Skills 是一个用于集中管理个人 Agent Skills 的 monorepo。�
 
 ## 当前状态
 
-- 已完成：仓库定位、目标架构、目录约定和第一个本地 Skill。
-- 规划中：Skill schema、共享管理包、CLI、MCP Server、Codex 适配器、构建、版本和发布流程。
+- 已完成：仓库定位、通用 Skill 约定、声明式 Codex/WorkBuddy 适配器、确定性 Agent 构建和 PR 校验。
+- 规划中：共享管理包、CLI、MCP Server、安装、registry 发布和自动化发布流程。
 - 尚未提供：项目级可执行命令。本文中的命令均描述目标接口。
 
-详细设计见 [Skill 管理仓库架构设计](docs/superpowers/specs/2026-07-10-skill-management-architecture-design.md)。
+当前适配层和版本边界见 [Agent Build 架构](docs/agent-build-architecture.md)；[最初的仓库设计](docs/superpowers/specs/2026-07-10-skill-management-architecture-design.md)保留为历史背景。
 
 ## 设计原则
 
 - **通用核心**：基础 Skill 遵循 [Agent Skills Specification](https://agentskills.io/specification)，不绑定单一 Agent 产品。
-- **Codex 优先适配**：首个适配器面向标准 Codex 插件结构：`skills/`、`.codex-plugin/plugin.json` 和 `.mcp.json`。
-- **独立版本**：每个 Skill 在自己的 `SKILL.md` 中维护 SemVer。
-- **渐进扩展**：说明型 Skill 只需要 `SKILL.md`；需要时再增加脚本、资料、资产、CLI 命令或 MCP tools。
+- **开放适配器**：从 `platforms/*/adapter.json` 自动发现 Agent；新增默认适配器不需要修改每个 Skill 或中央分支逻辑。
+- **独立版本**：通用 Skill、适配器与生成产物分别维护版本生命周期。
+- **渐进扩展**：满足仓库管理文件契约后，仅在确有需要时增加脚本、资料、资产、CLI 命令或 MCP tools。
 - **一套核心，两种入口**：CLI 和 MCP Server 复用相同的发现、校验、安装、版本和发布逻辑。
 - **显式信任**：远程 Skill 的可执行扩展默认禁用，获得明确确认后才能加载。
 
@@ -29,13 +29,15 @@ Personal Skills 是一个用于集中管理个人 Agent Skills 的 monorepo。�
 skill/
 |-- README.md
 |-- README.zh-CN.md
-|-- skillset.yaml                 # 仓库级配置、适配器和信任策略
 |-- skills/
 |   `-- <skill-name>/
 |       |-- SKILL.md              # 必需：面向 Agent 的通用入口、版本和触发规则
-|       |-- README.md             # 必需：使用说明、触发条件和不触发条件
-|       |-- agents/
-|       |   `-- openai.yaml       # 可选：Codex 展示元数据
+|       |-- README.md             # 必需：英文使用说明
+|       |-- README.zh-CN.md       # 必需：中文使用说明
+|       |-- CHANGELOG.md          # 必需：通用 Skill 变更
+|       |-- agent-builds/         # 必需边界；各 Agent 覆盖按需添加
+|       |   `-- codex/
+|       |       `-- agents/openai.yaml
 |       |-- extensions.yaml       # 可选：CLI/MCP 扩展声明
 |       |-- src/                  # 可选：扩展实现
 |       |   |-- core.ts
@@ -45,12 +47,21 @@ skill/
 |       |-- references/           # 可选：按需加载的资料
 |       |-- assets/               # 可选：模板与静态资产
 |       `-- tests/                # 可选：行为、脚本和扩展测试
-|-- packages/
+|-- platforms/
+|   |-- codex/
+|   |   |-- adapter.json          # 适配器/产物版本与输出布局
+|   |   |-- SKILL.append.md       # Codex 通用生成说明
+|   |   `-- root/.codex-plugin/plugin.json
+|   `-- workbuddy/
+|       |-- adapter.json
+|       `-- SKILL.append.md
+|-- scripts/
+|   `-- agent_build.py            # 自动发现并构建全部平台适配器
+|-- packages/                     # 规划中的共享管理运行时
 |   |-- core/                     # Skill 发现、校验、安装和版本管理
 |   |-- sdk/                      # Skill CLI/MCP 扩展 API
 |   |-- cli/                      # 项目级 CLI
-|   |-- mcp-server/               # 项目级 MCP Server
-|   `-- adapter-codex/            # Codex 插件构建与安装适配
+|   `-- mcp-server/               # 项目级 MCP Server
 |-- schemas/                      # Skill frontmatter、skillset 和 extensions JSON Schema
 |   |-- skill.schema.json
 |   |-- skillset.schema.json
@@ -65,7 +76,7 @@ skill/
 `-- dist/                         # 构建产物，不提交
 ```
 
-Agent Skills 规范只要求 `SKILL.md`，但本仓库额外要求每个受管理的 Skill 都提供面向使用者的 `README.md`；详见 [AGENTS.md](AGENTS.md)。其他目录按需创建。
+Agent Skills 规范只要求 `SKILL.md`，但本仓库额外要求双语使用说明、changelog 和 `agent-builds/` 边界；详见 [AGENTS.md](AGENTS.md)。该边界下的平台目录仅在 Skill 需要覆盖时创建。
 
 ## Skills
 
@@ -77,20 +88,25 @@ Agent Skills 规范只要求 `SKILL.md`，但本仓库额外要求每个受管�
 | `android-code-release-train` | `android-code-release-train` 约束 Android 需求从功能分支、版本集成和发布提升，到形成已评审源码提交及不可变 Tag 的完整代码链路。它不构建、签名、打包或上传发布产物。 | [README](skills/android-code-release-train/README.zh-CN.md) |
 | `build-pipeline-engineering` | `build-pipeline-engineering` 用于配置和执行可复现的可分发构建流水线：从一个确定源码引用完成 build variant 选择、环境配置、签名、打包、校验与输出上传。对于支持 variant 的目标，未指定时默认使用 `release`；在 GitHub Actions 中，构建输出默认上传到 GitHub Actions Artifacts。 | [README](skills/build-pipeline-engineering/README.zh-CN.md) |
 | `choose-project-doc-location` | `choose-project-doc-location` 用于在创建或修改项目文档前，判断内容应放在仓库 README、受版本控制的仓库文档，还是 GitHub Wiki 中。 | [README](skills/choose-project-doc-location/README.zh-CN.md) |
-| `sync-skills` | `sync-skills` 用于管理同一个 Agent Skill 在本仓库、项目目录、本机 Codex Skill 目录和明确指定的外部路径中的等价副本。它支持链接、转换、比较、同步、版本记录、快照、审计和回滚。 | [README](skills/sync-skills/README.zh-CN.md) |
+| `sync-skills` | `sync-skills` 用于管理同一个 Agent Skill 在仓库、项目、本机用户目录和明确指定的外部路径中的等价副本。它支持链接、转换、比较、同步、版本记录、快照、审计和回滚。 | [README](skills/sync-skills/README.zh-CN.md) |
 <!-- skills-catalog:end -->
 
-## Pull Request 目录检查
+## Pull Request 审查门禁
 
-`skill-catalog` GitHub Actions 检查会在 PR 合入 `main` 前校验所有 Skill 和两份目录。它会在 CI 日志中打印每一项校验失败原因，并为对应文件创建 GitHub Actions error 注释。若 PR 分支属于本仓库，且已配置具有仓库内容写权限的 `SKILL_CATALOG_TOKEN` secret，workflow 可以将生成后的根 README 目录提交回该 PR；对于 fork PR 或未配置该 secret 的情况，只要目录未同步，检查就会失败并提示贡献者运行生成器后提交两份根 README。
+在宣布 PR 可以合并前，应从干净且已提交的工作区运行 `bash tests/pr-review-gate.sh origin/main`，并执行 [PR 审查手册](docs/pr-review-playbook.md)规定的独立对抗性检查。GitHub Actions 的 required check `skill-catalog` 会调用同一门禁：检查完整 PR diff 与模拟合并结果、保护 `.skill-sync/`、拒绝预期范围外的已跟踪忽略文件、解析 Python 源码，并运行仓库全部校验测试。门禁全绿是必要条件，但不能替代路径身份、直接入口、递归规则、依赖降级和失败后状态检查。内部 PR 在配置 `SKILL_CATALOG_TOKEN` 后仍可自动提交生成目录；fork PR 必须自行提交两份根 README。
 
 ## Skill 结构与版本
 
-基础 Skill：
+最小受管理 Skill：
 
 ```text
 skills/example-skill/
-`-- SKILL.md
+|-- SKILL.md
+|-- README.md
+|-- README.zh-CN.md
+|-- CHANGELOG.md
+`-- agent-builds/
+    `-- .gitkeep
 ```
 
 `SKILL.md` 同时保存通用元数据、独立版本和可选触发规则：
@@ -113,6 +129,8 @@ metadata:
 ```
 
 其中 `name`、`description`、`metadata.sync_id` 和 `metadata.version` 是基础约定。`metadata.sync_id` 是 `sync-skills` 使用的逻辑 Skill 不可变标识；创建 Skill 时确定，后续即使触发名称或目录变化也不得修改。`description` 继续承担兼容 Agent Skills 发现的自然语言触发说明；`metadata.triggering` 是本仓库额外的结构化补充。`include` 表示明确触发时机，`exclude` 表示明确不触发时机。未配置 `metadata.triggering` 时等价于 `include: []` 和 `exclude: []`。`exclude` 优先于 `include`，避免关键词命中导致误触发。
+
+Agent 专属的调用语法、安装路径、UI 元数据和 manifest 不写入通用 `SKILL.md`。平台默认规则放在 `platforms/<agent>/`，单个 Skill 的例外文件放在 `agent-builds/<agent>/`。
 
 带可执行扩展的 Skill 可以增加：
 
@@ -170,7 +188,20 @@ MCP Server 与 CLI 共享 `packages/core`，计划提供：
 
 管理 tools 使用 `skills__<action>` 命名；Skill tools 使用 `<skill-name>__<tool-name>` 命名。首版使用本地 stdio transport；远程 Streamable HTTP 应在加入认证和来源限制后再启用。
 
-## Codex 适配器（规划）
+## Agent Build 适配器
+
+现在可以通过通用构建器使用适配器：
+
+```bash
+python3 scripts/agent_build.py --list
+python3 scripts/agent_build.py --check
+python3 scripts/agent_build.py codex
+python3 scripts/agent_build.py workbuddy
+```
+
+构建器扫描 `platforms/`，不硬编码 Agent 清单。新增具有仓库级默认行为的 Agent 时，只需新增 `platforms/<agent>/`；仅在某个 Skill 存在例外时，才新增对应的 `agent-builds/<agent>/`。
+
+## Codex 适配器
 
 Codex 适配器把通用源码构建成标准插件产物：
 
@@ -178,7 +209,7 @@ Codex 适配器把通用源码构建成标准插件产物：
 dist/codex/
 |-- .codex-plugin/
 |   `-- plugin.json
-|-- .mcp.json
+|-- .agent-build.json
 |-- skills/
 |   `-- <skill-name>/
 |       |-- SKILL.md
@@ -186,10 +217,9 @@ dist/codex/
 |       |-- scripts/
 |       |-- references/
 |       `-- assets/
-`-- runtime/
 ```
 
-Codex 插件使用独立的聚合包版本；它不会替代每个 Skill 自己的版本。插件结构依据 [Codex 插件文档](https://developers.openai.com/codex/plugins/build)。
+Codex 插件产物和 Codex 适配器分别拥有自己的版本；二者都不会替代或自动提升通用 Skill 的版本。插件结构依据 [OpenAI 官方插件打包文档](https://developers.openai.com/plugins/build/plugins)。
 
 ## 版本与发布（规划）
 
@@ -197,7 +227,8 @@ Codex 插件使用独立的聚合包版本；它不会替代每个 Skill 自己�
 - `.changes/` 记录受影响 Skill、升级级别和变更摘要。
 - Skill 发布标签格式为 `skill/<skill-name>/v<version>`。
 - 生成的 registry 记录版本、来源和 SHA-256 内容摘要。
-- 根 `package.json` 维护共享 CLI、MCP 与 Codex 聚合包版本。
+- 每个 `platforms/<agent>/adapter.json` 分别维护适配器版本和生成产物版本。
+- 新增或修改 Agent 支持不会提升 `metadata.version`，除非通用 Skill 行为也发生变化。
 - 发布产物按 `<skill-name>/<version>` 保存为不可变副本，源目录不复制历史版本。
 
 ## 安全与信任
@@ -216,11 +247,11 @@ Codex 插件使用独立的聚合包版本；它不会替代每个 Skill 自己�
 3. 实现 `packages/core` 和 Skill 校验流程。
 4. 实现项目级 CLI 与 Skill 自定义命令 SDK。
 5. 实现本地 MCP Server 与 Skill tools 注册。
-6. 实现 Codex 构建、安装和集成测试。
+6. 在声明式 Agent 构建之上补充安装和 registry 发布能力。
 7. 实现独立版本、打包与发布流程。
 
 ## 参考规范
 
 - [Agent Skills Specification](https://agentskills.io/specification)
-- [Codex plugin structure](https://developers.openai.com/codex/plugins/build)
+- [OpenAI plugin packaging](https://developers.openai.com/plugins/build/plugins)
 - [Model Context Protocol SDKs](https://modelcontextprotocol.io/docs/sdk)

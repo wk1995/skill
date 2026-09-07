@@ -19,7 +19,7 @@ A sync group maps one logical Skill to one or more physical copies. The registry
 Use stable role names:
 
 - `repo`: copy inside the current skill-management repository.
-- `local`: machine-wide user/Codex copy.
+- `local`: machine-wide user copy at an explicitly resolved path.
 - `project`: another workspace's project-level copy.
 - `external`: arbitrary copy outside the previous categories.
 
@@ -63,7 +63,7 @@ For this skill, use:
 
 ```yaml
 metadata:
-  version: "0.0.2"
+  version: "0.0.5"
 ```
 
 When a group is synchronized, copy the selected source version to all targets. If target versions differ before sync, record them in the pre-sync snapshot and report the difference.
@@ -149,8 +149,9 @@ Documentation-only Skills can be copied after validation. Skills with executable
 
 - `scripts/`
 - `src/`
+- `agent-builds/`
 - `extensions.yaml`
-- `.mcp.json`
+- runtime connector manifests
 - package manager manifests
 - binaries or archives in `assets/`
 
