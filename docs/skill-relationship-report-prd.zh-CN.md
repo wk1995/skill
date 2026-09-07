@@ -63,7 +63,8 @@
 | --- | --- |
 | Logical Skill | 由不可变 `sync_id` 标识的逻辑 Skill。 |
 | Skill Copy | Logical Skill 在一个具体路径中的物理副本。 |
-| Local Copy | 本机 Agent Skill 根目录中的副本，例如 Codex 或其他 Agent 的用户级 Skill。 |
+| Portable Source Copy | 当前项目 `skills/<skill>/` 中的跨 Agent 源目录。 |
+| Local Installed Copy | 本机 Agent Skill 根目录中的已安装副本，例如 Codex 或其他 Agent 的用户级 Skill；它通常由对应 Agent Build Copy 生成，不是 Portable Source Copy 的原样复制。 |
 | Current Project Copy | 当前执行目录所属项目中的 Skill 副本。 |
 | Related Project Copy | 显式登记的其他项目中的 Skill 副本。 |
 | Relationship | 多个 Skill Copy 因具有同一 `sync_id` 而属于同一个 Logical Skill。 |
@@ -77,12 +78,14 @@
 关系是多点连接，不是一对一映射：
 
 ```text
-                         ┌─ Local: Codex ~/.codex/skills/demo
-Logical Skill: demo ─────┼─ Current project: ./skills/demo
-                         ├─ Project A: /projects/app-a/.agents/skills/demo
-                         ├─ Project B: /projects/app-b/skills/demo
-                         ├─ Agent build: Codex dist/codex/skills/demo
-                         └─ Agent build: WorkBuddy dist/workbuddy/demo
+Logical Skill: demo
+├─ Portable source: ./skills/demo
+│  ├─ Codex build: dist/codex/skills/demo
+│  │  └─ Codex local install: ~/.codex/skills/demo
+│  └─ WorkBuddy build: dist/workbuddy/demo
+│     └─ WorkBuddy local install: <adapter-resolved-root>/demo
+├─ Project A: /projects/app-a/.agents/skills/demo
+└─ Project B: /projects/app-b/skills/demo
 ```
 
 ## 5. 用户故事
@@ -106,6 +109,10 @@ Logical Skill: demo ─────┼─ Current project: ./skills/demo
 ### 5.5 查看 Agent 构建覆盖与版本差异
 
 作为项目维护者，我希望按 Skill 查看当前项目支持的所有 AI Agent Builders 的构建覆盖。对于任意 Skill，可能全部受支持的 Builder 都有构建、仅部分 Builder 有构建或全部没有构建；如果多个 Builder 都有构建但使用的 Skill core 版本不同，报告必须突出显示版本分歧，而不能只显示“已构建”。Codex 和 WorkBuddy 只是当前项目的示例；新增 Agent adapter 后，该 Builder 应自动成为矩阵中的新列，不需要修改关系报告代码中的固定列表。
+
+### 5.6 修复本机安装副本身份缺失
+
+作为使用者，当 registry 已关联某个本机 Agent Skill，但本机 `SKILL.md` 缺少 `metadata.sync_id` 时，我希望报告说明它属于旧版或不完整的 Agent 安装产物，展示对应的可信构建来源，并给出“备份、重新构建、重新安装、验证”的修复建议，而不是让我手工只补一个字段或用 portable 源目录直接覆盖 Agent 安装目录。
 
 ## 6. 功能需求
 
@@ -237,7 +244,29 @@ Agent 构建不是普通同步 Copy：同一个 Agent Build Copy 仍归属于对
 }
 ```
 
-### 6.5 状态计算
+### 6.5 Portable、构建产物与本机安装副本的分层比对
+
+同一个 Logical Skill 的正确派生链为：
+
+```text
+Portable Source Copy
+  -> Agent Build Copy（应用 adapter 与 per-Skill overlay）
+    -> Local Installed Copy（安装到该 Agent 的本机 Skill 目录）
+```
+
+比对与修复规则：
+
+- Portable Source Copy 与 Agent Build Copy 通过 build manifest 中记录的 `sync_id`、core 版本、portable source digest、adapter ID、adapter 版本和 artifact 版本核对。
+- Local Installed Copy 只与同一 `agent_id` 的 Agent Build Copy 比较版本和规范化内容 digest。不得把它的原始目录 digest 直接与 Portable Source Copy 比较，因为 Agent overlay、安装布局和 Agent 专属文件会产生合法差异。
+- registry 中的本机位置必须记录 `agent_id` 和派生来源，例如 `derived_from: build:codex`；旧 registry 缺少该字段时，可根据已登记角色与受支持 Builder 的安装根目录生成待确认的内存映射，不静默持久化猜测结果。
+- 本机副本缺少 `metadata.sync_id` 时标记 `missing-sync-id`。若 registry 已将该绝对路径登记到一个 Logical Skill，可继续展示为“已登记但身份不完整”，但不得仅凭名称为未登记路径建立新关系。
+- 存在可信且有效的同 Agent 构建产物时，建议修复流程为：快照本机安装副本、重新构建、从该 Agent 构建产物原子安装、验证 `sync_id` / core 版本 / digest、刷新 registry 与关系报告。
+- 不得只在本机 `SKILL.md` 中手工补 `sync_id` 后宣告修复完成；同一副本可能还缺少 triggering metadata、Agent adaptation 或其他新文件。
+- 普通 `sync --source repo` 必须拒绝直接覆盖标记为 Agent 安装产物的本机目录，并提示使用对应 Agent build/install 流程。
+- 本机安装副本相对对应构建产物存在额外修改时，标记 `agent-install-diverged`，保留本机副本并要求明确选择“导出本机修改”或“从可信构建重新安装”，不得自动覆盖。
+- 任何重新安装都必须先创建可回滚快照；重复执行修复应幂等，第二次不得产生内容变化。
+
+### 6.6 状态计算
 
 每个 Logical Skill 生成一个汇总状态：
 
@@ -256,10 +285,11 @@ Agent 构建不是普通同步 Copy：同一个 Agent Build Copy 仍归属于对
 | `agent-version-diverged` | 同一 Skill 在不同 Agent 构建中的 core 版本不同。 |
 | `agent-build-stale` | Agent 构建的 core 版本落后或超前于当前项目 portable core。 |
 | `agent-build-invalid` | Agent 构建清单或产物身份无效。 |
+| `agent-install-diverged` | 本机 Agent 安装副本与同 Agent 的有效构建产物内容不同。 |
 
-状态优先级为：安全/身份错误 > 构建无效 > 缺失 > core/Agent 版本分歧 > 构建覆盖不全 > 内容分歧 > 已同步。
+状态优先级为：安全/身份错误 > 构建无效 > 缺失身份 > 安装产物分歧 > core/Agent 版本分歧 > 构建覆盖不全 > portable 内容分歧 > 已同步。
 
-### 6.6 生成时机
+### 6.7 生成时机
 
 - `sync` 成功并保存 registry 后，自动刷新关系文档。
 - `link`、`convert`、`rename`、`rollback` 成功后也应刷新，因为这些操作会改变关系或状态。
@@ -273,7 +303,7 @@ python3 skills/sync-skills/scripts/skill_sync.py relationships
 - Agent 构建成功后也应刷新关系文档；如果 builder 与关系报告解耦，至少应输出可直接执行的 `relationships` 刷新命令。
 - 同步已完成但报告刷新失败时，不得伪装为整体成功：命令必须明确输出 `report_status: stale`、上一份报告路径和可重试命令；不得回滚已经完成的 Skill 同步。
 
-### 6.7 本机存储与隐私
+### 6.8 本机存储与隐私
 
 默认产物：
 
@@ -339,7 +369,7 @@ python3 skills/sync-skills/scripts/skill_sync.py link-location demo \
 - 项目路径：`/projects/skill`
 - 数据范围：2 个受支持 Builder 声明的本机根目录、当前项目、2 个关联项目
 - 项目支持的 Agent Builders：`codex`（adapter `1.0.1`，artifact `0.1.0`）、`workbuddy`（adapter `1.0.1`，artifact `0.1.0`）
-- 汇总：本机 Skill 12；当前项目 Skill 4；其他项目 2；构建完整 1；构建部分缺失 1；Builder 版本分歧 1；全部构建缺失 1；关系分歧或错误 2
+- 汇总：本机 Skill 12；当前项目 Skill 4；其他项目 2；构建完整 2；构建部分缺失 1；Builder 版本分歧 1；本机安装分歧 1；关系分歧或错误 2
 
 ## Skill 关系与 Agent 构建覆盖
 
@@ -348,7 +378,7 @@ python3 skills/sync-skills/scripts/skill_sync.py link-location demo \
 | `sync-skills` | `skills/sync-skills` / `local:codex` / `app-a` | `0.1.0` | core `0.1.0` · adapter `1.0.1` · artifact `0.1.0` | core `0.1.0` · adapter `1.0.1` · artifact `0.1.0` | ✅ `synced` |
 | `android-release-train` | `skills/android-release-train` / `local:codex` / `app-a`, `app-b` | `1.2.0` | core `1.2.0` | core `1.1.0` | ⚠️ `agent-version-diverged` |
 | `build-pipeline-engineering` | `skills/build-pipeline-engineering` / — / — | `0.3.0` | core `0.3.0` | — | ⚠️ `agent-build-partial`, `project-only` |
-| `new-skill` | `skills/new-skill` / — / — | `0.1.0` | — | — | ℹ️ `agent-build-missing`, `project-only` |
+| `choose-project-doc-location` | `skills/choose-project-doc-location` / `local:codex` / — | `0.0.1` | build `0.0.1` · local 缺少 `sync_id` | build `0.0.1` | ⚠️ `missing-sync-id`, `agent-install-diverged` |
 
 说明：这是报告中唯一的常规表格，Builder 列由 adapter 动态生成。Codex 与 WorkBuddy 的 digest 不同是正常现象；只有 core 版本差异、同 Agent 新旧 digest 差异或无效清单才触发告警。
 
@@ -376,7 +406,7 @@ python3 skills/sync-skills/scripts/skill_sync.py diff android-release-train --ro
 ## 问题与警告
 
 - Error — `demo-a` / `demo-b`：两个 ID 指向同一物理目录；禁止同步，需先修复 identity conflict。
-- Warning — `choose-project-doc-location`：版本相同但 digest 不同；需要选择可信来源后再同步。
+- Warning — `choose-project-doc-location`：registry 已关联 repo 与 `local:codex`，但本机 Codex 副本缺少 `sync_id`，且与 Codex build digest 不同；先快照本机副本，再从可信 Codex build 重新安装并验证。禁止用 portable repo 目录直接覆盖。
 
 ## 扫描来源
 
@@ -407,6 +437,9 @@ python3 skills/sync-skills/scripts/skill_sync.py diff android-release-train --ro
 - 两个 Agent 构建版本相同但 digest 不同：默认合法，因为 adapter overlay 不同；仅与相同 Agent 的预期/历史 digest 比较。
 - 新增第三个 adapter：下一次生成报告时自动新增矩阵列，并重新计算完整/部分覆盖，不要求修改固定枚举。
 - 产物存在但 `.agent-build.json` 缺失或 platform 不匹配：标记 `agent-build-invalid`，不得通过目录结构猜测版本。
+- registry 已关联本机路径但该副本缺少 `sync_id`：展示为“已登记但身份不完整”；只允许从同 Agent 的可信构建产物修复，不得靠名称重新关联。
+- portable repo 与本机 Agent 安装副本 digest 不同：先检查中间 Agent build；只要 build 与 portable 来源记录一致且 local 与 build 一致，就不得误报为内容分歧。
+- 本机安装副本包含未进入 Agent build 的修改：标记 `agent-install-diverged` 并保留现场，禁止自动重装覆盖。
 
 ## 10. 验收标准
 
@@ -432,6 +465,11 @@ python3 skills/sync-skills/scripts/skill_sync.py diff android-release-train --ro
 20. Markdown 与 JSON 报告展示完整绝对路径且仅限本机用户读取；命令接口不包含路径脱敏选项。
 21. Skill 同步成功但报告刷新失败时，保留同步结果并明确输出 `report_status: stale`、上一份报告路径和重试命令，不回滚已完成的同步。
 22. 其他项目只有在逐个显式登记后才进入报告；父目录扫描不会自动发现或纳入任何项目。
+23. 每个本机 Agent 安装副本按 `portable source -> agent build -> local install` 分层核对，不直接拿 portable 与安装目录的原始 digest 判定分歧。
+24. registry 已关联但本机副本缺少 `sync_id` 时，报告显示“已登记但身份不完整”、对应 Agent 构建来源及安全修复建议。
+25. 缺少 `sync_id` 的 Agent 安装副本必须通过快照后重新构建/安装来完整修复；仅手工补字段不能得到修复成功状态。
+26. `sync --source repo` 直接指向 Agent 安装目录时在首次修改前失败关闭，并提示对应 build/install 命令。
+27. Agent 安装修复测试覆盖：缺少身份的负例、快照后修复成功、保留本机修改的冲突路径和重复修复幂等。
 
 ## 11. 建议实施顺序
 
@@ -439,10 +477,11 @@ python3 skills/sync-skills/scripts/skill_sync.py diff android-release-train --ro
 2. 扩展 adapter 的本机 Skill 目录声明/解析约定，实现受支持 Builder 驱动的 Inventory Root 发现。
 3. 实现 Inventory Root 覆盖配置、路径去重与只读扫描器。
 4. 实现 adapter 动态发现与 `.agent-build.json` 只读解析。
-5. 将旧 `roles` 转换为兼容的内存 Location 视图。
-6. 实现关系图、Agent 构建矩阵、状态计算与冲突检测。
-7. 实现稳定 JSON 输出和 Markdown renderer。
-8. 实现安全、原子的本机报告写入。
-9. 增加 `relationships` 与 `link-location` 命令。
-10. 在 `sync`、`link`、`convert`、`rename`、`rollback` 成功后自动刷新，并为 Agent build 提供刷新衔接。
-11. 补齐状态化、路径安全、跨项目、多 Agent、多次调用和缺失依赖测试。
+5. 实现 portable source、Agent build、本机安装副本的派生来源记录与分层 digest 比对。
+6. 将旧 `roles` 转换为兼容的内存 Location 视图。
+7. 实现关系图、Agent 构建矩阵、状态计算与冲突检测。
+8. 实现稳定 JSON 输出和 Markdown renderer。
+9. 实现安全、原子的本机报告写入。
+10. 增加 `relationships` 与 `link-location` 命令，并让普通 sync 对 Agent 安装目标失败关闭。
+11. 在 `sync`、`link`、`convert`、`rename`、`rollback` 成功后自动刷新，并为 Agent build/install 提供刷新衔接。
+12. 补齐状态化、路径安全、跨项目、多 Agent、多次调用、安装修复幂等和缺失依赖测试。
