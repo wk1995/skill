@@ -102,7 +102,7 @@ Logical Skill: demo ─────┼─ Current project: ./skills/demo
 
 ### 5.5 查看 Agent 构建覆盖与版本差异
 
-作为项目维护者，我希望按 Skill 查看 Codex 和 WorkBuddy 的构建覆盖：可能两者都有、只有一个存在或都不存在；如果两者都有但使用的 Skill core 版本不同，报告必须突出显示版本分歧，而不能只显示“已构建”。新增 Agent adapter 后，该 Agent 应自动成为矩阵中的新列，不需要修改关系报告代码中的固定 Agent 列表。
+作为项目维护者，我希望按 Skill 查看当前项目支持的所有 AI Agent Builders 的构建覆盖。对于任意 Skill，可能全部受支持的 Builder 都有构建、仅部分 Builder 有构建或全部没有构建；如果多个 Builder 都有构建但使用的 Skill core 版本不同，报告必须突出显示版本分歧，而不能只显示“已构建”。Codex 和 WorkBuddy 只是当前项目的示例；新增 Agent adapter 后，该 Builder 应自动成为矩阵中的新列，不需要修改关系报告代码中的固定列表。
 
 ## 6. 功能需求
 
