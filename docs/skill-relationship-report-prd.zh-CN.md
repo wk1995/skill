@@ -10,6 +10,9 @@
 | PRD 属性 | 本文档提交到项目仓库并随实现接受评审 |
 | 生成报告属性 | `skill-relationships.md/json` 仅保存在本机，不进入 Git 仓库 |
 | 关联背景 | `sync-skills` 外置状态目录与跨项目 Skill 管理 |
+| 技术设计 | [Skill 关系报告技术设计](skill-relationship-report-technical-design.zh-CN.md) |
+| 测试计划 | [Skill 关系报告测试计划](skill-relationship-report-test-plan.zh-CN.md) |
+| 数据契约 | [Skill 关系报告 JSON Schema](../schemas/skill-relationships.schema.json) |
 
 ## 2. 背景与问题
 

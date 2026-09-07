@@ -62,10 +62,11 @@ skill/
 |   |-- sdk/                      # Skill CLI/MCP 扩展 API
 |   |-- cli/                      # 项目级 CLI
 |   `-- mcp-server/               # 项目级 MCP Server
-|-- schemas/                      # Skill frontmatter、skillset 和 extensions JSON Schema
+|-- schemas/                      # JSON 契约；关系报告已实现，其余仍为规划项
 |   |-- skill.schema.json
 |   |-- skillset.schema.json
-|   `-- extensions.schema.json
+|   |-- extensions.schema.json
+|   `-- skill-relationships.schema.json # 已实现的本机报告契约
 |-- tests/
 |   |-- contract/
 |   `-- integration/
@@ -91,7 +92,7 @@ Agent Skills 规范只要求 `SKILL.md`，但本仓库额外要求双语使用�
 | `sync-skills` | `sync-skills` 用于管理同一个 Agent Skill 在仓库、项目、本机用户目录和明确指定的外部路径中的等价副本。它支持链接、转换、比较、同步、版本记录、快照、审计和回滚。 | [README](skills/sync-skills/README.zh-CN.md) |
 <!-- skills-catalog:end -->
 
-本机 Skill 清单与跨项目映射的产品需求见 [Skill 关系报告 PRD](docs/skill-relationship-report-prd.zh-CN.md)。PRD 随仓库维护，实际生成的关系报告仅保存在本机。
+本机 Skill 清单与跨项目映射见 [Skill 关系报告 PRD](docs/skill-relationship-report-prd.zh-CN.md)、随仓库维护的[技术设计](docs/skill-relationship-report-technical-design.zh-CN.md)和[测试计划](docs/skill-relationship-report-test-plan.zh-CN.md)。实际生成的关系报告仍只保存在本机；当前机器可读契约见 [skill-relationships.schema.json](schemas/skill-relationships.schema.json)。
 
 ## Pull Request 审查门禁
 

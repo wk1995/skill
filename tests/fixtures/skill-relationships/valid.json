@@ -1,0 +1,323 @@
+{
+  "schema_version": 1,
+  "generated_at": "2026-09-07T08:30:00Z",
+  "input_fingerprint": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+  "project": {
+    "id": "personal-skills",
+    "root": "/projects/skill",
+    "skills_root": "/projects/skill/skills"
+  },
+  "agent_builders": [
+    {
+      "id": "codex",
+      "adapter_version": "1.0.1",
+      "artifact_version": "0.1.0",
+      "adapter_manifest": "/projects/skill/platforms/codex/adapter.json",
+      "local_skill_roots": [
+        {
+          "resolver": "home-relative:.codex/skills",
+          "path": "/Users/example/.codex/skills",
+          "status": "resolved",
+          "source": "adapter"
+        }
+      ]
+    },
+    {
+      "id": "workbuddy",
+      "adapter_version": "1.0.1",
+      "artifact_version": "0.1.0",
+      "adapter_manifest": "/projects/skill/platforms/workbuddy/adapter.json",
+      "local_skill_roots": [
+        {
+          "resolver": "home-relative:.workbuddy/skills",
+          "path": "/Users/example/.workbuddy/skills",
+          "status": "resolved",
+          "source": "adapter"
+        }
+      ]
+    }
+  ],
+  "summary": {
+    "local_skill_count": 3,
+    "current_project_skill_count": 4,
+    "related_project_count": 1,
+    "build_complete_count": 1,
+    "build_partial_count": 1,
+    "build_missing_count": 1,
+    "agent_version_diverged_count": 1,
+    "agent_install_diverged_count": 1,
+    "issue_count": 2
+  },
+  "skills": [
+    {
+      "sync_id": "alpha",
+      "name": "alpha",
+      "aliases": [],
+      "portable": {
+        "present": true,
+        "project_id": "personal-skills",
+        "path": "/projects/skill/skills/alpha",
+        "core_version": "1.0.0",
+        "digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      },
+      "locations": [
+        {
+          "location_id": "project:app-a",
+          "kind": "project",
+          "path": "/projects/app-a/skills/alpha",
+          "project_id": "app-a",
+          "core_version": "1.0.0",
+          "digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        }
+      ],
+      "agent_builds": {
+        "codex": {
+          "present": true,
+          "sync_id": "alpha",
+          "agent_id": "codex",
+          "build_id": "build:codex",
+          "core_version": "1.0.0",
+          "portable_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "adapter_version": "1.0.1",
+          "artifact_version": "0.1.0",
+          "output_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "path": "/projects/skill/dist/codex/skills/alpha",
+          "manifest_path": "/projects/skill/dist/codex/.agent-build.json"
+        },
+        "workbuddy": {
+          "present": true,
+          "sync_id": "alpha",
+          "agent_id": "workbuddy",
+          "build_id": "build:workbuddy",
+          "core_version": "1.0.0",
+          "portable_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "adapter_version": "1.0.1",
+          "artifact_version": "0.1.0",
+          "output_digest": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+          "path": "/projects/skill/dist/workbuddy/alpha",
+          "manifest_path": "/projects/skill/dist/workbuddy/.agent-build.json"
+        }
+      },
+      "local_installs": [
+        {
+          "agent_id": "codex",
+          "path": "/Users/example/.codex/skills/alpha",
+          "sync_id": "alpha",
+          "core_version": "1.0.0",
+          "digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "derived_from": "build:codex",
+          "identity_status": "verified",
+          "statuses": ["synced"]
+        }
+      ],
+      "statuses": ["synced"]
+    },
+    {
+      "sync_id": "beta",
+      "name": "beta",
+      "aliases": [],
+      "portable": {
+        "present": true,
+        "project_id": "personal-skills",
+        "path": "/projects/skill/skills/beta",
+        "core_version": "2.0.0",
+        "digest": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+      },
+      "locations": [],
+      "agent_builds": {
+        "codex": {
+          "present": true,
+          "sync_id": "beta",
+          "agent_id": "codex",
+          "build_id": "build:codex",
+          "core_version": "2.0.0",
+          "portable_digest": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+          "adapter_version": "1.0.1",
+          "artifact_version": "0.1.0",
+          "output_digest": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+          "path": "/projects/skill/dist/codex/skills/beta",
+          "manifest_path": "/projects/skill/dist/codex/.agent-build.json"
+        },
+        "workbuddy": {
+          "present": false,
+          "sync_id": "beta",
+          "agent_id": "workbuddy"
+        }
+      },
+      "local_installs": [],
+      "statuses": ["agent-build-partial", "project-only"]
+    },
+    {
+      "sync_id": "delta",
+      "name": "delta",
+      "aliases": [],
+      "portable": {
+        "present": true,
+        "project_id": "personal-skills",
+        "path": "/projects/skill/skills/delta",
+        "core_version": "0.1.0",
+        "digest": "1111111111111111111111111111111111111111111111111111111111111111"
+      },
+      "locations": [],
+      "agent_builds": {
+        "codex": {
+          "present": false,
+          "sync_id": "delta",
+          "agent_id": "codex"
+        },
+        "workbuddy": {
+          "present": false,
+          "sync_id": "delta",
+          "agent_id": "workbuddy"
+        }
+      },
+      "local_installs": [],
+      "statuses": ["agent-build-missing", "project-only"]
+    },
+    {
+      "sync_id": "gamma",
+      "name": "gamma",
+      "aliases": ["old-gamma"],
+      "portable": {
+        "present": true,
+        "project_id": "personal-skills",
+        "path": "/projects/skill/skills/gamma",
+        "core_version": "1.0.0",
+        "digest": "2222222222222222222222222222222222222222222222222222222222222222"
+      },
+      "locations": [],
+      "agent_builds": {
+        "codex": {
+          "present": true,
+          "sync_id": "gamma",
+          "agent_id": "codex",
+          "build_id": "build:codex",
+          "core_version": "1.0.0",
+          "portable_digest": "2222222222222222222222222222222222222222222222222222222222222222",
+          "adapter_version": "1.0.1",
+          "artifact_version": "0.1.0",
+          "output_digest": "3333333333333333333333333333333333333333333333333333333333333333",
+          "path": "/projects/skill/dist/codex/skills/gamma",
+          "manifest_path": "/projects/skill/dist/codex/.agent-build.json"
+        },
+        "workbuddy": {
+          "present": true,
+          "sync_id": "gamma",
+          "agent_id": "workbuddy",
+          "build_id": "build:workbuddy",
+          "core_version": "0.9.0",
+          "portable_digest": "2222222222222222222222222222222222222222222222222222222222222222",
+          "adapter_version": "1.0.1",
+          "artifact_version": "0.1.0",
+          "output_digest": "4444444444444444444444444444444444444444444444444444444444444444",
+          "path": "/projects/skill/dist/workbuddy/gamma",
+          "manifest_path": "/projects/skill/dist/workbuddy/.agent-build.json"
+        }
+      },
+      "local_installs": [
+        {
+          "agent_id": "codex",
+          "path": "/Users/example/.codex/skills/gamma",
+          "core_version": "1.0.0",
+          "digest": "5555555555555555555555555555555555555555555555555555555555555555",
+          "derived_from": "build:codex",
+          "identity_status": "registered-incomplete",
+          "statuses": ["agent-install-diverged", "missing-sync-id"]
+        }
+      ],
+      "statuses": [
+        "agent-build-stale",
+        "agent-install-diverged",
+        "agent-version-diverged",
+        "missing-sync-id"
+      ]
+    }
+  ],
+  "unlinked_local_skills": [
+    {
+      "name": "hatch-pet",
+      "sync_id": "hatch-pet",
+      "agent_ids": ["codex"],
+      "path": "/Users/example/.codex/skills/hatch-pet",
+      "core_version": "1.0.0",
+      "digest": "6666666666666666666666666666666666666666666666666666666666666666",
+      "statuses": ["unlinked-local"]
+    }
+  ],
+  "issues": [
+    {
+      "severity": "warning",
+      "code": "agent-install-diverged",
+      "message": "The Codex local install differs from its trusted Codex build.",
+      "sync_id": "gamma",
+      "agent_id": "codex",
+      "path": "/Users/example/.codex/skills/gamma"
+    },
+    {
+      "severity": "warning",
+      "code": "missing-sync-id",
+      "message": "The registered Codex local install has incomplete identity metadata.",
+      "sync_id": "gamma",
+      "agent_id": "codex",
+      "path": "/Users/example/.codex/skills/gamma"
+    }
+  ],
+  "scan_sources": [
+    {
+      "kind": "adapter",
+      "id": "codex",
+      "path": "/projects/skill/platforms/codex/adapter.json",
+      "status": "scanned",
+      "skill_count": 0
+    },
+    {
+      "kind": "adapter",
+      "id": "workbuddy",
+      "path": "/projects/skill/platforms/workbuddy/adapter.json",
+      "status": "scanned",
+      "skill_count": 0
+    },
+    {
+      "kind": "agent-build",
+      "id": "codex",
+      "path": "/projects/skill/dist/codex",
+      "status": "scanned",
+      "skill_count": 3
+    },
+    {
+      "kind": "agent-build",
+      "id": "workbuddy",
+      "path": "/projects/skill/dist/workbuddy",
+      "status": "scanned",
+      "skill_count": 2
+    },
+    {
+      "kind": "current-project",
+      "id": "personal-skills",
+      "path": "/projects/skill/skills",
+      "status": "scanned",
+      "skill_count": 4
+    },
+    {
+      "kind": "local",
+      "id": "codex",
+      "path": "/Users/example/.codex/skills",
+      "status": "scanned",
+      "skill_count": 3
+    },
+    {
+      "kind": "local",
+      "id": "workbuddy",
+      "path": "/Users/example/.workbuddy/skills",
+      "status": "scanned",
+      "skill_count": 0
+    },
+    {
+      "kind": "related-project",
+      "id": "app-a",
+      "path": "/projects/app-a/skills",
+      "status": "scanned",
+      "skill_count": 1
+    }
+  ]
+}

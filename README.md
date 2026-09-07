@@ -62,10 +62,11 @@ skill/
 |   |-- sdk/                      # Skill CLI/MCP extension API
 |   |-- cli/                      # Project-level CLI
 |   `-- mcp-server/               # Project-level MCP server
-|-- schemas/                      # Skill frontmatter, skillset, and extensions JSON Schema
+|-- schemas/                      # JSON contracts; relationship report implemented, others planned
 |   |-- skill.schema.json
 |   |-- skillset.schema.json
-|   `-- extensions.schema.json
+|   |-- extensions.schema.json
+|   `-- skill-relationships.schema.json # Implemented local report contract
 |-- tests/
 |   |-- contract/
 |   `-- integration/
@@ -156,7 +157,7 @@ skills/example-skill/
 
 These conventions are shared across Skills and management tools. They should be reflected in schemas, registries, CLI output, and MCP resources as those pieces are implemented.
 
-The proposed machine-local inventory and cross-project mapping output is specified in the [Skill Relationship Report PRD](docs/skill-relationship-report-prd.zh-CN.md). The PRD is versioned with the repository; generated relationship reports remain local-only.
+The proposed machine-local inventory and cross-project mapping output is specified in the [Skill Relationship Report PRD](docs/skill-relationship-report-prd.zh-CN.md), with a repository-versioned [technical design](docs/skill-relationship-report-technical-design.zh-CN.md) and [test plan](docs/skill-relationship-report-test-plan.zh-CN.md). The generated relationship reports remain local-only. Their current machine-readable contract is [skill-relationships.schema.json](schemas/skill-relationships.schema.json).
 
 ### Stable Skill information
 
