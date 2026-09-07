@@ -28,6 +28,16 @@ Operate this source-only Android lifecycle:
 
 The output is a reviewed, versioned source commit and immutable tag. This Skill never configures or runs packaging, signing, output verification, or uploads. Use `build-pipeline-engineering` when work starts from a source ref and enters a build pipeline.
 
+
+## Platform Compatibility
+
+This skill is written to run in both OpenAI Codex and WorkBuddy.
+
+- **Codex**: user-level skills live under `$CODEX_HOME/skills` or `~/.codex/skills`; the agent interface is `agents/openai.yaml`; Codex uses `metadata.triggering` and the `$android-code-release-train` invocation syntax, and Codex-specific artifacts include `agents/` and `extensions.yaml`.
+- **WorkBuddy**: WorkBuddy reads `SKILL.md` directly, triggers automatically from the `description` field, and ignores `agents/openai.yaml`. Its installed-Skill directory is product-configured: domestic builds commonly use `~/.workbuddy/skills`, while WorkBuddy AI/overseas builds may use `~/.workbuddy-ai/skills`. Import through WorkBuddy or use the directory configured by the installed product. No `$`-prefix is needed.
+
+When copying this skill to WorkBuddy, treat `SKILL.md` as the required file and copy `agents/`/`extensions.yaml` only when they exist.
+
 ## Prerequisites
 
 - Read [references/code-train-contract.md](references/code-train-contract.md) before a mutating train operation.

@@ -41,6 +41,7 @@ def write_fixture(skill: Path, changelog: str | None) -> None:
 name: demo
 description: Demonstrate catalog validation.
 metadata:
+  sync_id: "demo"
   version: "1.2.3"
   triggering:
     include: [demo]

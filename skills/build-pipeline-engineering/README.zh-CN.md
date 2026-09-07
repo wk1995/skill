@@ -9,7 +9,7 @@
 请尽可能提供仓库、源码 Tag 或提交，以及目标产物或构建变体：
 
 ```text
-使用 $build-pipeline-engineering 配置 CI，构建签名 Android release AAB。
+使用 build-pipeline-engineering 配置 CI，构建签名 Android release AAB。
 从指定 Tag 构建 qa variant APK，并上传到 GitHub Actions Artifacts。
 审计这个 AAR 流水线的签名、校验和与保留时间。
 排查 Gradle 插件产物为什么没有出现在 workflow run 中。

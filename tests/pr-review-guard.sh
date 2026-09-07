@@ -60,6 +60,20 @@ git commit -qm "track ignored file"
 rejects "$BASE_COMMIT" "tracked ignored files outside protected legacy state are not allowed"
 
 git switch -q --detach "$BASE_COMMIT"
+git switch -qc ignore-rule-base
+printf 'ignored-by-base.log\n' >> .gitignore
+git add .gitignore
+git commit -qm "base adds ignore rule"
+IGNORE_RULE_BASE="$(git rev-parse HEAD)"
+
+git switch -q --detach "$BASE_COMMIT"
+git switch -qc ignored-via-base
+printf 'tracked by pull request\n' > ignored-by-base.log
+git add ignored-by-base.log
+git commit -qm "track file ignored by advanced base"
+rejects "$IGNORE_RULE_BASE" "tracked ignored files outside protected legacy state are not allowed"
+
+git switch -q --detach "$BASE_COMMIT"
 git switch -qc base-advanced
 printf 'base advanced\n' > shared.txt
 git add shared.txt

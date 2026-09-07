@@ -55,7 +55,7 @@ Run $demo to perform the workflow.
 
 - Example:
   ```bash
-  $demo perform the workflow
+  Use $demo to perform the workflow.
   ```
 
 ## When It Triggers
@@ -96,6 +96,7 @@ Do not use it otherwise.
     fixed = run("--fix", "--skill", str(skill))
     assert fixed.returncode == 0, fixed.stdout + fixed.stderr
     assert "  ```text" in (skill / "README.md").read_text(encoding="utf-8")
+    assert "Use demo to perform the workflow." in (skill / "README.md").read_text(encoding="utf-8")
     skill_text = (skill / "SKILL.md").read_text(encoding="utf-8")
     assert "Run demo to perform the workflow." in skill_text
     assert "Run $demo to perform the workflow." not in skill_text

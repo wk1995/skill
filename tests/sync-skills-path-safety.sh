@@ -22,10 +22,11 @@ assert spec.loader is not None
 spec.loader.exec_module(skill_sync)
 
 
-def skill(path: Path, name: str = "demo") -> Path:
+def skill(path: Path, name: str = "demo", sync_id=None) -> Path:
     path.mkdir(parents=True)
     (path / "SKILL.md").write_text(
-        f"---\nname: {name}\ndescription: test fixture\nmetadata:\n  version: \"0.0.1\"\n---\n",
+        f"---\nname: {name}\ndescription: test fixture\nmetadata:\n"
+        f"  sync_id: \"{sync_id or name}\"\n  version: \"0.0.1\"\n---\n",
         encoding="utf-8",
     )
     return path
@@ -62,7 +63,7 @@ with tempfile.TemporaryDirectory() as raw_tmp:
     )
 
     parent = skill(tmp / "parent", "nested")
-    child = skill(parent / "child", "nested-child")
+    child = skill(parent / "child", "nested")
     nested_state = tmp / "nested-state"
     run(["--state-dir", str(nested_state), "link", "nested", "--repo", str(parent)])
     rejects(
@@ -70,8 +71,8 @@ with tempfile.TemporaryDirectory() as raw_tmp:
         "is inside role",
     )
 
-    source = skill(tmp / "source")
-    existing = skill(tmp / "existing")
+    source = skill(tmp / "source", sync_id="convert")
+    existing = skill(tmp / "existing", sync_id="convert")
     convert_state = tmp / "convert-state"
     run(["--state-dir", str(convert_state), "link", "convert", "--external", str(existing)])
     rejects(
@@ -91,6 +92,38 @@ with tempfile.TemporaryDirectory() as raw_tmp:
     assert status_code == 2
     assert status["clean"] is False
     assert status["path_issues"]
+
+    dangerous_parent = skill(tmp / "dangerous-parent", "dangerous")
+    dangerous_source = skill(dangerous_parent / "source", "dangerous")
+    dangerous_state = tmp / "dangerous-state"
+    skill_sync.save_registry(
+        dangerous_state,
+        {
+            "groups": {
+                "dangerous": {
+                    "sync_id": "dangerous",
+                    "name": "dangerous",
+                    "roles": {
+                        "repo": str(dangerous_source.resolve()),
+                        "local": str(dangerous_parent.resolve()),
+                    },
+                }
+            }
+        },
+    )
+    rejects(
+        ["--state-dir", str(dangerous_state), "sync", "dangerous", "--source", "repo"],
+        "is inside role",
+    )
+    assert (dangerous_source / "SKILL.md").is_file(), "sync rejection must preserve the nested source"
+
+    try:
+        skill_sync.copy_skill_tree(dangerous_source, dangerous_parent)
+    except SystemExit as exc:
+        assert "source" in str(exc) and "inside" in str(exc), str(exc)
+    else:
+        raise AssertionError("copy_skill_tree must reject a source nested inside its target")
+    assert (dangerous_source / "SKILL.md").is_file(), "copy rejection must preserve the nested source"
 
 print("PASS: sync-skills rejects persisted, symlinked, and nested path conflicts")
 PY

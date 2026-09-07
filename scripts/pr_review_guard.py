@@ -7,17 +7,27 @@ import argparse
 import os
 import subprocess
 import sys
+import tempfile
+from pathlib import Path
 
 
 PROTECTED_PATHS = (".skill-sync/",)
 
 
-def git(*args: str, check: bool = True, binary: bool = False) -> subprocess.CompletedProcess:
+def git(
+    *args: str,
+    check: bool = True,
+    binary: bool = False,
+    env: dict[str, str] | None = None,
+    input_data: str | bytes | None = None,
+) -> subprocess.CompletedProcess:
     result = subprocess.run(
         ["git", *args],
         check=False,
         capture_output=True,
         text=not binary,
+        env=env,
+        input=input_data,
     )
     if check and result.returncode != 0:
         stderr = os.fsdecode(result.stderr) if binary else result.stderr
@@ -30,10 +40,40 @@ def changed_paths(base: str, result_tree: str, *extra: str) -> list[str]:
     return [os.fsdecode(path) for path in result.stdout.split(b"\0") if path]
 
 
-def unexpected_tracked_ignored_paths() -> list[str]:
-    result = git("ls-files", "-ci", "--exclude-standard", "-z", binary=True)
-    paths = [os.fsdecode(path) for path in result.stdout.split(b"\0") if path]
-    return [path for path in paths if not path.startswith(PROTECTED_PATHS)]
+def unexpected_tracked_ignored_paths(result_tree: str) -> list[str]:
+    """Return paths that are tracked and ignored in the simulated merge tree."""
+    with tempfile.TemporaryDirectory(prefix="pr-review-guard-") as raw_tmp:
+        worktree = Path(raw_tmp) / "tree"
+        worktree.mkdir()
+
+        checkout_env = os.environ.copy()
+        checkout_env["GIT_INDEX_FILE"] = str(Path(raw_tmp) / "index")
+        checkout_env["GIT_WORK_TREE"] = str(worktree)
+        git("read-tree", result_tree, env=checkout_env)
+        git("checkout-index", "--all", f"--prefix={worktree}{os.sep}", env=checkout_env)
+
+        deterministic_env = os.environ.copy()
+        deterministic_env["GIT_CONFIG_GLOBAL"] = os.devnull
+        deterministic_env["GIT_CONFIG_NOSYSTEM"] = "1"
+        git("-C", str(worktree), "init", "-q", env=deterministic_env)
+
+        tracked = git("ls-tree", "-r", "--name-only", "-z", result_tree, binary=True).stdout
+        result = git(
+            "-C",
+            str(worktree),
+            "check-ignore",
+            "--no-index",
+            "-z",
+            "--stdin",
+            check=False,
+            binary=True,
+            env=deterministic_env,
+            input_data=tracked,
+        )
+        if result.returncode not in (0, 1):
+            raise RuntimeError(os.fsdecode(result.stderr).strip() or "git check-ignore failed")
+        paths = [os.fsdecode(path) for path in result.stdout.split(b"\0") if path]
+        return [path for path in paths if not path.startswith(PROTECTED_PATHS)]
 
 
 def merge_tree(base: str, head: str) -> str:
@@ -83,7 +123,7 @@ def main() -> int:
                 )
             raise RuntimeError("protected .skill-sync state must have no net PR changes")
 
-        tracked_ignored = unexpected_tracked_ignored_paths()
+        tracked_ignored = unexpected_tracked_ignored_paths(merged_tree)
         if tracked_ignored:
             for path in tracked_ignored:
                 print(

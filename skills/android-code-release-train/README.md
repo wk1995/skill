@@ -9,7 +9,7 @@ Language: **English** | [中文](README.zh-CN.md)
 Provide the repository, requirement or branch names, version, and desired source stage when known:
 
 ```text
-Use $android-code-release-train to create a feature branch for this Android requirement.
+Use android-code-release-train to create a feature branch for this Android requirement.
 Select feature/login and feature/report for dev/1.4.0.
 Show which requirement PRs are ready for code integration.
 Promote the approved code to release/1.4.0 and finalize its source tag.

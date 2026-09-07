@@ -241,6 +241,11 @@ def fix_readme(readme_path: Path, name: str, heading: str) -> bool:
                 block_had_skill = True
                 changed = True
                 continue
+            if invocation_pattern(name).search(line):
+                out.append(invocation_pattern(name).sub(name, line))
+                block_had_skill = True
+                changed = True
+                continue
             out.append(line)
             continue
         if re.search(r"\$\s*" + re.escape(name) + r"\b", line) and not is_allowed_codex_line(line, name):

@@ -3,7 +3,7 @@ name: sync-skills
 description: Use when linking, converting, synchronizing, versioning, auditing, or rolling back multiple copies of the same Agent Skill across this repository, project-level skill folders, local Codex/user skill folders, or arbitrary external paths.
 metadata:
   sync_id: "sync-skills"
-  version: "0.0.4"
+  version: "0.0.5"
   urls:
     - type: repository
       value: https://github.com/wk1995/skill.git
@@ -126,7 +126,7 @@ python skills/sync-skills/scripts/skill_sync.py diff my-skill-id --role local --
 - If versions are equal but digests differ, use normal conflict handling and require an explicit source unless only one linked role changed since the previous snapshot.
 - If two or more copies changed since the previous snapshot and no source was specified, stop and report the conflict instead of choosing silently.
 - Keep the immutable sync-group identity in `metadata.sync_id` and the logical Skill version in `metadata.version` in `SKILL.md`. New Skills must define a stable sync ID that does not change with `metadata.name`; `rename --to` is reserved for migrating legacy name-keyed registry entries and cannot change an existing stable ID.
-- Use this Skill's own sync ID as `sync-skills` and its version as `0.0.3`.
+- Use this Skill's own sync ID as `sync-skills` and its version as `0.0.5`.
 - Legacy registries keyed by a Skill name remain readable; run `rename <old-reference> --to <sync-id> --name <new-name>` to migrate the group and its snapshots before linking a renamed Skill.
 - Record Skill addresses in the registry: `skill_urls` for canonical repository/documentation/registry/source URLs, and `role_urls` for role-specific remote/source URLs.
 - If a role URL is not provided, infer it from `git remote get-url origin` when available.
@@ -143,8 +143,9 @@ To convert a local, project, external, or repo copy into another location:
 
 1. Validate the source has `SKILL.md` and a valid `name`.
 2. Run `convert` with explicit source and target paths.
-3. Run `status` and confirm all roles report the same digest.
-4. Preserve or set `metadata.version` according to the source of truth chosen for the group.
+3. Refuse the conversion if either path is nested inside the other; clearing a parent target would otherwise delete a nested source before copying begins.
+4. Run `status` and confirm all roles report the same digest.
+5. Preserve or set `metadata.version` according to the source of truth chosen for the group.
 
 ## Output Shape
 

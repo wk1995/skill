@@ -9,7 +9,7 @@ Language: **English** | [中文](README.zh-CN.md)
 Provide the repository and source tag/commit when known, plus the desired artifact or variant:
 
 ```text
-Use $build-pipeline-engineering to configure CI for a signed Android release AAB.
+Use build-pipeline-engineering to configure CI for a signed Android release AAB.
 Build the tagged source with the qa variant and upload its APK to GitHub Actions Artifacts.
 Audit this AAR pipeline's signing, checksums, and retention.
 Troubleshoot why the Gradle plugin artifact is missing from the workflow run.

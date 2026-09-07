@@ -9,7 +9,7 @@
 请尽可能提供仓库、需求或分支名称、版本号和目标代码阶段：
 
 ```text
-使用 $android-code-release-train 为这个 Android 需求创建功能分支。
+使用 android-code-release-train 为这个 Android 需求创建功能分支。
 将 feature/login 和 feature/report 选入 dev/1.4.0。
 列出已经满足代码集成条件的需求 PR。
 将通过评审的代码提升到 release/1.4.0，并完成源码 Tag。

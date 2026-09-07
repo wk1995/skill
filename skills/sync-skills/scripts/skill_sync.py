@@ -94,6 +94,8 @@ def copy_skill_tree(source: Path, target: Path) -> None:
         raise SystemExit(f"refusing to copy a skill onto itself: {source_real}")
     if is_relative_to(target_real, source_real):
         raise SystemExit(f"refusing to copy a skill into its own subtree: {target_real} is inside {source_real}")
+    if is_relative_to(source_real, target_real):
+        raise SystemExit(f"refusing to copy a skill from inside its target: {source_real} is inside {target_real}")
     if target.exists() and not target.is_dir():
         raise SystemExit(f"target exists and is not a directory: {target}")
     target.mkdir(parents=True, exist_ok=True)
@@ -126,47 +128,6 @@ def is_relative_to(child: Path, parent: Path) -> bool:
         return True
     except ValueError:
         return False
-
-
-def validate_role_paths(roles: dict[str, str]) -> dict[str, str]:
-    """Refuse to link roles that resolve to the same path or nest inside each
-    other. A symlinked copy is already identical to its target, so link only
-    real copies; and a role inside another role's directory is a self-sync."""
-    by_path: dict[str, list[str]] = {}
-    for role, path in roles.items():
-        by_path.setdefault(path, []).append(role)
-    for path, linked_roles in by_path.items():
-        if len(linked_roles) > 1:
-            raise SystemExit(
-                "refusing to link roles that resolve to the same path: "
-                + ", ".join(sorted(linked_roles)) + " -> " + path
-                + ". A symlinked copy is already identical to its target, so link only real copies."
-            )
-    for role_a, path_a in roles.items():
-        for role_b, path_b in roles.items():
-            if role_a != role_b and is_relative_to(Path(path_b), Path(path_a)):
-                raise SystemExit(
-                    f"refusing to link role {role_b} inside role {role_a}: {path_b} is inside {path_a}"
-                )
-    return roles
-
-
-def role_path_issues(roles: dict[str, str]) -> list[str]:
-    """Return human-readable path-safety issues for a role map, without raising."""
-    issues: list[str] = []
-    by_path: dict[str, list[str]] = {}
-    for role, path in roles.items():
-        by_path.setdefault(path, []).append(role)
-    for path, linked_roles in by_path.items():
-        if len(linked_roles) > 1:
-            issues.append(
-                "roles resolve to the same path: " + ", ".join(sorted(linked_roles)) + " -> " + path
-            )
-    for role_a, path_a in roles.items():
-        for role_b, path_b in roles.items():
-            if role_a != role_b and is_relative_to(Path(path_b), Path(path_a)):
-                issues.append(f"role {role_b} is inside role {role_a}: {path_b} is inside {path_a}")
-    return issues
 
 
 def normalized_role_paths(roles: dict[str, str]) -> dict[str, str]:
@@ -778,6 +739,7 @@ def command_sync(args: argparse.Namespace) -> int:
     state_dir = Path(args.state_dir).resolve()
     registry = load_registry(state_dir)
     key, group = get_group(registry, args.group)
+    group["roles"] = validate_role_paths(group.get("roles", {}))
     current = build_member_state(group)
     validate_group_members(group, current)
     if len(current) < 2:

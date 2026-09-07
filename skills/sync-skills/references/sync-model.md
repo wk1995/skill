@@ -63,7 +63,7 @@ For this skill, use:
 
 ```yaml
 metadata:
-  version: "0.0.4"
+  version: "0.0.5"
 ```
 
 When a group is synchronized, copy the selected source version to all targets. If target versions differ before sync, record them in the pre-sync snapshot and report the difference.
