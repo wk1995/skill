@@ -18,8 +18,10 @@ adapters="$(python3 "$BUILD" --list | cut -f1 | tr '\n' ' ')"
 
 codex_output="$tmp/codex"
 workbuddy_output="$tmp/workbuddy"
-python3 "$BUILD" codex --output "$codex_output"
-python3 "$BUILD" workbuddy --output "$workbuddy_output"
+codex_build_output="$(python3 "$BUILD" codex --output "$codex_output")"
+workbuddy_build_output="$(python3 "$BUILD" workbuddy --output "$workbuddy_output")"
+grep -Fq 'skill_sync.py relationships' <<<"$codex_build_output" || fail "Codex build did not print the relationship refresh command"
+grep -Fq 'skill_sync.py relationships' <<<"$workbuddy_build_output" || fail "WorkBuddy build did not print the relationship refresh command"
 
 [[ -f "$codex_output/.codex-plugin/plugin.json" ]] || fail "Codex plugin manifest is missing"
 [[ -f "$codex_output/.agent-build.json" ]] || fail "Codex build manifest is missing"
@@ -41,8 +43,12 @@ done
 [[ -f "$codex_output/skills/sync-skills/agents/openai.yaml" ]] || fail "Codex override was not materialized"
 grep -Fq '## Codex Sync Adaptation' "$codex_output/skills/sync-skills/SKILL.md" || fail "per-Skill Codex instructions were not appended"
 grep -Fq '## WorkBuddy Sync Adaptation' "$workbuddy_output/sync-skills/SKILL.md" || fail "per-Skill WorkBuddy instructions were not appended"
-grep -Fq '"adapter_version": "1.0.1"' "$codex_output/.agent-build.json" || fail "adapter version missing from build manifest"
+grep -Fq '"adapter_version": "1.1.1"' "$codex_output/.agent-build.json" || fail "adapter version missing from build manifest"
 grep -Fq '"artifact_version": "0.1.0"' "$codex_output/.agent-build.json" || fail "artifact version missing from build manifest"
+grep -Fq '"schema_version": 2' "$codex_output/.agent-build.json" || fail "build manifest v2 is missing"
+grep -Fq '"sync_id": "sync-skills"' "$codex_output/.agent-build.json" || fail "stable Skill identity missing from build manifest"
+grep -Fq '"portable_digest":' "$codex_output/.agent-build.json" || fail "portable source digest missing from build manifest"
+grep -Fq '"output_digest":' "$codex_output/.agent-build.json" || fail "output digest missing from build manifest"
 
 PYTHONDONTWRITEBYTECODE=1 python3 - "$ROOT/platforms/codex/adapter.json" "$codex_output/.codex-plugin/plugin.json" <<'PY'
 import json
@@ -79,6 +85,7 @@ spec.loader.exec_module(agent_build)
         "artifact_version": "1.0.0",
         "skills_path": "skills",
         "skill_append": "SKILL.append.md",
+        "local_skill_roots": [{"type": "home-relative", "path": ".new-agent/skills"}],
     }),
     encoding="utf-8",
 )
@@ -95,6 +102,7 @@ spec.loader.exec_module(agent_build)
 name: demo
 description: Demonstrate an extensible Agent build.
 metadata:
+  sync_id: "demo"
   version: "2.3.4"
 ---
 
@@ -113,7 +121,11 @@ generated = (output / "skills" / "demo" / "SKILL.md").read_text(encoding="utf-8"
 assert "Built for demo by new-agent." in generated
 assert not (output / "skills" / "demo" / "agent-builds").exists()
 manifest = json.loads((output / ".agent-build.json").read_text(encoding="utf-8"))
-assert manifest["skills"][0]["version"] == "2.3.4"
+assert manifest["schema_version"] == 2
+assert manifest["skills"][0]["sync_id"] == "demo"
+assert manifest["skills"][0]["core_version"] == "2.3.4"
+assert len(manifest["skills"][0]["portable_digest"]) == 64
+assert len(manifest["skills"][0]["output_digest"]) == 64
 
 for unsafe in (".git", "scripts", ".skill-sync", "README.md", "dist"):
     try:

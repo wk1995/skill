@@ -6,7 +6,49 @@ version, date, and a change summary.
 
 ## [Unreleased]
 
+## [0.2.3] - 2026-09-08
+
+- Apply registry-wide location identity and containment checks to ordinary role registration, conversion, synchronization, and rollback before mutation.
+- Reject Agent snapshot rollback when the current installation declares another Skill identity, and fail installation protection closed when adapter discovery reports errors.
+- Detect and restore permission-only installation damage, including staged/post-install verification and idempotent permission-aware rollback. Manifest-v2 content digests remain compatible.
+- Inventory explicitly registered nested local installs through shared identity, Agent ownership, and deduplication checks.
+- Add five stateful finding regressions and a staged/post-install permission-failure test. Trigger selection and adapter versions are unchanged.
+
+## [0.2.2] - 2026-09-08
+
+- Reject cross-group nested installation paths before repair or rollback, and conflicting non-empty install identities before repair can modify data.
+- Report external/project identity conflicts and duplicate identities within related projects without linking ambiguous copies or aborting inventory.
+- Deduplicate repeated local roots by filesystem identity and align portable digests with the builder's top-level Agent override boundary.
+- Protect Skill inputs from report lock writes and report installs without trusted builds as `agent-build-missing`, never `synced`.
+- Add eight stateful regressions covering rejection, correction, repeat execution, path aliases, and preservation of unselected copies. Triggers and adapter versions remain unchanged.
+
+## [0.2.1] - 2026-09-08
+
+- Package the report validator and informative schema with the portable Skill.
+- Validate complete build manifests before accepting any entries; report malformed builds without aborting inventory.
+- Reject conflicting registry identities, unsupported/cross-Agent local locations, symlink installs, and report output overlapping known Skill trees.
+- Preserve recovery staging and report snapshot paths on installation recovery failure; support repair snapshot rollback with idempotency.
+- Treat healthy project-only inventories as strict success and document exit code 2, report-only retries, and the authoritative runtime contract. Triggers remain unchanged.
+
 - No unreleased changes.
+
+## [0.2.0] - 2026-09-07
+
+- Relationship reporting: generate canonical machine-local JSON and a single-table Markdown report across portable Skills, dynamic Agent Builders, local installs, and explicitly registered projects.
+- Builder discovery: resolve local Skill inventory roots from declarative adapters and support future Builders without a fixed Agent list.
+- Provenance: upgrade Agent build manifests to v2 with stable sync IDs, portable digests, output digests, core versions, and safe artifact paths.
+- Registry: add explicit multi-project/local/external locations while retaining read compatibility with legacy `roles`.
+- Safety: atomically write private reports outside the repository, preserve completed mutations when refresh becomes stale, and reject portable sync into Agent install roots before snapshot or overwrite.
+- Repair: snapshot and atomically reinstall incomplete Agent installations from a trusted same-Agent build, preserve divergent local changes by default, and make repeated repair idempotent.
+- Tests: cover dynamic coverage, version divergence, unlinked local Skills, explicit projects, stable rendering, output permissions, replacement failure recovery, stale refresh, sync rejection, repair success, conflict preservation, and idempotency.
+
+## [0.1.0] - 2026-09-07
+
+- State isolation: default registry and snapshot storage now uses an XDG state directory outside the repository, namespaced by checkout identity.
+- Migration: add an idempotent `migrate-state` command that copies and verifies legacy `.skill-sync/` data without deleting its source or overwriting a different destination.
+- Safety: reject symlinks, special files, same-path aliases, and both source/target nesting directions before migration mutates the destination.
+- Compatibility: callers can continue to select an explicit location with `--state-dir`; legacy repository-local state remains available as migration input.
+- Tests: cover successful migration, malformed state preservation, file-mode fidelity, repeat execution, destination conflicts, interrupted copies, path overlap, case aliases, symlinks, missing sources, file targets, and missing optional executables.
 
 ## [0.0.6] - 2026-09-07
 

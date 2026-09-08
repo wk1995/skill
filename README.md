@@ -62,10 +62,11 @@ skill/
 |   |-- sdk/                      # Skill CLI/MCP extension API
 |   |-- cli/                      # Project-level CLI
 |   `-- mcp-server/               # Project-level MCP server
-|-- schemas/                      # Skill frontmatter, skillset, and extensions JSON Schema
+|-- schemas/                      # JSON contracts; relationship report implemented, others planned
 |   |-- skill.schema.json
 |   |-- skillset.schema.json
-|   `-- extensions.schema.json
+|   |-- extensions.schema.json
+|   `-- skill-relationships.schema.json # Implemented local report contract
 |-- tests/
 |   |-- contract/
 |   `-- integration/
@@ -88,12 +89,12 @@ Every Skill has a companion README with usage and trigger guidance. This table i
 | `android-code-release-train` | Orchestrate Android source code from a requirement branch through version-train integration, release promotion, default-branch synchronization, and an immutable source tag. Use for feature/bugfix branches, versioned dev and release PRs, code-readiness gates, version metadata, or source-release tags; do not use for APK/AAB/AAR builds, signing, packaging, or artifact uploads. | [README](skills/android-code-release-train/README.md) |
 | `build-pipeline-engineering` | Configure, validate, run, and troubleshoot reproducible distributable builds from an exact source ref, including CI environments, user-selected build variants, Android signing, APK/AAB/AAR or plugin packaging, output verification, manifests, checksums, and uploads. For variant-based builds default to release; for CI output default to GitHub Actions Artifacts. Do not use for requirement branches, PR integration, source version changes, or tag creation. | [README](skills/build-pipeline-engineering/README.md) |
 | `choose-project-doc-location` | Decide whether requested project documentation belongs in README, repository docs, or GitHub Wiki before creating or updating it. MUST use before editing documentation when the user asks to create, update, rewrite, or organize README/readme, Wiki/wiki, docs/doc, project documentation, project details, workflow/workflows, 流程, 项目文档, 项目说明, 仓库说明, 使用说明, skill 列表, skill 作用, skill 使用说明, architecture notes, onboarding guides, or repository documentation. Treat the user's words "README" and "Wiki" as tentative labels, not final placement decisions. | [README](skills/choose-project-doc-location/README.md) |
-| `sync-skills` | Use when linking, converting, synchronizing, versioning, auditing, or rolling back multiple copies of the same Agent Skill across repository, project, machine-wide, or explicitly provided external locations. | [README](skills/sync-skills/README.md) |
+| `sync-skills` | Use when linking, converting, synchronizing, inventorying, reporting, repairing Agent installs, versioning, auditing, or rolling back Skill copies across repository, project, machine-wide, or explicit external locations. | [README](skills/sync-skills/README.md) |
 <!-- skills-catalog:end -->
 
 ## Pull Request Review Gate
 
-Run `bash tests/pr-review-gate.sh origin/main` from a clean, committed worktree before declaring a PR ready, and follow the independent adversarial passes in the [PR review playbook](docs/pr-review-playbook.md). The `skill-catalog` required GitHub Actions check invokes the same gate before a PR can merge into `main`. It validates the complete PR diff and simulated merge, protects `.skill-sync/`, rejects unexpected tracked ignored files, parses Python sources, and runs every repository validation test. A green gate is necessary but does not replace path-identity, direct-entry-point, recursive-rule, dependency-degradation, and failure-state review. For internal branches it can still commit regenerated catalogs when `SKILL_CATALOG_TOKEN` is configured; fork PRs must commit both generated root READMEs themselves.
+Run `bash tests/pr-review-gate.sh origin/main` from a clean, committed worktree before declaring a PR ready, and follow the independent adversarial passes in the [PR review playbook](docs/pr-review-playbook.md). The `skill-catalog` required GitHub Actions check invokes the same gate before a PR can merge into `main`. It validates the complete PR diff and simulated merge, protects legacy `.skill-sync/` state until its [coordinated migration](docs/skill-sync-state-migration.md) is complete, rejects unexpected tracked ignored files, parses Python sources, and runs every repository validation test. New sync state defaults to an external XDG state directory. A green gate is necessary but does not replace path-identity, direct-entry-point, recursive-rule, dependency-degradation, and failure-state review. For internal branches it can still commit regenerated catalogs when `SKILL_CATALOG_TOKEN` is configured; fork PRs must commit both generated root READMEs themselves.
 
 ## Skill Structure And Versioning
 
@@ -155,6 +156,8 @@ skills/example-skill/
 ## Shared Metadata And Audit Conventions
 
 These conventions are shared across Skills and management tools. They should be reflected in schemas, registries, CLI output, and MCP resources as those pieces are implemented.
+
+The proposed machine-local inventory and cross-project mapping output is specified in the [Skill Relationship Report PRD](docs/skill-relationship-report-prd.zh-CN.md), with a repository-versioned [technical design](docs/skill-relationship-report-technical-design.zh-CN.md) and [test plan](docs/skill-relationship-report-test-plan.zh-CN.md). The generated relationship reports remain local-only. Their current machine-readable contract is [skill-relationships.schema.json](schemas/skill-relationships.schema.json). The executable report contract is the portable [validator](skills/sync-skills/scripts/validate_skill_relationship_report.py). JSON Schema is informative; runtime uses only its shared status vocabulary, not a Draft 2020-12 engine.
 
 ### Stable Skill information
 

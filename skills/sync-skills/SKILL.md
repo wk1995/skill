@@ -1,9 +1,9 @@
 ---
 name: sync-skills
-description: Use when linking, converting, synchronizing, versioning, auditing, or rolling back multiple copies of the same Agent Skill across repository, project, machine-wide, or explicitly provided external locations.
+description: Use when linking, converting, synchronizing, inventorying, reporting, repairing Agent installs, versioning, auditing, or rolling back Skill copies across repository, project, machine-wide, or explicit external locations.
 metadata:
   sync_id: "sync-skills"
-  version: "0.0.6"
+  version: "0.2.3"
   urls:
     - type: repository
       value: https://github.com/wk1995/skill.git
@@ -14,6 +14,8 @@ metadata:
       - The user asks to link, convert, synchronize, audit, version, compare, or roll back Skill copies.
       - The task involves local, project-level, repository-level, or external copies of the same Skill.
       - The task needs Skill provenance URLs, version history, content digests, snapshots, or difference reports.
+      - The user needs to migrate legacy repository-local Skill synchronization state.
+      - The user needs a machine-local relationship report across supported AI Agent Builders or needs to repair an incomplete Agent installation.
     exclude:
       - The user is only asking to use a Skill for its domain workflow rather than manage Skill copies.
       - The task is ordinary code editing and does not involve Skill synchronization, conversion, auditing, or rollback.
@@ -23,7 +25,7 @@ metadata:
 
 ## Overview
 
-Use this skill to keep equivalent Skill directories connected across this repository, project-owned locations, a machine-wide user location, and explicit external paths. Treat one linked group as one logical Skill with multiple materialized copies.
+Use this skill to keep equivalent Skill directories connected across this repository, project-owned locations, machine-wide Agent installations, Agent build artifacts, and explicit external paths. Treat one linked group as one logical Skill with multiple materialized copies and preserve the `portable source -> Agent build -> local install` derivation chain.
 
 ## Start Here
 
@@ -31,6 +33,8 @@ Use this skill to keep equivalent Skill directories connected across this reposi
 2. Inspect each copy's complete directory tree, including `SKILL.md`, scripts, references, assets, executable extensions, and any build-adapter inputs, before mutating anything.
 3. Read `references/sync-model.md` when designing a new sync group, resolving a conflict, changing version policy, or performing a rollback.
 4. Use `scripts/skill_sync.py` for deterministic operations whenever copying, snapshotting, status checking, or rollback is needed.
+5. Keep runtime state outside the repository. The default is an XDG state directory isolated by checkout; migrate a legacy `.skill-sync/` directory before its tracked files are removed.
+6. Read [references/sync-model.md](references/sync-model.md) before repairing an Agent install or interpreting relationship-report statuses.
 
 ## Location Roles
 
@@ -44,6 +48,14 @@ Use these role names consistently:
 A group may contain any subset of these roles. Do not invent paths; resolve each role to an absolute path before linking.
 
 ## Common Operations
+
+Copy legacy repository-local state to the external default without deleting the source:
+
+```bash
+python skills/sync-skills/scripts/skill_sync.py migrate-state
+```
+
+The command verifies the copied tree, preserves file modes, refuses symlinks and path overlap, stops on a differing destination, and is idempotent when the destination already matches. Keep `.skill-sync/` in place until every collaborator has migrated or backed it up and the dedicated stop-tracking change is ready to merge.
 
 Create or update a sync group using the immutable ID declared in `SKILL.md`:
 
@@ -105,19 +117,50 @@ Compare the different places between two snapshots or a snapshot and the current
 python skills/sync-skills/scripts/skill_sync.py diff my-skill-id --role local --from-snapshot 20260720T120000Z --to-current
 ```
 
+Generate the machine-local relationship report using every supported Builder declared by `platforms/*/adapter.json`:
+
+```bash
+python skills/sync-skills/scripts/skill_sync.py relationships
+python skills/sync-skills/scripts/skill_sync.py relationships --project app-a=/projects/app-a/skills --strict
+```
+
+Register another project or a local Agent installation explicitly:
+
+```bash
+python skills/sync-skills/scripts/skill_sync.py link-location my-skill-id \
+  --location-id project:app-a --kind project --project-id app-a \
+  --path /projects/app-a/skills/my-skill
+```
+
+Repair an already registered Agent installation from a trusted manifest-v2 build. Diverged local content is preserved unless replacement is explicitly authorized; authorized replacement is still snapshotted first:
+
+```bash
+python scripts/agent_build.py codex --force
+python skills/sync-skills/scripts/skill_sync.py repair-agent-install my-skill-id \
+  --agent codex --discard-local-changes
+```
+
 ## Sync Rules
 
 - Always snapshot all existing linked copies before overwriting any target.
 - Treat `SKILL.md` as required. A path without `SKILL.md` is not a valid source copy.
 - Refuse to link two roles that resolve to the same filesystem location, or one role nested inside another, including case-only path aliases on case-insensitive filesystems. A symlinked or case-aliased local directory pointing at the repository copy is already identical to its target, so register only real copies; linking it as a separate role would make a later sync copy the directory onto itself and destroy it.
 - Preserve each Skill as a directory tree. Copy `SKILL.md`, `agent-builds/`, `scripts/`, `references/`, `assets/`, `extensions.yaml`, `src/`, and `tests/` when present. Platform-specific materialized files belong in build artifacts, not the portable source tree.
+- Discover supported AI Agent Builders from adapter manifests, never from a fixed Agent list or from whichever `dist/` directories happen to exist. Resolve local inventory roots from each adapter, plus explicit overrides.
+- Compare a portable source to its manifest-v2 Agent build, then compare a local installation only to the build for the same Agent. Different Agents may legitimately have different output digests.
+- Treat an Agent installation without `metadata.sync_id` as registered but incomplete only when the registry already identifies the path. Snapshot and reinstall the complete build; do not declare a hand-edited frontmatter field to be a repair.
+- Reject repair or Agent snapshot rollback when the current installation declares a different non-empty sync ID, even when discarding local changes is authorized. All role registration and overwrite commands must check paths against every registered role and location before mutation.
+- Treat missing adapter root information as a blocking error for installation protection; a read-only inventory may continue with diagnostics for other valid adapters.
+- Compare installed file execute bits as well as manifest-v2 content digests. Permission-only differences need the same snapshot, authorized replacement, verification, and idempotency as content differences.
+- Refuse ordinary portable repo sync into a registered or adapter-discovered Agent install directory. Use the Agent build/install flow instead.
 - Exclude transient directories and files such as `.git`, `node_modules`, `dist`, `.DS_Store`, `__pycache__`, and Python bytecode.
 - When the skill-management repository is on `master` or its configured default branch, compare linked copies by `metadata.version`; if versions differ, synchronize and let the higher version replace the lower version.
 - When the repository is on any other branch, do not synchronize only because versions differ unless the user explicitly requests synchronization or the branch work requires updating the target copy.
 - If versions are equal but digests differ, use normal conflict handling and require an explicit source unless only one linked role changed since the previous snapshot.
 - If two or more copies changed since the previous snapshot and no source was specified, stop and report the conflict instead of choosing silently.
 - Keep the immutable sync-group identity in `metadata.sync_id` and the logical Skill version in `metadata.version` in `SKILL.md`. New Skills must define a stable sync ID that does not change with `metadata.name`; `rename --to` is reserved for migrating legacy name-keyed registry entries and cannot change an existing stable ID.
-- Use this Skill's own sync ID as `sync-skills` and its version as `0.0.6`.
+- Use this Skill's own sync ID as `sync-skills` and its version as `0.2.3`.
+- Store registry and snapshot runtime state outside the repository. By default, use `$XDG_STATE_HOME/sync-skills/<checkout-id>/`, or `$HOME/.local/state/sync-skills/<checkout-id>/` when `XDG_STATE_HOME` is unset. Treat repository-local `.skill-sync/` as legacy migration input only.
 - Legacy registries keyed by a Skill name remain readable; run `rename <old-reference> --to <sync-id> --name <new-name>` to migrate the group and its snapshots before linking a renamed Skill.
 - Record Skill addresses in the registry: `skill_urls` for canonical repository/documentation/registry/source URLs, and `role_urls` for role-specific remote/source URLs.
 - If a role URL is not provided, infer it from `git remote get-url origin` when available.
@@ -152,3 +195,19 @@ For sync work, report:
 - content update time, operation time, and available diff command;
 - conflicts, trust concerns, or invalid paths;
 - rollback command for the created snapshot.
+
+For relationship inventory, write `skill-relationships.json` and `skill-relationships.md` only under the external state directory (or another validated repository-external output directory). Show dynamic Builder columns, complete absolute paths, related projects, unlinked local Skills, build/install derivation, all applicable statuses, and `report_status: stale` when a completed mutation could not refresh the previous report.
+
+Report and lock writes must remain outside Skill inputs. Repeated local roots are deduplicated by filesystem identity. Conflicting external/project identities and duplicate sync IDs within a related project are reported without associating those copies. An installation without a trusted same-Agent build is `agent-build-missing`, never `synced`.
+
+Inventory explicit local locations even when they are below the automatically scanned root's direct children. Apply the same identity and Agent ownership checks, and deduplicate them against automatically discovered copies.
+
+## Exit Codes And Recovery
+
+`link`, `link-location`, `convert`, `sync`, `rollback`, `rename`, and `repair-agent-install` return exit code **2** when the mutation succeeded but report refresh failed (`report_status: stale`). Run only the returned `report_retry_command`; do not repeat the mutation just because a shell reports nonzero. Exit code 0 means the command and refresh completed.
+
+For the read-only `relationships --strict` command, exit code **2** instead means the freshly generated report contains findings or unlinked copies. Healthy `project-only` Skills pass, as do `synced` Skills. Without `--strict`, findings are reported in JSON without a nonzero exit code. Validation or execution errors fail separately with an error message.
+
+Use `rollback <sync-id> --snapshot <repair-snapshot-id> --roles local` to restore an Agent repair snapshot, including installations registered only as locations. Only that installation is restored. A repeated rollback of identical content creates no new snapshot. If installation recovery fails, keep the reported staging directory and snapshot path for recovery.
+
+The portable [contract validator](scripts/validate_skill_relationship_report.py) is the authoritative executable report contract and runs with Python's standard library. The [JSON Schema](references/skill-relationships.schema.json) is an informative interoperability document; runtime validation reads its shared status vocabulary but does not execute Draft 2020-12 constraints. The validator and schema ship inside the Skill so installed builds can generate reports independently of the repository CLI.

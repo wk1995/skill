@@ -68,24 +68,19 @@ See [docs/agent-build-architecture.md](docs/agent-build-architecture.md) for the
 
 ## Required PR Review Procedure
 
-Before declaring a PR review or PR fix complete, the agent must follow
-[docs/pr-review-playbook.md](docs/pr-review-playbook.md). A green test suite is
-necessary evidence, not proof that the review is complete. The agent must:
+Use [docs/pr-review-playbook.md](docs/pr-review-playbook.md) as the single source
+for review methods, matrices, and completion criteria. A green test suite is
+necessary evidence, not proof of review coverage. The agent must:
 
-1. Work from a clean, committed worktree and compare the complete PR with its base branch using `git diff --name-status --find-renames <base>...HEAD`.
-2. Inspect deletions, renames, executable-bit changes, generated files, and newly tracked ignored files. A review based only on reading changed source lines is incomplete.
-3. Run `bash tests/pr-review-gate.sh <base>` and report its result. For the usual local checkout, `<base>` is `origin/main`; CI passes the pull request's exact base SHA.
-4. Exercise stateful commands across multiple invocations, including existing or malformed persisted state, rather than testing only a fresh single command.
-5. Add a regression test for every confirmed review defect. Auto-fix behavior requires negative, fix-success, and idempotency coverage.
-6. Verify external product claims against current authoritative documentation and, when behavior is version-dependent, a versioned product configuration. State the scope instead of generalizing one installation.
-7. Inventory every changed entry point that can delete, overwrite, move, synchronize, generate, or persist data. For each one, trace `entry point -> validation -> first mutation`; direct execution must not rely on a separate `--check` command having run first.
-8. Test path-sensitive mutations against the playbook's identity and containment matrix, including same path, symlink alias, both nesting directions, case-only aliases on a case-insensitive filesystem, file-versus-directory targets, and repository-internal versus external paths. If the current filesystem cannot represent a case, use a controlled substitute and state that limitation.
-9. Test reserved names, ignore rules, overlays, and exclusions at both top level and nested depth. A rule based only on a path's first component is not evidence that recursive inputs are safe.
-10. Test missing optional and required executables with a controlled `PATH`. A required safety check must fail closed or use a tested fallback; it must not silently disappear when a command is unavailable.
-11. Read every changed implementation file without truncated output. If a batched command truncates, reopen the affected files in bounded ranges and record them as reviewed.
-12. Report the adversarial cases actually exercised and any untested cases with reasons. Do not declare the review complete from CI status, the repository gate, or happy-path tests alone.
+1. Before implementation, identify the affected invariants and new or existing entry points; prepare the playbook's coverage ledger before the first review. Split independently reviewable behavior when practical, and document necessary coupling.
+2. Review the complete PR against its exact base and head from a clean, committed worktree. Inspect deletions, renames, executable-bit changes, generated files, and newly tracked ignored files; read every changed implementation file without truncated output.
+3. Trace each affected mutating entry point, including unchanged callers, through `entry point -> validation -> first mutation` and its failure-state invariant. Validation must run on direct invocation, before any persistence or early-success branch.
+4. Exercise the applicable playbook matrices: state sequences, path identity and containment (including case-only aliases), recursive rules, real distributed artifacts, and missing dependencies under a controlled `PATH`. Record evidence per entry point and scenario; mark inapplicable or untested cases with reasons instead of blanket coverage claims.
+5. For every confirmed defect, add regression evidence and expand the check to all sibling entry points and representations governed by the same invariant. Executable behavior requires a regression test; automatic fixes require rejection, fix-success, and idempotency coverage. Apply shared validation and parameterized tests where the contract is shared. Documentation-only corrections require an appropriate consistency check, not an artificial runtime test.
+6. Read and deduplicate existing findings by root cause and trigger. Reproduce claims independently and link repeat confirmations to the original finding. After fixes, update the coverage ledger for the new head and recheck affected callers and interactions; fixing the listed comments alone is insufficient.
+7. Before declaring a PR review or PR fix complete, run `bash tests/pr-review-gate.sh <base>` from the clean committed tree and report the exact base/head, result, coverage ledger, and residual risks. Normally `<base>` is `origin/main`; CI uses the exact PR base SHA. Verify external product claims against authoritative documentation and versioned configuration where relevant. Follow the playbook's completion criteria; CI or a passing gate alone is insufficient.
 
-The `skill-catalog` required status check invokes the same gate in GitHub Actions. Protected local state under `.skill-sync/` must have no net PR changes; stopping tracking or migrating it requires a separately designed migration rather than an ordinary cleanup commit.
+The `skill-catalog` required status check invokes the same gate in GitHub Actions. Runtime sync state belongs in the external XDG location selected by `sync-skills`. Legacy local state under `.skill-sync/` must have no net PR changes until every collaborator has migrated or backed it up; stopping tracking requires a dedicated migration change rather than an ordinary cleanup commit.
 
 ## Changelog Requirement
 

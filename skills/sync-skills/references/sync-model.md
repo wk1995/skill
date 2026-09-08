@@ -4,7 +4,7 @@
 
 Every managed Skill must declare an immutable `metadata.sync_id` in `SKILL.md`. It is the primary key for synchronization and must not change when `metadata.name`, the directory name, or the trigger wording changes. Use lowercase letters, digits, and hyphens. The Skill `name` remains the Agent-facing display and trigger name, not the synchronization key.
 
-The registry stores groups by sync ID and keeps the current Skill name plus old names in `aliases`. New `link` and `convert` operations must use the declared sync ID. Use `rename` to migrate a legacy name or change a Skill name while preserving the group, version history, and snapshots:
+The registry stores groups by sync ID and keeps the current Skill name plus old names in `aliases`. New `link` and `convert` operations must use the declared sync ID. Runtime state belongs outside the repository in an XDG state directory isolated per checkout. Use `rename` to migrate a legacy name or change a Skill name while preserving the group, version history, and snapshots:
 
 ```bash
 python skills/sync-skills/scripts/skill_sync.py rename old-skill-name --to stable-skill-id --name new-skill-name
@@ -14,7 +14,9 @@ Legacy registries keyed by Skill name remain readable. A migration should be exp
 
 ## Logical Group
 
-A sync group maps one logical Skill to one or more physical copies. The registry lives in `.skill-sync/registry.json` by default and stores stable sync IDs, current Skill names, aliases, roles, absolute paths, canonical URLs, role-specific URLs, last known digests, versions, content update times, operation update times, and snapshot history. Snapshot directories use the stable sync ID.
+A sync group maps one logical Skill to one or more physical copies. By default, the registry lives at `$XDG_STATE_HOME/sync-skills/<checkout-id>/registry.json`, falling back to `$HOME/.local/state/sync-skills/<checkout-id>/registry.json`; the checkout ID combines a readable directory name with a hash of its resolved path. The registry stores stable sync IDs, current Skill names, aliases, roles, absolute paths, canonical URLs, role-specific URLs, last known digests, versions, content update times, operation update times, and snapshot history. Snapshot directories use the stable sync ID.
+
+Repository-local `.skill-sync/` data is legacy state. Migrate it with `skill_sync.py migrate-state`, which copies and verifies the complete tree without deleting the source. A matching destination makes the command succeed idempotently; a different existing destination, symlink, special file, or overlapping source/target path fails before the source is changed. Stop tracking the legacy directory only in a dedicated change after every collaborator has migrated or backed it up.
 
 Use stable role names:
 
@@ -24,6 +26,28 @@ Use stable role names:
 - `external`: arbitrary copy outside the previous categories.
 
 Additional role names are allowed only when the user explicitly needs more than one location of the same category, such as `external-docs` or `project-client-a`.
+
+New multi-location records use stable Location IDs such as `repo:current`, `local:codex`, and `project:app-a`. Related projects are registered one at a time; never register a parent directory for implicit project discovery. Legacy `roles` remain readable and are converted to an in-memory location view during reporting.
+
+## Relationship And Agent Build Policy
+
+Supported AI Agent Builders are the valid manifests under `platforms/*/adapter.json`. Each adapter declares one or more local Skill root resolvers. The relationship report scans their resolved union, the current project's portable Skills, and only explicitly registered related-project roots.
+
+Use this comparison chain:
+
+```text
+portable source -> manifest-v2 Agent build -> same-Agent local install
+```
+
+An Agent build manifest records `sync_id`, core version, portable digest, adapter and artifact versions, output digest, and safe output path. Do not compare Codex and WorkBuddy output digests: their overlays intentionally differ.
+
+If a registered Agent install lacks `metadata.sync_id`, keep it visible as `registered-incomplete` and `missing-sync-id`. A trustworthy repair requires a matching same-Agent manifest-v2 build, a verified snapshot, staged installation, post-install identity/digest verification, registry provenance update, and report refresh. Preserve a divergent local copy unless the user explicitly authorizes replacement. A second repair of the same current build must not create another snapshot or change content.
+
+Ordinary `sync --source repo` must stop before its first mutation when a target is an Agent installation. Portable sources are not installable Agent outputs.
+
+Role registration and overwrite commands check their paths against all registry roles and locations, including other groups. An incomplete adapter discovery blocks installation-protection decisions; read-only inventory can still report the adapter error and continue with valid Builders. Explicitly registered local locations are inventoried even below direct-child scan depth, with the same identity checks and physical-path deduplication.
+
+Install equivalence includes file execute bits, checked separately from the unchanged manifest-v2 content digest. A permission mismatch is `agent-install-diverged` and requires authorized snapshot/replacement. Repair and rollback verify staged and installed execute bits; Agent snapshot rollback also checks the current target's non-empty sync ID before modifying it.
 
 ## URL Policy
 
@@ -63,7 +87,7 @@ For this skill, use:
 
 ```yaml
 metadata:
-  version: "0.0.5"
+  version: "0.2.3"
 ```
 
 When a group is synchronized, copy the selected source version to all targets. If target versions differ before sync, record them in the pre-sync snapshot and report the difference.
@@ -88,7 +112,7 @@ Create snapshots before every operation that may overwrite a linked copy. A snap
 Store snapshots as full directory copies:
 
 ```text
-.skill-sync/
+<external-state-directory>/
 |-- registry.json
 `-- snapshots/
     `-- <group>/

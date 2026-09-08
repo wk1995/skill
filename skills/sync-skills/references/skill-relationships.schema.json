@@ -1,0 +1,607 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/wk1995/skill/schemas/skill-relationships.schema.json",
+  "title": "Skill relationship report",
+  "description": "Machine-local derived inventory for portable Skills, Agent builds, local Agent installs, and explicitly registered projects.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "generated_at",
+    "input_fingerprint",
+    "project",
+    "agent_builders",
+    "summary",
+    "skills",
+    "unlinked_local_skills",
+    "issues",
+    "scan_sources"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": 1
+    },
+    "generated_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "input_fingerprint": {
+      "$ref": "#/$defs/digest"
+    },
+    "project": {
+      "$ref": "#/$defs/project"
+    },
+    "agent_builders": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/agentBuilder"
+      }
+    },
+    "summary": {
+      "$ref": "#/$defs/summary"
+    },
+    "skills": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/logicalSkill"
+      }
+    },
+    "unlinked_local_skills": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/unlinkedLocalSkill"
+      }
+    },
+    "issues": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/issue"
+      }
+    },
+    "scan_sources": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/scanSource"
+      }
+    }
+  },
+  "$defs": {
+    "agentId": {
+      "type": "string",
+      "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"
+    },
+    "identifier": {
+      "type": "string",
+      "minLength": 1
+    },
+    "semver": {
+      "type": "string",
+      "pattern": "^\\d+\\.\\d+\\.\\d+(?:[-+][0-9A-Za-z.-]+)?$"
+    },
+    "digest": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "absolutePath": {
+      "type": "string",
+      "pattern": "^/"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "agent-build-complete",
+        "agent-build-invalid",
+        "agent-build-missing",
+        "agent-build-partial",
+        "agent-build-stale",
+        "agent-install-diverged",
+        "agent-version-diverged",
+        "content-diverged",
+        "identity-conflict",
+        "missing-copy",
+        "missing-sync-id",
+        "project-only",
+        "scan-unstable",
+        "synced",
+        "unlinked-local",
+        "unsafe-path",
+        "version-diverged"
+      ]
+    },
+    "project": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "root", "skills_root"],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/identifier"
+        },
+        "root": {
+          "$ref": "#/$defs/absolutePath"
+        },
+        "skills_root": {
+          "$ref": "#/$defs/absolutePath"
+        }
+      }
+    },
+    "localSkillRoot": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["resolver", "status", "source"],
+      "properties": {
+        "resolver": {
+          "type": "string",
+          "minLength": 1
+        },
+        "path": {
+          "$ref": "#/$defs/absolutePath"
+        },
+        "status": {
+          "enum": ["resolved", "missing-root", "unresolved-root"]
+        },
+        "source": {
+          "enum": ["adapter", "override"]
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {"status": {"const": "unresolved-root"}},
+            "required": ["status"]
+          },
+          "then": {
+            "not": {"required": ["path"]}
+          },
+          "else": {
+            "required": ["path"]
+          }
+        }
+      ]
+    },
+    "agentBuilder": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "adapter_version",
+        "artifact_version",
+        "adapter_manifest",
+        "local_skill_roots"
+      ],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/agentId"
+        },
+        "adapter_version": {
+          "$ref": "#/$defs/semver"
+        },
+        "artifact_version": {
+          "$ref": "#/$defs/semver"
+        },
+        "adapter_manifest": {
+          "$ref": "#/$defs/absolutePath"
+        },
+        "local_skill_roots": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/localSkillRoot"
+          }
+        }
+      }
+    },
+    "summary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "local_skill_count",
+        "current_project_skill_count",
+        "related_project_count",
+        "build_complete_count",
+        "build_partial_count",
+        "build_missing_count",
+        "agent_version_diverged_count",
+        "agent_install_diverged_count",
+        "issue_count"
+      ],
+      "properties": {
+        "local_skill_count": {"type": "integer", "minimum": 0},
+        "current_project_skill_count": {"type": "integer", "minimum": 0},
+        "related_project_count": {"type": "integer", "minimum": 0},
+        "build_complete_count": {"type": "integer", "minimum": 0},
+        "build_partial_count": {"type": "integer", "minimum": 0},
+        "build_missing_count": {"type": "integer", "minimum": 0},
+        "agent_version_diverged_count": {"type": "integer", "minimum": 0},
+        "agent_install_diverged_count": {"type": "integer", "minimum": 0},
+        "issue_count": {"type": "integer", "minimum": 0}
+      }
+    },
+    "portableCopy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["present", "project_id", "path"],
+      "properties": {
+        "present": {
+          "type": "boolean"
+        },
+        "project_id": {
+          "$ref": "#/$defs/identifier"
+        },
+        "path": {
+          "$ref": "#/$defs/absolutePath"
+        },
+        "core_version": {
+          "$ref": "#/$defs/semver"
+        },
+        "digest": {
+          "$ref": "#/$defs/digest"
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {"present": {"const": true}},
+            "required": ["present"]
+          },
+          "then": {
+            "required": ["core_version", "digest"]
+          },
+          "else": {
+            "not": {
+              "anyOf": [
+                {"required": ["core_version"]},
+                {"required": ["digest"]}
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "location": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["location_id", "kind", "path", "core_version", "digest"],
+      "properties": {
+        "location_id": {
+          "$ref": "#/$defs/identifier"
+        },
+        "kind": {
+          "enum": ["project", "external"]
+        },
+        "path": {
+          "$ref": "#/$defs/absolutePath"
+        },
+        "project_id": {
+          "$ref": "#/$defs/identifier"
+        },
+        "source_id": {
+          "$ref": "#/$defs/identifier"
+        },
+        "core_version": {
+          "$ref": "#/$defs/semver"
+        },
+        "digest": {
+          "$ref": "#/$defs/digest"
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {"kind": {"const": "project"}},
+            "required": ["kind"]
+          },
+          "then": {
+            "required": ["project_id"],
+            "not": {"required": ["source_id"]}
+          },
+          "else": {
+            "required": ["source_id"],
+            "not": {"required": ["project_id"]}
+          }
+        }
+      ]
+    },
+    "agentBuild": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["present", "sync_id", "agent_id"],
+      "properties": {
+        "present": {
+          "type": "boolean"
+        },
+        "sync_id": {
+          "$ref": "#/$defs/identifier"
+        },
+        "agent_id": {
+          "$ref": "#/$defs/agentId"
+        },
+        "build_id": {
+          "type": "string",
+          "pattern": "^build:[a-z0-9]+(?:-[a-z0-9]+)*$"
+        },
+        "core_version": {
+          "$ref": "#/$defs/semver"
+        },
+        "portable_digest": {
+          "$ref": "#/$defs/digest"
+        },
+        "adapter_version": {
+          "$ref": "#/$defs/semver"
+        },
+        "artifact_version": {
+          "$ref": "#/$defs/semver"
+        },
+        "output_digest": {
+          "$ref": "#/$defs/digest"
+        },
+        "path": {
+          "$ref": "#/$defs/absolutePath"
+        },
+        "manifest_path": {
+          "$ref": "#/$defs/absolutePath"
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "present": {"const": true}
+            },
+            "required": ["present"]
+          },
+          "then": {
+            "required": [
+              "build_id",
+              "core_version",
+              "portable_digest",
+              "adapter_version",
+              "artifact_version",
+              "output_digest",
+              "path",
+              "manifest_path"
+            ]
+          },
+          "else": {
+            "not": {
+              "anyOf": [
+                {"required": ["build_id"]},
+                {"required": ["core_version"]},
+                {"required": ["output_digest"]},
+                {"required": ["path"]}
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "localInstall": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "agent_id",
+        "path",
+        "core_version",
+        "digest",
+        "derived_from",
+        "identity_status",
+        "statuses"
+      ],
+      "properties": {
+        "agent_id": {
+          "$ref": "#/$defs/agentId"
+        },
+        "path": {
+          "$ref": "#/$defs/absolutePath"
+        },
+        "sync_id": {
+          "$ref": "#/$defs/identifier"
+        },
+        "core_version": {
+          "$ref": "#/$defs/semver"
+        },
+        "digest": {
+          "$ref": "#/$defs/digest"
+        },
+        "derived_from": {
+          "type": "string",
+          "pattern": "^build:[a-z0-9]+(?:-[a-z0-9]+)*$"
+        },
+        "identity_status": {
+          "enum": ["verified", "registered-incomplete"]
+        },
+        "statuses": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/status"
+          }
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "not": {"required": ["sync_id"]}
+          },
+          "then": {
+            "properties": {
+              "identity_status": {"const": "registered-incomplete"},
+              "statuses": {"contains": {"const": "missing-sync-id"}}
+            }
+          }
+        }
+      ]
+    },
+    "logicalSkill": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "sync_id",
+        "name",
+        "aliases",
+        "portable",
+        "locations",
+        "agent_builds",
+        "local_installs",
+        "statuses"
+      ],
+      "properties": {
+        "sync_id": {
+          "$ref": "#/$defs/identifier"
+        },
+        "name": {
+          "$ref": "#/$defs/identifier"
+        },
+        "aliases": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/identifier"
+          }
+        },
+        "portable": {
+          "$ref": "#/$defs/portableCopy"
+        },
+        "locations": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/location"
+          }
+        },
+        "agent_builds": {
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/$defs/agentBuild"
+          }
+        },
+        "local_installs": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/localInstall"
+          }
+        },
+        "statuses": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/status"
+          }
+        }
+      }
+    },
+    "unlinkedLocalSkill": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "agent_ids", "path", "core_version", "digest", "statuses"],
+      "properties": {
+        "name": {
+          "$ref": "#/$defs/identifier"
+        },
+        "sync_id": {
+          "$ref": "#/$defs/identifier"
+        },
+        "agent_ids": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/agentId"
+          }
+        },
+        "path": {
+          "$ref": "#/$defs/absolutePath"
+        },
+        "core_version": {
+          "$ref": "#/$defs/semver"
+        },
+        "digest": {
+          "$ref": "#/$defs/digest"
+        },
+        "statuses": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/status"
+          }
+        }
+      }
+    },
+    "issue": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["severity", "code", "message"],
+      "properties": {
+        "severity": {
+          "enum": ["error", "warning", "info"]
+        },
+        "code": {
+          "$ref": "#/$defs/status"
+        },
+        "message": {
+          "type": "string",
+          "minLength": 1
+        },
+        "sync_id": {
+          "$ref": "#/$defs/identifier"
+        },
+        "agent_id": {
+          "$ref": "#/$defs/agentId"
+        },
+        "path": {
+          "$ref": "#/$defs/absolutePath"
+        }
+      }
+    },
+    "scanSource": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "id", "status", "skill_count"],
+      "properties": {
+        "kind": {
+          "enum": ["local", "current-project", "related-project", "adapter", "agent-build"]
+        },
+        "id": {
+          "$ref": "#/$defs/identifier"
+        },
+        "path": {
+          "$ref": "#/$defs/absolutePath"
+        },
+        "status": {
+          "enum": ["scanned", "missing-root", "unresolved-root", "invalid"]
+        },
+        "resolver": {
+          "type": "string",
+          "minLength": 1
+        },
+        "skill_count": {
+          "type": "integer",
+          "minimum": 0
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {"status": {"const": "unresolved-root"}},
+            "required": ["status"]
+          },
+          "then": {
+            "required": ["resolver"],
+            "not": {"required": ["path"]}
+          },
+          "else": {
+            "required": ["path"]
+          }
+        }
+      ]
+    }
+  },
+  "x-semantic-invariants": [
+    "agent_builders ids are unique and sorted; every logical Skill has exactly one agent_builds entry for each declared Builder",
+    "agent build keys, agent_id values, sync_id values, and local derived_from references must agree",
+    "a local install without sync_id is registered-incomplete and causes missing-sync-id on both the install and logical Skill",
+    "Builder coverage and version divergence status codes are derived from the complete dynamic Builder set",
+    "all emitted paths are normalized absolute paths and all order-insensitive arrays and maps use canonical sort order"
+  ]
+}
