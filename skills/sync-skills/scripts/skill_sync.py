@@ -26,6 +26,7 @@ if str(SCRIPT_DIR) not in sys.path:
 from skill_relationships import (  # noqa: E402
     RelationshipError,
     digest_tree as relationship_digest_tree,
+    execution_modes,
     generate_and_write,
     load_adapters,
     normalized_absolute,
@@ -817,6 +818,7 @@ def command_link(args: argparse.Namespace) -> int:
         if not metadata.get("sync_id") and not legacy_group:
             read_sync_metadata(skill_dir, role)
     group["roles"] = validate_role_paths(candidate_roles)
+    validate_group_role_locations(registry, expected_id, group)
 
     group["sync_id"] = expected_id
     if args.name:
@@ -887,6 +889,7 @@ def command_convert(args: argparse.Namespace) -> int:
     candidate_roles[args.source_role] = str(source)
     candidate_roles[args.target_role] = str(target)
     group["roles"] = validate_role_paths(candidate_roles)
+    validate_group_role_locations(registry, expected_id, group)
     if args.source_url:
         group.setdefault("role_urls", {})[args.source_role] = args.source_url
     if args.target_url:
@@ -959,6 +962,7 @@ def command_sync(args: argparse.Namespace) -> int:
     registry = load_registry(state_dir)
     key, group = get_group(registry, args.group)
     group["roles"] = validate_role_paths(group.get("roles", {}))
+    validate_group_role_locations(registry, group_id(key, group), group)
     current = build_member_state(group)
     validate_group_members(group, current)
     if len(current) < 2:
@@ -1033,6 +1037,7 @@ def command_rollback(args: argparse.Namespace) -> int:
     registry = load_registry(state_dir)
     key, group = get_group(registry, args.group)
     group["roles"] = validate_role_paths(group.get("roles", {}))
+    validate_group_role_locations(registry, group_id(key, group), group)
     if not re.fullmatch(r"[0-9]{8}T[0-9]{6}Z(?:-[0-9]+)?", args.snapshot):
         raise SystemExit("invalid snapshot ID")
     snapshot_dir = state_dir / "snapshots" / key / args.snapshot
@@ -1104,7 +1109,10 @@ def rollback_agent_install(args: argparse.Namespace, registry: dict[str, Any], k
         raise SystemExit("snapshot metadata.sync_id conflicts with the group")
     if path_is_within(target, source) or path_is_within(source, target):
         raise SystemExit("snapshot and install must not overlap")
-    if target.exists() and relationship_digest_tree(target) == expected_digest:
+    if target.exists():
+        validate_install_identity(target, group_id(key, group))
+    if (target.exists() and relationship_digest_tree(target) == expected_digest
+            and execution_modes(target) == execution_modes(source)):
         return finish_mutation(args, registry, {"group": key, "rolled_back_to": args.snapshot,
                                                "pre_rollback_snapshot": None, "status": "already-current"})
     state_dir = Path(args.state_dir).expanduser().resolve()
@@ -1378,6 +1386,12 @@ def validate_location_identity(
                 )
 
 
+def validate_group_role_locations(registry: dict[str, Any], sync_id: str, group: dict[str, Any]) -> None:
+    """Protect explicit locations as well as legacy roles before role mutations."""
+    for path in group.get("roles", {}).values():
+        validate_location_identity(registry, sync_id, Path(path))
+
+
 def command_link_location(args: argparse.Namespace) -> int:
     state_dir = Path(args.state_dir).expanduser().resolve()
     registry = load_registry(state_dir)
@@ -1446,9 +1460,12 @@ def command_link_location(args: argparse.Namespace) -> int:
 
 def adapter_roots_for_project(args: argparse.Namespace) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
     try:
-        adapters, _ = load_adapters(relationship_project_root(args), [])
+        adapters, issues = load_adapters(relationship_project_root(args), [])
     except RelationshipError as error:
         raise SystemExit(str(error)) from error
+    if issues:
+        raise SystemExit("cannot safely determine Agent install roots: "
+                         + "; ".join(issue["message"] for issue in issues))
     roots = []
     for adapter in adapters:
         for root in adapter["local_skill_roots"]:
@@ -1568,6 +1585,12 @@ def validate_install_directory(target: Path) -> None:
         raise SystemExit(f"Agent install target is not a directory: {target}")
 
 
+def validate_install_identity(target: Path, sync_id: str) -> None:
+    if ((target / "SKILL.md").is_file()
+            and read_skill_metadata(target).get("sync_id") not in (None, sync_id)):
+        raise SystemExit("local metadata.sync_id conflicts with the registered group")
+
+
 def validate_agent_target(agent_id: str, target: Path, adapters: list[dict[str, Any]],
                           roots: list[dict[str, Any]]) -> None:
     if agent_id not in {adapter["id"] for adapter in adapters}:
@@ -1598,6 +1621,9 @@ def atomic_install_build(build_path: Path, target: Path, sync_id: str | None, ex
             raise SystemExit("staged Agent install does not contain the expected metadata.sync_id")
         if relationship_digest_tree(staged) != expected_digest:
             raise SystemExit("staged Agent install failed build digest verification")
+        expected_modes = execution_modes(build_path)
+        if execution_modes(staged) != expected_modes:
+            raise SystemExit("staged Agent install failed executable permission verification")
         had_target = target.exists()
         if had_target:
             os.replace(target, previous)
@@ -1607,6 +1633,8 @@ def atomic_install_build(build_path: Path, target: Path, sync_id: str | None, ex
             installed = True
             if relationship_digest_tree(target) != expected_digest:
                 raise SystemExit("installed Agent Skill failed post-install digest verification")
+            if execution_modes(target) != expected_modes:
+                raise SystemExit("installed Agent Skill failed executable permission verification")
         except BaseException as install_error:
             try:
                 if installed and target.exists():
@@ -1651,11 +1679,11 @@ def command_repair_agent_install(args: argparse.Namespace) -> int:
     build_path = Path(build["path"])
     if target.exists():
         require_skill_dir(str(target), f"local:{args.agent}")
+        validate_install_identity(target, sync_id)
         local_digest = relationship_digest_tree(target)
         local_metadata = read_skill_metadata(target)
-        if local_metadata.get("sync_id") not in (None, sync_id):
-            raise SystemExit("local metadata.sync_id conflicts with the registered group")
-        if local_digest == build["output_digest"] and local_metadata.get("sync_id") == sync_id:
+        if (local_digest == build["output_digest"] and local_metadata.get("sync_id") == sync_id
+                and execution_modes(target) == execution_modes(build_path)):
             location = {
                 "kind": "local",
                 "agent_id": args.agent,

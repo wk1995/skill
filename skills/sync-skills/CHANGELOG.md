@@ -6,6 +6,14 @@ version, date, and a change summary.
 
 ## [Unreleased]
 
+## [0.2.3] - 2026-09-08
+
+- Apply registry-wide location identity and containment checks to ordinary role registration, conversion, synchronization, and rollback before mutation.
+- Reject Agent snapshot rollback when the current installation declares another Skill identity, and fail installation protection closed when adapter discovery reports errors.
+- Detect and restore permission-only installation damage, including staged/post-install verification and idempotent permission-aware rollback. Manifest-v2 content digests remain compatible.
+- Inventory explicitly registered nested local installs through shared identity, Agent ownership, and deduplication checks.
+- Add five stateful finding regressions and a staged/post-install permission-failure test. Trigger selection and adapter versions are unchanged.
+
 ## [0.2.2] - 2026-09-08
 
 - Reject cross-group nested installation paths before repair or rollback, and conflicting non-empty install identities before repair can modify data.

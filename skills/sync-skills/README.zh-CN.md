@@ -33,6 +33,8 @@ python skills/sync-skills/scripts/skill_sync.py repair-agent-install my-skill-id
 
 即使传入 `--discard-local-changes`，修复也会拒绝非空 sync ID 冲突或与其他已登记 Skill 嵌套的路径。重复的本机扫描根会去重；身份冲突的外部或项目副本只报告问题，不建立关联。缺少可信构建的安装标为 `agent-build-missing`。报告与锁文件都必须位于 Skill 输入目录之外。
 
+安装快照回滚同样拒绝当前安装的身份冲突。普通角色命令会保护全部已登记位置；adapter 发现不完整时，安装保护会阻止修改。修复同时检查和恢复文件执行权限与内容，也能处理仅执行权限丢失的情况。显式登记在根目录多层子目录中的本机安装也会进入清单。这些检查保留 manifest v2 的摘要兼容性。
+
 ## 何时触发
 
 在以下情况使用此 Skill：

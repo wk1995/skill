@@ -115,6 +115,19 @@ def digest_tree(root: Path, *, portable: bool = False) -> str:
     return digest.hexdigest()
 
 
+def execution_modes(root: Path) -> dict[str, int]:
+    """Compare file execute bits without changing the manifest-v2 byte digest."""
+    if not root.is_dir():
+        raise RelationshipError(f"cannot inspect permissions of a missing directory: {root}")
+    modes: dict[str, int] = {}
+    for path in sorted(root.rglob("*")):
+        if path.is_symlink():
+            raise RelationshipError(f"Skill tree contains a symbolic link: {path}")
+        if path.is_file() and not should_ignore(path, root, portable=False):
+            modes[path.relative_to(root).as_posix()] = stat.S_IMODE(path.stat().st_mode) & 0o111
+    return modes
+
+
 def match_yaml_scalar(text: str, key: str) -> str | None:
     match = re.search(rf"^\s*{re.escape(key)}\s*:\s*[\"']?([^\"'\n]+)[\"']?\s*$", text, re.MULTILINE)
     return match.group(1).strip() if match else None
@@ -759,6 +772,35 @@ def build_report(
                 record["source_id"] = location.get("source_id") or location["location_id"].replace(":", "-")
             entry["locations"].append(record)
 
+    # Explicit locations may use a deeper layout than automatic root discovery.
+    # Merge them before the shared identity checks, never by name or digest.
+    for sync_id, locations in registry_locations.items():
+        for location in locations:
+            if location.get("kind") != "local":
+                continue
+            path = Path(location["path"])
+            if not path.exists():
+                continue
+            agents = agent_for_path(path, roots)
+            declared_agent = location.get("agent_id")
+            if not agents or (declared_agent and declared_agent not in agents):
+                if sync_id in logical:
+                    logical[sync_id].setdefault("forced_statuses", set()).add("unsafe-path")
+                add_issue(issues, "error", "unsafe-path", "Registered local Skill has no matching supported Agent root",
+                          sync_id=sync_id, path=location["path"])
+                continue
+            if any(same_location(path, Path(copy["path"])) for copy in local_copies):
+                continue
+            try:
+                copy = read_skill(path)
+            except (OSError, RelationshipError) as error:
+                if sync_id in logical:
+                    logical[sync_id].setdefault("forced_statuses", set()).add("missing-copy")
+                add_issue(issues, "warning", "missing-copy", str(error), sync_id=sync_id, path=location["path"])
+                continue
+            copy["agent_ids"] = agents
+            local_copies.append(copy)
+
     assigned_local_paths: set[str] = set()
     unlinked: list[dict[str, Any]] = []
     for copy in local_copies:
@@ -872,7 +914,8 @@ def build_report(
             if not build or not build["present"]:
                 statuses.add("agent-build-missing" if not present_builds else "agent-build-partial")
                 install_statuses.add("agent-build-missing")
-            elif build["output_digest"] != local["digest"]:
+            elif (build["output_digest"] != local["digest"]
+                  or execution_modes(Path(build["path"])) != execution_modes(Path(local["path"]))):
                 statuses.add("agent-install-diverged")
                 install_statuses.add("agent-install-diverged")
             if local["unstable"]:

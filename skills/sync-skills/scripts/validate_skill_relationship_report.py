@@ -396,6 +396,12 @@ def validate_report(report: dict[str, Any], schema_path: Path = DEFAULT_SCHEMA) 
             if agent_id and derived_from != f"build:{agent_id}":
                 validator.error(f"{install_path}.derived_from", "must reference the build for the same Agent")
             install_statuses = validator.statuses(install.get("statuses"), f"{install_path}.statuses")
+            if "agent-install-diverged" in install_statuses:
+                # Divergence also includes executable permissions, which are
+                # checked against the filesystem by the inventory producer.
+                install_diverged_count += 1
+                if "agent-install-diverged" not in statuses:
+                    validator.error(f"{path}.statuses", "must contain agent-install-diverged for a divergent install")
             if "synced" in install_statuses and len(install_statuses) != 1:
                 validator.error(f"{install_path}.statuses", "synced cannot coexist with another status")
             install_sync_id = install.get("sync_id")
@@ -420,7 +426,6 @@ def validate_report(report: dict[str, Any], schema_path: Path = DEFAULT_SCHEMA) 
                     validator.error(install_path, "an install without a trusted build must be agent-build-missing, not synced")
             if isinstance(build, dict) and build.get("present") is True and install_digest:
                 if build.get("output_digest") != install_digest:
-                    install_diverged_count += 1
                     if "agent-install-diverged" not in install_statuses or "agent-install-diverged" not in statuses:
                         validator.error(install_path, "install/build digest mismatch must cause agent-install-diverged on both records")
 

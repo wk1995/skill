@@ -631,6 +631,249 @@ class ReviewRegressions(unittest.TestCase):
                 builder.build("codex", [], None, case == "invalid")
                 self.assertEqual(self.report()["skills"][0]["local_installs"][0]["statuses"], ["synced"])
 
+    def assert_rejected_preserving_state(self, argv, fragment, *inputs):
+        state_before = sync.state_tree_manifest(self.state)
+        input_before = [sync.state_tree_manifest(path) for path in inputs]
+        with self.assertRaisesRegex(SystemExit, fragment):
+            self.run_cli(*argv)
+        self.assertEqual(sync.state_tree_manifest(self.state), state_before)
+        self.assertEqual([sync.state_tree_manifest(path) for path in inputs], input_before)
+
+    def test_ordinary_role_commands_protect_registered_locations(self):
+        external = self.root / "external/alpha"
+        shutil.copytree(self.project / "skills/alpha", external)
+        self.registry["groups"]["alpha"]["roles"] = {
+            "repo": str(self.project / "skills/alpha"), "external": str(external)}
+        self.save()
+        snapshot = sync.create_snapshot(self.state, "alpha", self.registry["groups"]["alpha"], "sync", "repo")
+        self.registry["groups"]["alpha"]["roles"].pop("external")
+        self.save()
+        nested = external / "nested/gamma"
+        shutil.copytree(self.project / "skills/gamma", nested)
+        self.run_cli("link-location", "gamma", "--location-id", "external:bundle", "--kind", "external",
+                     "--source-id", "bundle", "--path", str(nested))
+        self.assert_rejected_preserving_state(("link", "alpha", "--external", str(external)),
+                                             "must not be nested", external)
+
+        # Existing unsafe state must also fail at every overwriting role entry.
+        self.registry = sync.load_registry(self.state)
+        self.registry["groups"]["alpha"]["roles"]["external"] = str(external)
+        self.save()
+        operations = [
+            ("sync", "alpha", "--source", "repo"),
+            ("convert", "alpha", "--source-path", str(self.project / "skills/alpha"), "--source-role", "repo",
+             "--target-path", str(external), "--target-role", "external"),
+            ("rollback", "alpha", "--snapshot", snapshot, "--roles", "external"),
+        ]
+        for argv in operations:
+            with self.subTest(operation=argv[0]):
+                self.assert_rejected_preserving_state(argv, "must not be nested", external, self.project / "skills/alpha")
+
+        # Cover reverse containment, exact identity, symlink and native case aliases.
+        alias = self.root / "external-alias"
+        alias.symlink_to(external, target_is_directory=True)
+        cases = [(external.parent, "must not be nested"), (external, "already registered"),
+                 (alias, "already registered")]
+        case_alias = external.with_name("ALPHA")
+        if case_alias.exists() and os.path.samefile(case_alias, external):
+            cases.append((case_alias, "already registered"))
+        for path, message in cases:
+            with self.subTest(path=path):
+                self.registry["groups"]["gamma"]["locations"]["external:bundle"]["path"] = str(path)
+                self.save()
+                self.assert_rejected_preserving_state(operations[0], message, external)
+
+        # Correct the location to a separate real copy and retain normal role workflows.
+        gamma = self.root / "gamma-copy"
+        shutil.move(str(nested), gamma)
+        self.registry["groups"]["gamma"]["locations"]["external:bundle"]["path"] = str(gamma)
+        self.save()
+        self.assertEqual(self.run_cli("link", "alpha", "--external", str(external))[0], 0)
+        for _ in range(2):
+            self.assertEqual(self.run_cli(*operations[0])[0], 0)
+            self.assertEqual(rel.digest_tree(external, portable=True), rel.digest_tree(self.project / "skills/alpha", portable=True))
+            self.assertEqual(sync.read_skill_metadata(gamma)["sync_id"], "gamma")
+        self.assertEqual(self.run_cli(*operations[1])[0], 0)
+        self.assertEqual(self.run_cli(*operations[2])[0], 0)
+
+    def test_agent_rollback_rejects_changed_target_identity(self):
+        (self.target / "LOCAL.txt").write_text("restore alpha edits")
+        _, repaired = self.repair()
+        metadata = self.target / "SKILL.md"
+        original = metadata.read_text()
+        metadata.write_text(original.replace('sync_id: "alpha"', 'sync_id: "gamma"'))
+        (self.target / "GAMMA.txt").write_text("unselected Skill data")
+        self.assertTrue(any(i["code"] == "identity-conflict" for i in self.report()["issues"]))
+        argv = ("rollback", "alpha", "--snapshot", repaired["snapshot"], "--roles", "local")
+        for _ in range(2):
+            self.assert_rejected_preserving_state(argv, "metadata.sync_id conflicts", self.target)
+        # Registered missing identities remain recoverable.
+        metadata.write_text(original.replace('  sync_id: "alpha"\n', ""))
+        self.assertEqual(self.run_cli(*argv)[0], 0)
+        self.assertEqual((self.target / "LOCAL.txt").read_text(), "restore alpha edits")
+        snapshots = self.snapshot_names()
+        self.assertEqual(self.run_cli(*argv)[1]["status"], "already-current")
+        self.assertEqual(self.snapshot_names(), snapshots)
+
+        # Rollback can also restore a damaged install whose entry file vanished.
+        metadata.unlink()
+        self.assertEqual(self.run_cli(*argv)[0], 0)
+        self.assertEqual(sync.read_skill_metadata(self.target)["sync_id"], "alpha")
+        snapshots = self.snapshot_names()
+        self.assertEqual(self.run_cli(*argv)[1]["status"], "already-current")
+        self.assertEqual(self.snapshot_names(), snapshots)
+
+    def test_invalid_adapter_cannot_disable_sync_protection(self):
+        overlay = self.project / "skills/alpha/agent-builds/codex"
+        overlay.mkdir()
+        (overlay / "AGENT.txt").write_text("required Agent output")
+        builder.build("codex", [], None, True)
+        self.repair()
+        self.registry = sync.load_registry(self.state)
+        self.registry["groups"]["alpha"].pop("locations")
+        self.save()
+        adapter = self.project / "platforms/codex/adapter.json"
+        original = adapter.read_text()
+        other = self.project / "platforms/other"
+        other.mkdir()
+        config = {"id": "other", "schema_version": 1, "version": "1.0.0", "artifact_version": "1.0.0",
+                  "skills_path": "skills", "local_skill_roots": [{"type": "home-relative", "path": ".other/skills"}]}
+        (other / "adapter.json").write_text(json.dumps(config))
+        argv = ("sync", "alpha", "--source", "repo")
+        self.assert_rejected_preserving_state(argv, "refusing portable repo sync", self.target)
+        for malformed in ("{malformed", json.dumps({**json.loads(original), "version": "invalid"})):
+            with self.subTest(malformed=malformed):
+                adapter.write_text(malformed)
+                for _ in range(2):
+                    self.assert_rejected_preserving_state(argv, "cannot safely determine", self.target)
+                self.assertTrue(any(i["code"] == "agent-build-invalid" for i in self.report()["issues"]))
+        adapter.write_text(original)
+        with patch.dict(os.environ, {"PR14_SKILLS": ""}):
+            self.assert_rejected_preserving_state(argv, "cannot safely determine", self.target)
+        self.assert_rejected_preserving_state(argv, "refusing portable repo sync", self.target)
+        for _ in range(2):
+            self.assertEqual(self.repair()[1]["status"], "already-current")
+        # Valid configuration still permits ordinary external synchronization.
+        external = self.root / "external-alpha"
+        shutil.copytree(self.project / "skills/alpha", external)
+        self.registry["groups"]["alpha"]["roles"].pop("local")
+        self.registry["groups"]["alpha"]["roles"]["external"] = str(external)
+        self.save()
+        for _ in range(2):
+            self.assertEqual(self.run_cli(*argv)[0], 0)
+        self.assertEqual((self.target / "AGENT.txt").read_text(), "required Agent output")
+
+    def test_repair_and_rollback_preserve_executable_permissions(self):
+        skill = self.project / "skills/alpha"
+        for relative in ("run.sh", "scripts/nested/run.sh"):
+            script = skill / relative
+            script.parent.mkdir(parents=True, exist_ok=True)
+            script.write_text("#!/bin/sh\nexit 0\n")
+            script.chmod(0o755)
+        builder.build("codex", [], None, True)
+        self.repair()
+        built = self.project / "dist/codex/skills/alpha"
+        built_digest = rel.digest_tree(built)
+        for relative in ("run.sh", "scripts/nested/run.sh"):
+            with self.subTest(relative=relative):
+                script = self.target / relative
+                script.chmod(0o644)
+                self.assertEqual(rel.digest_tree(self.target), built_digest)  # v2 compatibility
+                report = self.report()
+                alpha = report["skills"][0]
+                self.assertIn("agent-install-diverged", alpha["local_installs"][0]["statuses"])
+                self.assertEqual(report["summary"]["agent_install_diverged_count"], 1)
+                self.assert_rejected_preserving_state(("repair-agent-install", "alpha", "--agent", "codex"),
+                                                     "existing copy was preserved", self.target)
+                code, repaired = self.repair()
+                self.assertEqual(code, 0)
+                self.assertEqual(script.stat().st_mode & 0o111, 0o111)
+                self.assertEqual(subprocess.run([str(script)], capture_output=True).returncode, 0)
+                snapshots = self.snapshot_names()
+                self.assertEqual(self.repair()[1]["status"], "already-current")
+                self.assertEqual(self.snapshot_names(), snapshots)
+                self.assertEqual(self.report()["skills"][0]["local_installs"][0]["statuses"], ["synced"])
+                # Permission-only rollback must not take the digest-only shortcut either.
+                argv = ("rollback", "alpha", "--snapshot", repaired["snapshot"], "--roles", "local")
+                self.assertEqual(self.run_cli(*argv)[0], 0)
+                self.assertEqual(script.stat().st_mode & 0o111, 0)
+                snapshots = self.snapshot_names()
+                self.assertEqual(self.run_cli(*argv)[1]["status"], "already-current")
+                self.assertEqual(self.snapshot_names(), snapshots)
+                self.repair()
+
+    def test_registered_nested_local_is_inventoried(self):
+        self.run_cli("relationships")
+        nested = self.local / "collection/deeper/alpha"
+        nested.parent.mkdir(parents=True)
+        self.target.rename(nested)
+        self.target = nested
+        self.registry["groups"]["alpha"]["roles"].pop("local")
+        self.save()
+        self.assertEqual(self.run_cli("link-location", "alpha", "--location-id", "local:codex", "--kind", "local",
+                                     "--agent-id", "codex", "--path", str(nested))[0], 0)
+        self.assertEqual(self.repair()[1]["status"], "already-current")
+        for _ in range(2):
+            report = self.report()
+            self.assertEqual(report["summary"]["local_skill_count"], 1)
+            self.assertEqual([item["path"] for item in report["skills"][0]["local_installs"]], [str(nested)])
+            self.assertNotIn("project-only", report["skills"][0]["statuses"])
+        self.assertEqual(self.run_cli("relationships", "--local-root", f"codex={nested.parent}")[0], 0)
+        report = json.loads((self.state / "reports/skill-relationships.json").read_text())
+        self.assertEqual(report["summary"]["local_skill_count"], 1)
+        metadata = nested / "SKILL.md"
+        original = metadata.read_text()
+        metadata.write_text(original.replace('sync_id: "alpha"', 'sync_id: "gamma"'))
+        for _ in range(2):
+            report = self.report()
+            self.assertTrue(all(not s["local_installs"] for s in report["skills"]))
+            self.assertIn("identity-conflict", report["unlinked_local_skills"][0]["statuses"])
+        metadata.write_text(original.replace('  sync_id: "alpha"\n', ""))
+        self.assertEqual(self.report()["skills"][0]["local_installs"][0]["identity_status"], "registered-incomplete")
+        metadata.write_text("malformed frontmatter")
+        report = self.report()
+        self.assertTrue(any(i.get("path") == str(nested) and i["code"] == "missing-copy" for i in report["issues"]))
+        metadata.write_text(original)
+        self.assertEqual(self.report()["skills"][0]["local_installs"][0]["statuses"], ["synced"])
+        # Missing entries stay diagnostic and are repairable from the registered path.
+        shutil.rmtree(nested)
+        self.assertIn("missing-copy", self.report()["skills"][0]["statuses"])
+        self.assertEqual(self.repair()[0], 0)
+        self.assertEqual(self.repair()[1]["status"], "already-current")
+
+    def test_install_permission_verification_preserves_target_on_failure(self):
+        script = self.project / "skills/alpha/run.sh"
+        script.write_text("#!/bin/sh\nexit 0\n")
+        script.chmod(0o755)
+        builder.build("codex", [], None, True)
+        source = self.project / "dist/codex/skills/alpha"
+        digest = rel.digest_tree(source)
+        before = sync.state_tree_manifest(self.target)
+        copytree = shutil.copytree
+        replace = os.replace
+
+        def lose_staged_mode(source_path, target_path, *args, **kwargs):
+            result = copytree(source_path, target_path, *args, **kwargs)
+            if Path(target_path).name == "new":
+                (Path(target_path) / "run.sh").chmod(0o644)
+            return result
+
+        def lose_installed_mode(source_path, target_path):
+            result = replace(source_path, target_path)
+            if Path(source_path).name == "new":
+                (Path(target_path) / "run.sh").chmod(0o644)
+            return result
+
+        for method, side_effect in (("copytree", lose_staged_mode), ("replace", lose_installed_mode)):
+            owner = shutil if method == "copytree" else os
+            with self.subTest(stage=method), patch.object(owner, method, side_effect=side_effect):
+                with self.assertRaisesRegex(SystemExit, "executable permission verification"):
+                    sync.atomic_install_build(source, self.target, "alpha", digest)
+            self.assertEqual(sync.state_tree_manifest(self.target), before)
+            self.assertFalse(list(self.local.glob(".alpha-install-*")))
+        self.assertEqual(self.repair()[0], 0)
+        self.assertEqual(self.repair()[1]["status"], "already-current")
+
 
 
 if __name__ == "__main__":

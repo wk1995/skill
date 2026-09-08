@@ -33,6 +33,8 @@ Each location has a role or explicit location ID. The workflow validates `SKILL.
 
 Repair refuses a conflicting non-empty sync ID or a path nested with another registered Skill, even with `--discard-local-changes`. Repeated local roots are deduplicated; conflicting external/project copies are reported without being linked. An install without a trusted build is `agent-build-missing`. Both reports and their lock file must stay outside Skill inputs.
 
+Agent snapshot rollback also refuses a conflicting current install identity. Ordinary role commands protect every registered location, and installation protection stops when adapter discovery is incomplete. Repair detects and restores file execute bits as well as content, including permission-only damage. Explicitly registered local installs below the root's direct children are included in inventory. These checks retain manifest-v2 digest compatibility.
+
 ## When It Triggers
 
 Use this skill when the request:
