@@ -95,6 +95,8 @@ Agent Skills 规范只要求 `SKILL.md`，但本仓库额外要求双语使用�
 
 本机 Skill 清单与跨项目映射见 [Skill 关系报告 PRD](docs/skill-relationship-report-prd.zh-CN.md)、随仓库维护的[技术设计](docs/skill-relationship-report-technical-design.zh-CN.md)和[测试计划](docs/skill-relationship-report-test-plan.zh-CN.md)。实际生成的关系报告仍只保存在本机；当前机器可读契约见 [skill-relationships.schema.json](schemas/skill-relationships.schema.json)。 报告运行时契约以随 Skill 分发的[校验器](skills/sync-skills/scripts/validate_skill_relationship_report.py)为权威。JSON Schema 用作互操作文档；运行时只使用其共享状态词汇，不执行 Draft 2020-12 引擎。
 
+模型推荐、自动选择与使用反馈的规划见 [Codex 模型自动选择与使用优化 PRD](docs/codex-model-routing-prd.zh-CN.md)。文档区分待实现能力与已验证的运行时支持。
+
 ## Pull Request 审查门禁
 
 在宣布 PR 可以合并前，应从干净且已提交的工作区运行 `bash tests/pr-review-gate.sh origin/main`，并执行 [PR 审查手册](docs/pr-review-playbook.md)规定的独立对抗性检查。GitHub Actions 的 required check `skill-catalog` 会调用同一门禁：检查完整 PR diff 与模拟合并结果、在[协同迁移](docs/skill-sync-state-migration.md)完成前保护旧版 `.skill-sync/` 状态、拒绝预期范围外的已跟踪忽略文件、解析 Python 源码，并运行仓库全部校验测试。新的同步状态默认保存到仓库外的 XDG state 目录。门禁全绿是必要条件，但不能替代路径身份、直接入口、递归规则、依赖降级和失败后状态检查。内部 PR 在配置 `SKILL_CATALOG_TOKEN` 后仍可自动提交生成目录；fork PR 必须自行提交两份根 README。
