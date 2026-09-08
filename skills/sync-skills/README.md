@@ -31,6 +31,8 @@ The `--to` option is for migrating a legacy name-keyed registry. For an existing
 
 Each location has a role or explicit location ID. The workflow validates `SKILL.md` and its stable `metadata.sync_id`, snapshots existing copies before an overwrite, reports conflicts instead of selecting a source silently, and records versions, digests, provenance, and differences. `relationships` dynamically discovers Builders from adapter manifests and writes JSON/Markdown only to machine-local external state. See [SKILL.md](SKILL.md) for the full command set and trust rules.
 
+Repair refuses a conflicting non-empty sync ID or a path nested with another registered Skill, even with `--discard-local-changes`. Repeated local roots are deduplicated; conflicting external/project copies are reported without being linked. An install without a trusted build is `agent-build-missing`. Both reports and their lock file must stay outside Skill inputs.
+
 ## When It Triggers
 
 Use this skill when the request:

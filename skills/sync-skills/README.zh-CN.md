@@ -31,6 +31,8 @@ python skills/sync-skills/scripts/skill_sync.py repair-agent-install my-skill-id
 
 每个位置使用角色或显式 Location ID。流程会校验 `SKILL.md` 及其稳定的 `metadata.sync_id`，在覆盖前为已有副本创建快照；多份副本发生冲突时会报告而不会自行选择来源，并记录版本、摘要、来源和差异。`relationships` 从 adapter 清单动态发现 Builder，生成的 JSON/Markdown 仅写入仓库外的本机状态目录。完整命令及信任规则见 [SKILL.md](SKILL.md)。
 
+即使传入 `--discard-local-changes`，修复也会拒绝非空 sync ID 冲突或与其他已登记 Skill 嵌套的路径。重复的本机扫描根会去重；身份冲突的外部或项目副本只报告问题，不建立关联。缺少可信构建的安装标为 `agent-build-missing`。报告与锁文件都必须位于 Skill 输入目录之外。
+
 ## 何时触发
 
 在以下情况使用此 Skill：

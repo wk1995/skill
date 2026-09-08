@@ -6,6 +6,14 @@ version, date, and a change summary.
 
 ## [Unreleased]
 
+## [0.2.2] - 2026-09-08
+
+- Reject cross-group nested installation paths before repair or rollback, and conflicting non-empty install identities before repair can modify data.
+- Report external/project identity conflicts and duplicate identities within related projects without linking ambiguous copies or aborting inventory.
+- Deduplicate repeated local roots by filesystem identity and align portable digests with the builder's top-level Agent override boundary.
+- Protect Skill inputs from report lock writes and report installs without trusted builds as `agent-build-missing`, never `synced`.
+- Add eight stateful regressions covering rejection, correction, repeat execution, path aliases, and preservation of unselected copies. Triggers and adapter versions remain unchanged.
+
 ## [0.2.1] - 2026-09-08
 
 - Package the report validator and informative schema with the portable Skill.

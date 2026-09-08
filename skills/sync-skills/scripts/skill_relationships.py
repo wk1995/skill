@@ -22,7 +22,7 @@ DIGEST = re.compile(r"^[0-9a-f]{64}$")
 AGENT_ID = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
 SEMVER = re.compile(r"^\d+\.\d+\.\d+(?:[-+][0-9A-Za-z.-]+)?$")
 ENV_NAME = re.compile(r"^[A-Z_][A-Z0-9_]*$")
-IGNORED_DIRECTORY_NAMES = {".git", "agent-builds", "dist", "node_modules", "__pycache__", ".pytest_cache"}
+IGNORED_DIRECTORY_NAMES = {".git", "dist", "node_modules", "__pycache__", ".pytest_cache"}
 IGNORED_FILE_NAMES = {".DS_Store"}
 BYTECODE_SUFFIXES = {".pyc", ".pyo"}
 
@@ -90,8 +90,7 @@ def normalized_absolute(path: Path) -> str:
 
 def should_ignore(path: Path, root: Path, portable: bool) -> bool:
     relative = path.relative_to(root)
-    ignored_dirs = IGNORED_DIRECTORY_NAMES if portable else IGNORED_DIRECTORY_NAMES - {"agent-builds"}
-    if any(part in ignored_dirs for part in relative.parts[:-1]):
+    if any(part in IGNORED_DIRECTORY_NAMES for part in relative.parts[:-1]):
         return True
     if portable and relative.parts and relative.parts[0] == "agent-builds":
         return True
@@ -252,7 +251,17 @@ def load_adapters(
                     "status": "resolved" if override.exists() else "missing-root",
                     "source": "override",
                 })
-            roots.sort(key=lambda item: item.get("path", item["resolver"]))
+            unique_roots: list[dict[str, Any]] = []
+            for root in roots:
+                if any(
+                    same_location(Path(root["path"]), Path(existing["path"]))
+                    if root.get("path") and existing.get("path")
+                    else root.get("path") == existing.get("path") and root["resolver"] == existing["resolver"]
+                    for existing in unique_roots
+                ):
+                    continue
+                unique_roots.append(root)
+            roots = sorted(unique_roots, key=lambda item: item.get("path", item["resolver"]))
             adapters.append({
                 "id": agent_id,
                 "adapter_version": adapter_version,
@@ -655,11 +664,50 @@ def build_report(
         elif sync_id in logical:
             logical[sync_id]["registry_group"] = group
 
+    identity_conflict_paths: set[str] = set()
+
+    def reject_registered_identity(copy: dict[str, Any], expected_id: str | None = None) -> bool:
+        identities = {identity for path, (identity, _) in registry_index.items()
+                      if same_location(Path(path), Path(copy["path"]))}
+        identities.update(identity for path, first, second in registry_conflicts
+                          if same_location(Path(path), Path(copy["path"])) for identity in (first, second))
+        identities.update(identity for identity in (expected_id, copy.get("sync_id")) if identity)
+        if len(identities) <= 1:
+            return False
+        for identity in identities:
+            if identity in logical:
+                logical[identity].setdefault("forced_statuses", set()).add("identity-conflict")
+        if copy["path"] not in identity_conflict_paths:
+            add_issue(issues, "error", "identity-conflict",
+                      "Registry and Skill metadata assign conflicting identities; the copy was not linked",
+                      path=copy["path"])
+            identity_conflict_paths.add(copy["path"])
+        return True
+
+    related_groups: dict[tuple[str, str], list[dict[str, Any]]] = {}
     for copy in related_copies:
         sync_id = copy.get("sync_id")
         if not sync_id:
             add_issue(issues, "warning", "missing-sync-id", "Related-project Skill is missing metadata.sync_id", path=copy["path"])
             continue
+        if reject_registered_identity(copy):
+            continue
+        copies = related_groups.setdefault((copy["project_id"], sync_id), [])
+        if not any(same_location(Path(copy["path"]), Path(existing["path"])) for existing in copies):
+            copies.append(copy)
+
+    duplicate_related_paths: set[str] = set()
+    for (related_id, sync_id), copies in sorted(related_groups.items()):
+        if len(copies) > 1:
+            if sync_id in logical:
+                logical[sync_id].setdefault("forced_statuses", set()).add("identity-conflict")
+            for copy in copies:
+                duplicate_related_paths.add(copy["path"])
+                add_issue(issues, "error", "identity-conflict",
+                          f"Duplicate metadata.sync_id in related project {related_id!r}; copies were not linked",
+                          sync_id=sync_id, path=copy["path"])
+            continue
+        copy = copies[0]
         if sync_id in logical:
             logical[sync_id]["locations"].append({
                 "location_id": f"project:{copy['project_id']}",
@@ -676,6 +724,8 @@ def build_report(
             if location.get("kind") == "local" or location["location_id"] == "repo:current":
                 continue
             path = Path(location["path"])
+            if any(same_location(path, Path(duplicate)) for duplicate in duplicate_related_paths):
+                continue
             if normalized_absolute(path) in existing_paths:
                 continue
             if not path.exists():
@@ -687,6 +737,13 @@ def build_report(
             except RelationshipError as error:
                 entry.setdefault("forced_statuses", set()).add("missing-copy")
                 add_issue(issues, "warning", "missing-copy", str(error), sync_id=sync_id, path=normalized_absolute(path))
+                continue
+            if reject_registered_identity(copy, sync_id):
+                continue
+            if not copy.get("sync_id"):
+                entry.setdefault("forced_statuses", set()).add("missing-sync-id")
+                add_issue(issues, "warning", "missing-sync-id", "Registered location is missing metadata.sync_id",
+                          sync_id=sync_id, path=copy["path"])
                 continue
             kind = location.get("kind", "external")
             record = {
@@ -814,6 +871,7 @@ def build_report(
             build = build_cells.get(agent_id)
             if not build or not build["present"]:
                 statuses.add("agent-build-missing" if not present_builds else "agent-build-partial")
+                install_statuses.add("agent-build-missing")
             elif build["output_digest"] != local["digest"]:
                 statuses.add("agent-install-diverged")
                 install_statuses.add("agent-install-diverged")
@@ -882,7 +940,7 @@ def build_report(
                 skill["statuses"] = sorted(set(skill["statuses"]) | {"agent-build-invalid"})
 
     for skill in report_skills:
-        if "missing-sync-id" in skill["statuses"]:
+        if any("missing-sync-id" in install["statuses"] for install in skill["local_installs"]):
             add_issue(
                 issues,
                 "warning",
@@ -1062,19 +1120,16 @@ def validate_output_directory(
             if target == state_dir / "snapshots" and output == state_dir / "reports":
                 continue
             raise RelationshipError(f"report output conflicts with protected path: {target}")
-    current = output
-    existing_ancestors: list[Path] = []
-    while not current.exists() and current.parent != current:
-        current = current.parent
-    while current != current.parent:
-        existing_ancestors.append(current)
-        current = current.parent
-    for ancestor in existing_ancestors:
-        if ancestor.is_symlink():
-            raise RelationshipError(f"report output ancestor must not be a symlink: {ancestor}")
-    if output.exists() and (output.is_symlink() or not output.is_dir()):
-        raise RelationshipError(f"report output must be a regular directory: {output}")
+    validate_report_directory(output)
     return output
+
+
+def validate_report_directory(directory: Path) -> None:
+    for ancestor in (directory, *directory.parents):
+        if ancestor.is_symlink():
+            raise RelationshipError(f"report directory ancestor must not be a symlink: {ancestor}")
+        if ancestor.exists() and not ancestor.is_dir():
+            raise RelationshipError(f"report path must be a regular directory: {ancestor}")
 
 
 def validate_report_target(path: Path) -> None:
@@ -1148,6 +1203,7 @@ def write_reports(
 ) -> dict[str, str]:
     if output_format not in {"json", "markdown", "both"}:
         raise RelationshipError(f"unknown report format: {output_format}")
+    state_dir = state_dir.expanduser().absolute()
     validate_contract(report)
     # Protect all scanned roots (including malformed/unlinked copies) and explicit
     # locations before mkdir/chmod, including calls directly to this entry point.
@@ -1169,6 +1225,10 @@ def write_reports(
     for path in selected_contents:
         validate_report_target(path)
     lock_path = state_dir / ".relationships.lock"
+    validate_report_directory(state_dir)
+    for target in [project_root, state_dir / "registry.json", state_dir / "snapshots", *protected]:
+        if same_location(lock_path, target) or path_is_within(lock_path, target) or path_is_within(target, lock_path):
+            raise RelationshipError(f"report lock conflicts with protected path: {target}")
     validate_report_target(lock_path)
     output.mkdir(parents=True, exist_ok=True, mode=0o700)
     os.chmod(output, 0o700)

@@ -1370,11 +1370,11 @@ def validate_location_identity(
                 raise SystemExit(
                     f"location path is already registered to {other_sync_id!r}: {candidate}"
                 )
-            if other_sync_id == sync_id and (
+            if (
                 path_is_within(candidate, existing) or path_is_within(existing, candidate)
             ) and not paths_refer_to_same_location(candidate, existing):
                 raise SystemExit(
-                    f"location paths for one Skill must not be nested: {candidate}, {existing}"
+                    f"registered Skill location paths must not be nested: {candidate}, {existing}"
                 )
 
 
@@ -1653,6 +1653,8 @@ def command_repair_agent_install(args: argparse.Namespace) -> int:
         require_skill_dir(str(target), f"local:{args.agent}")
         local_digest = relationship_digest_tree(target)
         local_metadata = read_skill_metadata(target)
+        if local_metadata.get("sync_id") not in (None, sync_id):
+            raise SystemExit("local metadata.sync_id conflicts with the registered group")
         if local_digest == build["output_digest"] and local_metadata.get("sync_id") == sync_id:
             location = {
                 "kind": "local",

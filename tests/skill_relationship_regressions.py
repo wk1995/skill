@@ -417,5 +417,221 @@ class ReviewRegressions(unittest.TestCase):
         self.assertEqual(shared["agent_ids"], ["codex", "workbuddy"])
 
 
+    def test_cross_group_nested_install_preserved(self):
+        nested = self.target / "nested/gamma"
+        shutil.copytree(self.project / "dist/codex/skills/gamma", nested)
+        before = rel.digest_tree(self.target)
+        registry_before = (self.state / "registry.json").read_bytes()
+        with self.assertRaisesRegex(SystemExit, "must not be nested"):
+            self.run_cli("link-location", "gamma", "--location-id", "local:codex", "--kind", "local",
+                         "--agent-id", "codex", "--path", str(nested))
+        self.assertEqual((self.state / "registry.json").read_bytes(), registry_before)
+        self.assertEqual(rel.digest_tree(self.target), before)
+        self.assertFalse(self.snapshot_names())
+
+        # Existing unsafe registries must be rejected independently of link-location.
+        self.registry["groups"]["gamma"]["roles"]["local"] = str(nested)
+        self.save()
+        registry_before = (self.state / "registry.json").read_bytes()
+        with self.assertRaisesRegex(SystemExit, "must not be nested"):
+            self.repair()
+        self.assertEqual(rel.digest_tree(self.target), before)
+        self.assertEqual((self.state / "registry.json").read_bytes(), registry_before)
+        self.assertFalse(self.snapshot_names())
+        for candidate in (nested, self.target.parent):
+            with self.subTest(candidate=candidate), self.assertRaisesRegex(SystemExit, "must not be nested"):
+                sync.validate_location_identity(self.registry, "gamma", candidate)
+
+        # After correcting the registry, the authorized repair remains idempotent.
+        self.registry["groups"]["gamma"]["roles"].pop("local")
+        self.save()
+        code, repaired = self.repair()
+        self.assertEqual(code, 0)
+        self.assertEqual(self.repair()[1]["status"], "already-current")
+        # The rollback entry must also protect an unselected group added later.
+        shutil.copytree(self.project / "dist/codex/skills/gamma", nested)
+        self.registry = sync.load_registry(self.state)
+        self.registry["groups"]["gamma"]["roles"]["local"] = str(nested)
+        self.save()
+        before = rel.digest_tree(self.target)
+        snapshots = self.snapshot_names()
+        registry_before = (self.state / "registry.json").read_bytes()
+        with self.assertRaisesRegex(SystemExit, "must not be nested"):
+            self.run_cli("rollback", "alpha", "--snapshot", repaired["snapshot"])
+        self.assertEqual(rel.digest_tree(self.target), before)
+        self.assertEqual(self.snapshot_names(), snapshots)
+        self.assertEqual((self.state / "registry.json").read_bytes(), registry_before)
+
+    def test_changed_install_identity_rejected(self):
+        skill = self.target / "SKILL.md"
+        original = skill.read_text()
+        skill.write_text(original.replace('sync_id: "alpha"', 'sync_id: "gamma"'))
+        before = rel.digest_tree(self.target)
+        registry_before = (self.state / "registry.json").read_bytes()
+        self.assertTrue(any(i["code"] == "identity-conflict" for i in self.report()["issues"]))
+        with self.assertRaisesRegex(SystemExit, "metadata.sync_id conflicts"):
+            self.repair()
+        self.assertEqual(rel.digest_tree(self.target), before)
+        self.assertEqual((self.state / "registry.json").read_bytes(), registry_before)
+        self.assertFalse(self.snapshot_names())
+        # Missing identity is still repairable after an explicit registration.
+        skill.write_text(original.replace('  sync_id: "alpha"\n', ""))
+        self.assertEqual(self.repair()[0], 0)
+        snapshots = self.snapshot_names()
+        self.assertEqual(self.repair()[1]["status"], "already-current")
+        self.assertEqual(self.snapshot_names(), snapshots)
+
+    def test_external_identity_change_not_associated(self):
+        for kind, owner_flag in (("external", "--source-id"), ("project", "--project-id")):
+            with self.subTest(kind=kind):
+                ext = self.root / kind / "skills/alpha"
+                shutil.copytree(self.project / "skills/alpha", ext)
+                self.assertEqual(self.run_cli("link-location", "alpha", "--location-id", f"{kind}:bundle",
+                                             "--kind", kind, owner_flag, "bundle", "--path", str(ext))[0], 0)
+                skill = ext / "SKILL.md"
+                original = skill.read_text()
+                skill.write_text(original.replace('sync_id: "alpha"', 'sync_id: "gamma"'))
+                for _ in range(2):
+                    report = self.report()
+                    self.assertTrue(any(i["code"] == "identity-conflict" and i.get("path") == str(ext)
+                                        for i in report["issues"]))
+                    self.assertFalse(any(loc["path"] == str(ext) for s in report["skills"] for loc in s["locations"]))
+                skill.write_text(original)
+                self.assertTrue(any(loc["path"] == str(ext) for s in self.report()["skills"] for loc in s["locations"]))
+                skill.write_text(original.replace('  sync_id: "alpha"\n', ""))
+                report = self.report()
+                self.assertFalse(any(loc["path"] == str(ext) for s in report["skills"] for loc in s["locations"]))
+                self.assertTrue(any(i["code"] == "missing-sync-id" and i.get("path") == str(ext) for i in report["issues"]))
+                skill.write_text(original)
+
+    def test_repeated_existing_local_root(self):
+        self.assertEqual(self.run_cli("relationships")[0], 0)
+        alias = self.root / "alias-root"
+        alias.symlink_to(self.local, target_is_directory=True)
+        argv = ("relationships", "--local-root", f"codex={self.local}",
+                "--local-root", f"codex={self.local}", "--local-root", f"codex={alias}")
+        for _ in range(2):
+            self.assertEqual(self.run_cli(*argv)[0], 0)
+            report = json.loads((self.state / "reports/skill-relationships.json").read_text())
+            self.assertEqual(len(report["agent_builders"][0]["local_skill_roots"]), 1)
+            self.assertEqual(report["summary"]["local_skill_count"], 1)
+        upper = self.local.with_name("SKILLS")
+        real_samefile = os.path.samefile
+        simulated = not upper.exists()
+        if simulated:
+            upper.mkdir()
+        def samefile(a, b):
+            if simulated and {str(a), str(b)} == {str(upper), str(self.local)}:
+                return True
+            return real_samefile(a, b)
+        with patch.object(os.path, "samefile", side_effect=samefile):
+            self.assertEqual(self.run_cli("relationships", "--local-root", f"codex={upper}")[0], 0)
+            report = json.loads((self.state / "reports/skill-relationships.json").read_text())
+            self.assertEqual(len(report["agent_builders"][0]["local_skill_roots"]), 1)
+
+    def test_multiple_related_roots_same_project(self):
+        roots = [self.root / "app/skills", self.root / "app/extra-skills"]
+        for root in roots:
+            shutil.copytree(self.project / "skills/alpha", root / "alpha")
+        # Exercise persisted roots/locations as well as explicit root inputs.
+        self.registry["projects"] = {"app": {"skill_roots": [str(r) for r in roots]}}
+        self.registry["groups"]["alpha"]["locations"] = {
+            f"project:app-{index}": {"kind": "project", "project_id": "app", "path": str(root / "alpha")}
+            for index, root in enumerate(roots)}
+        self.save()
+        argv = ("relationships", "--project", f"app={roots[0]}", "--project", f"app={roots[1]}")
+        for _ in range(2):
+            self.assertEqual(self.run_cli(*argv)[0], 0)
+            report = self.report()
+            alpha = next(s for s in report["skills"] if s["sync_id"] == "alpha")
+            self.assertIn("identity-conflict", alpha["statuses"])
+            self.assertEqual(alpha["locations"], [])
+            self.assertEqual(sum(i["code"] == "identity-conflict" for i in report["issues"]), 2)
+            gamma = next(s for s in report["skills"] if s["sync_id"] == "gamma")
+            self.assertNotIn("identity-conflict", gamma["statuses"])
+        self.assertEqual(self.run_cli(*argv, "--strict")[0], 2)
+        shutil.rmtree(roots[1] / "alpha")
+        self.registry["groups"]["alpha"]["locations"].pop("project:app-1")
+        self.save()
+        self.assertEqual(self.run_cli(*argv, "--strict")[0], 0)
+        alpha = next(s for s in self.report()["skills"] if s["sync_id"] == "alpha")
+        self.assertEqual(len(alpha["locations"]), 1)
+
+    def test_nested_agent_builds_fresh(self):
+        skill = self.project / "skills/alpha"
+        nested = skill / "references/example/agent-builds"
+        nested.mkdir(parents=True)
+        (nested / "example.json").write_text("{}")
+        override = skill / "agent-builds/codex"
+        override.mkdir()
+        (override / "adapter.txt").write_text("overlay")
+        for _ in range(2):
+            builder.build("codex", [], None, True)
+            output = self.project / "dist/codex/skills/alpha"
+            self.assertEqual((output / "references/example/agent-builds/example.json").read_text(), "{}")
+            self.assertFalse((output / "agent-builds").exists())
+            self.assertEqual((output / "adapter.txt").read_text(), "overlay")
+            alpha = next(s for s in self.report()["skills"] if s["sync_id"] == "alpha")
+            self.assertNotIn("agent-build-stale", alpha["statuses"])
+        (nested / "example.json").write_text('{"changed": true}')
+        self.assertIn("agent-build-stale", self.report()["skills"][0]["statuses"])
+        builder.build("codex", [], None, True)
+        self.assertNotIn("agent-build-stale", self.report()["skills"][0]["statuses"])
+
+    def test_state_lock_does_not_mutate_local_skill(self):
+        before = rel.digest_tree(self.target)
+        project_before = rel.digest_tree(self.project / "skills")
+        registry_before = (self.state / "registry.json").read_bytes()
+        output = self.root / "reports-output"
+        for state in (self.target, self.target / "runtime-state", self.project / "runtime-state"):
+            with self.subTest(state=state), self.assertRaisesRegex(rel.RelationshipError, "lock conflicts"):
+                rel.generate_and_write(project_root=self.project, state_dir=state,
+                                       registry=self.registry, output_dir=output)
+            self.assertFalse(output.exists())
+            self.assertFalse((state / ".relationships.lock").exists())
+            self.assertEqual(rel.digest_tree(self.target), before)
+            self.assertEqual(rel.digest_tree(self.project / "skills"), project_before)
+            self.assertEqual((self.state / "registry.json").read_bytes(), registry_before)
+        alias = self.root / "state-alias"
+        alias.symlink_to(self.state, target_is_directory=True)
+        file = self.root / "state-file"
+        file.write_text("keep")
+        for state in (alias, alias / "nested", file, file / "nested"):
+            with self.subTest(state=state), self.assertRaises(rel.RelationshipError):
+                rel.generate_and_write(project_root=self.project, state_dir=state,
+                                       registry=self.registry, output_dir=output)
+            self.assertFalse(output.exists())
+        for _ in range(2):
+            rel.generate_and_write(project_root=self.project, state_dir=self.state,
+                                   registry=self.registry, output_dir=output)
+        self.assertEqual(file.read_text(), "keep")
+        self.assertEqual(rel.digest_tree(self.target), before)
+
+    def test_missing_build_not_synced_install(self):
+        manifest = self.manifest_path.read_text()
+        cases = ("missing", "invalid")
+        for case in cases:
+            with self.subTest(case=case):
+                if not self.manifest_path.exists():
+                    builder.build("codex", [], None, False)
+                self.manifest_path.write_text(manifest)
+                if case == "missing":
+                    shutil.rmtree(self.project / "dist/codex")
+                else:
+                    self.manifest_path.write_text("{invalid")
+                report = self.report()
+                alpha = next(s for s in report["skills"] if s["sync_id"] == "alpha")
+                self.assertEqual(alpha["local_installs"][0]["statuses"], ["agent-build-missing"])
+                invalid = copy.deepcopy(report)
+                invalid["skills"][0]["local_installs"][0]["statuses"] = ["synced"]
+                with self.assertRaisesRegex(rel.RelationshipError, "without a trusted build"):
+                    rel.validate_contract(invalid)
+                if case == "invalid":
+                    self.manifest_path.write_text(manifest)
+                builder.build("codex", [], None, case == "invalid")
+                self.assertEqual(self.report()["skills"][0]["local_installs"][0]["statuses"], ["synced"])
+
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

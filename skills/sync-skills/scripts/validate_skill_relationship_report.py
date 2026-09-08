@@ -396,6 +396,8 @@ def validate_report(report: dict[str, Any], schema_path: Path = DEFAULT_SCHEMA) 
             if agent_id and derived_from != f"build:{agent_id}":
                 validator.error(f"{install_path}.derived_from", "must reference the build for the same Agent")
             install_statuses = validator.statuses(install.get("statuses"), f"{install_path}.statuses")
+            if "synced" in install_statuses and len(install_statuses) != 1:
+                validator.error(f"{install_path}.statuses", "synced cannot coexist with another status")
             install_sync_id = install.get("sync_id")
             if install_sync_id is None:
                 if install.get("identity_status") != "registered-incomplete":
@@ -413,6 +415,9 @@ def validate_report(report: dict[str, Any], schema_path: Path = DEFAULT_SCHEMA) 
                 if install.get("identity_status") != "verified":
                     validator.error(f"{install_path}.identity_status", "must be verified when sync_id is present")
             build = builds.get(agent_id) if builds is not None and agent_id else None
+            if not isinstance(build, dict) or build.get("present") is not True:
+                if "synced" in install_statuses or "agent-build-missing" not in install_statuses:
+                    validator.error(install_path, "an install without a trusted build must be agent-build-missing, not synced")
             if isinstance(build, dict) and build.get("present") is True and install_digest:
                 if build.get("output_digest") != install_digest:
                     install_diverged_count += 1
