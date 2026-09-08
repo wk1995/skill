@@ -6,10 +6,11 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import re
 import subprocess
 import sys
 import tempfile
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 
 
@@ -74,18 +75,21 @@ def valid_backup_time(value: object) -> bool:
     if not isinstance(value, str):
         return False
     try:
-        datetime.strptime(value, "%Y-%m-%dT%H:%M:%SZ")
+        parsed = datetime.strptime(value, "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=timezone.utc)
     except ValueError:
         return False
-    return True
+    return parsed <= datetime.now(timezone.utc)
 
 
 def approved_skill_sync_removal(base: str, result_tree: str, changed: list[str]) -> tuple[bool, str]:
     """Allow one exact, acknowledged removal of the legacy tracked state tree."""
     try:
-        plan = read_tree_json(result_tree, SKILL_SYNC_MIGRATION_PLAN)
+        plan = read_tree_json(base, SKILL_SYNC_MIGRATION_PLAN)
     except RuntimeError as error:
         return False, str(error)
+
+    if tree_object(base, SKILL_SYNC_MIGRATION_PLAN) != tree_object(result_tree, SKILL_SYNC_MIGRATION_PLAN):
+        return False, "migration approval must already be merged into the base and remain unchanged"
 
     if plan.get("schema_version") != 1 or plan.get("migration") != "skill-sync-xdg-state-v1":
         return False, "migration plan identity or schema is invalid"
@@ -111,7 +115,17 @@ def approved_skill_sync_removal(base: str, result_tree: str, changed: list[str])
     if not isinstance(confirmations, dict) or set(confirmations) != set(required):
         return False, "every required collaborator must confirm an external backup"
     if not all(valid_backup_time(value) for value in confirmations.values()):
-        return False, "backup confirmations must contain UTC timestamps"
+        return False, "backup confirmations must contain non-future UTC timestamps"
+
+    evidence = plan.get("backup_evidence")
+    if not isinstance(evidence, dict) or set(evidence) != set(required):
+        return False, "every backup confirmation needs base-reviewed identity evidence"
+    # These links are attestations verified by maintainers in the prior approval
+    # PR. The offline guard cannot authenticate a collaborator from JSON alone.
+    if not all(isinstance(url, str) and re.fullmatch(
+        r"https://github\.com/[^/]+/[^/]+/(?:pull|issues)/[0-9]+#(?:issuecomment-|pullrequestreview-)[0-9]+", url
+    ) for url in evidence.values()):
+        return False, "backup evidence must link to an attributable GitHub comment or review"
 
     base_paths = tree_paths(base, ".skill-sync")
     result_paths = tree_paths(result_tree, ".skill-sync")
@@ -251,7 +265,7 @@ def main() -> int:
                 )
             raise RuntimeError("tracked ignored files outside protected legacy state are not allowed")
 
-    except RuntimeError as error:
+    except (RuntimeError, OSError) as error:
         print(f"FAIL: {error}", file=sys.stderr)
         print(f"::error::{error}", file=sys.stderr)
         return 1

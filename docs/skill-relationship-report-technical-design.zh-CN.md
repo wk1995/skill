@@ -296,3 +296,9 @@ JSON 和 Markdown 是一对输出。先完成两份 staging 与校验，再依�
 8. 已完成：Agent install 修复入口及其快照、冲突和幂等测试。
 
 每一步合并前都按测试计划增加回归用例；涉及覆盖、移动、同步或安装的入口还必须执行项目 PR review playbook 的路径身份、首次修改前校验、缺失依赖和多次调用检查。
+
+## PR #14 契约与恢复补充
+
+报告运行时以 `skills/sync-skills/scripts/validate_skill_relationship_report.py` 为权威；`references/skill-relationships.schema.json` 是随 Skill 分发的互操作文档及共享状态词汇。根目录 validator CLI 和 schema 引用入口保留兼容。运行时不执行 Draft 2020-12 约束，也不需要第三方 Python 包。
+
+`tests/skill-relationship-regressions.sh` 覆盖完整 manifest 拒绝、身份冲突、报告输出路径矩阵、真实构建产物脱离仓库运行、安装与恢复双故障、repair → rollback → 重复 rollback，以及退出码 2 的变更成功/报告过期语义。健康 `project-only` 不导致 strict 失败。

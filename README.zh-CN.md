@@ -92,7 +92,7 @@ Agent Skills 规范只要求 `SKILL.md`，但本仓库额外要求双语使用�
 | `sync-skills` | `sync-skills` 用于管理同一个 Agent Skill 在仓库、项目、本机 Agent 安装目录、Agent 构建产物和明确指定的外部路径中的等价副本。它还会按项目支持的全部 AI Agent Builders 生成本机关系报告，并安全修复身份不完整的 Agent 安装副本。 | [README](skills/sync-skills/README.zh-CN.md) |
 <!-- skills-catalog:end -->
 
-本机 Skill 清单与跨项目映射见 [Skill 关系报告 PRD](docs/skill-relationship-report-prd.zh-CN.md)、随仓库维护的[技术设计](docs/skill-relationship-report-technical-design.zh-CN.md)和[测试计划](docs/skill-relationship-report-test-plan.zh-CN.md)。实际生成的关系报告仍只保存在本机；当前机器可读契约见 [skill-relationships.schema.json](schemas/skill-relationships.schema.json)。
+本机 Skill 清单与跨项目映射见 [Skill 关系报告 PRD](docs/skill-relationship-report-prd.zh-CN.md)、随仓库维护的[技术设计](docs/skill-relationship-report-technical-design.zh-CN.md)和[测试计划](docs/skill-relationship-report-test-plan.zh-CN.md)。实际生成的关系报告仍只保存在本机；当前机器可读契约见 [skill-relationships.schema.json](schemas/skill-relationships.schema.json)。 报告运行时契约以随 Skill 分发的[校验器](skills/sync-skills/scripts/validate_skill_relationship_report.py)为权威。JSON Schema 用作互操作文档；运行时只使用其共享状态词汇，不执行 Draft 2020-12 引擎。
 
 ## Pull Request 审查门禁
 

@@ -6,6 +6,14 @@ version, date, and a change summary.
 
 ## [Unreleased]
 
+## [0.2.1] - 2026-09-08
+
+- Package the report validator and informative schema with the portable Skill.
+- Validate complete build manifests before accepting any entries; report malformed builds without aborting inventory.
+- Reject conflicting registry identities, unsupported/cross-Agent local locations, symlink installs, and report output overlapping known Skill trees.
+- Preserve recovery staging and report snapshot paths on installation recovery failure; support repair snapshot rollback with idempotency.
+- Treat healthy project-only inventories as strict success and document exit code 2, report-only retries, and the authoritative runtime contract. Triggers remain unchanged.
+
 - No unreleased changes.
 
 ## [0.2.0] - 2026-09-07

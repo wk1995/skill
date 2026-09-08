@@ -102,3 +102,7 @@ dist/workbuddy/
 Generated output is ignored by Git. Installation commands belong to their adapter documentation or packaging layer; portable Skill READMEs describe how to use the workflow, not how a specific Agent installs it.
 
 After a successful build, the builder prints the machine-local `skill_sync.py relationships` refresh command. Report generation never invokes a build implicitly.
+
+### Codex local roots (adapter 1.1.1)
+
+As checked on 2026-09-08, the [official Skills documentation](https://learn.chatgpt.com/docs/build-skills) lists `$HOME/.agents/skills` as the user scope (the former `developers.openai.com/codex/skills` URL redirects there). Adapter 1.1.1 discovers this root and retains `.codex/skills` for legacy local installations. A physical root shared with another adapter retains both Agent IDs. This describes inventory configuration, not a claim that every historical client version loads the same directories.

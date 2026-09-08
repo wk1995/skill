@@ -48,3 +48,13 @@ python skills/sync-skills/scripts/skill_sync.py repair-agent-install my-skill-id
 
 - 只是使用某个 Skill 的业务工作流，并不管理它的副本；
 - 只是普通代码修改，且不涉及 Skill 同步、转换、审计或回滚。
+
+## 退出码与恢复
+
+`link`、`link-location`、`convert`、`sync`、`rollback`、`rename` 和 `repair-agent-install` 返回退出码 **2** 时，表示变更已成功、报告刷新失败（`report_status: stale`）。此时只运行返回的 `report_retry_command`；不要因为 shell 显示非零退出码就重复变更。退出码 0 表示命令与报告刷新均已完成。
+
+对于只读的 `relationships --strict`，退出码 **2** 表示新报告中存在问题或未关联副本。健康的 `project-only` 和 `synced` 均可通过；不加 `--strict` 时，发现的问题只记录在 JSON 中，不因此返回非零退出码。校验或执行错误会另行失败并给出错误信息。
+
+使用 `rollback <sync-id> --snapshot <repair-snapshot-id> --roles local` 恢复安装修复快照，也支持只通过 location 登记的安装。它只恢复对应安装；对相同内容重复回滚不会创建新快照。若安装恢复失败，请保留错误中列出的 staging 目录和快照路径以便恢复。
+
+随 Skill 分发的[契约校验器](scripts/validate_skill_relationship_report.py)是报告运行时契约的权威实现，仅依赖 Python 标准库。[JSON Schema](references/skill-relationships.schema.json)用于互操作文档；运行时只读取其中共享的状态词汇，不执行 Draft 2020-12 约束。校验器和 schema 均包含在 Skill 内，安装产物生成报告无需依赖仓库 CLI。

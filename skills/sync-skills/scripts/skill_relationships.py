@@ -17,7 +17,8 @@ from pathlib import Path, PurePosixPath
 from typing import Any, Iterable
 
 
-REPOSITORY_ROOT = Path(__file__).resolve().parents[3]
+SKILL_ROOT = Path(__file__).resolve().parents[1]
+DIGEST = re.compile(r"^[0-9a-f]{64}$")
 AGENT_ID = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
 SEMVER = re.compile(r"^\d+\.\d+\.\d+(?:[-+][0-9A-Za-z.-]+)?$")
 ENV_NAME = re.compile(r"^[A-Z_][A-Z0-9_]*$")
@@ -346,6 +347,8 @@ def read_builds(
         try:
             if output.is_symlink() or not output.is_dir():
                 raise RelationshipError("build output must be a regular directory")
+            if manifest_path.is_symlink() or not manifest_path.is_file():
+                raise RelationshipError("build manifest must be a regular file")
             manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
             if not isinstance(manifest, dict) or manifest.get("schema_version") != 2:
                 raise RelationshipError("a trusted build requires .agent-build.json schema_version 2")
@@ -358,6 +361,7 @@ def read_builds(
             skills = manifest.get("skills")
             if not isinstance(skills, list):
                 raise RelationshipError("manifest skills must be an array")
+            accepted: dict[str, dict[str, Any]] = {}
             seen_ids: set[str] = set()
             for index, record in enumerate(skills):
                 if not isinstance(record, dict):
@@ -365,13 +369,24 @@ def read_builds(
                 required = {"name", "sync_id", "core_version", "portable_digest", "output_digest", "path"}
                 if not required.issubset(record):
                     raise RelationshipError(f"skills[{index}] is missing v2 identity fields")
+                for field in required:
+                    if not isinstance(record[field], str) or not record[field]:
+                        raise RelationshipError(f"skills[{index}].{field} must be a non-empty string")
+                for field in ("portable_digest", "output_digest"):
+                    if DIGEST.fullmatch(record[field]) is None:
+                        raise RelationshipError(f"skills[{index}].{field} must be a SHA-256 digest")
+                if SEMVER.fullmatch(record["core_version"]) is None:
+                    raise RelationshipError(f"skills[{index}].core_version must be SemVer")
                 sync_id = record["sync_id"]
                 if not isinstance(sync_id, str) or AGENT_ID.fullmatch(sync_id) is None or sync_id in seen_ids:
                     raise RelationshipError(f"skills[{index}] has an invalid or duplicate sync_id")
                 seen_ids.add(sync_id)
                 relative = PurePosixPath(record["path"])
-                if relative.is_absolute() or ".." in relative.parts:
+                if relative.is_absolute() or ".." in relative.parts or not relative.parts or "\\" in record["path"] or relative.as_posix() != record["path"]:
                     raise RelationshipError(f"skills[{index}].path is unsafe")
+                expected_path = PurePosixPath(adapter["skills_path"]) / record["name"]
+                if relative != expected_path or AGENT_ID.fullmatch(record["name"]) is None:
+                    raise RelationshipError(f"skills[{index}].path must match the adapter skills_path and name")
                 skill_path = output.joinpath(*relative.parts)
                 if not path_is_within(skill_path, output) or skill_path.is_symlink() or not skill_path.is_dir():
                     raise RelationshipError(f"skills[{index}].path does not identify a safe build directory")
@@ -385,7 +400,7 @@ def read_builds(
                     raise RelationshipError(f"skills[{index}] sync_id does not match the built SKILL.md")
                 if built_metadata.get("core_version") != record["core_version"]:
                     raise RelationshipError(f"skills[{index}] core_version does not match the built SKILL.md")
-                by_sync_id.setdefault(sync_id, {})[agent_id] = {
+                accepted[sync_id] = {
                     "present": True,
                     "sync_id": sync_id,
                     "agent_id": agent_id,
@@ -398,8 +413,10 @@ def read_builds(
                     "path": normalized_absolute(skill_path),
                     "manifest_path": normalized_absolute(manifest_path),
                 }
+            for sync_id, cell in accepted.items():
+                by_sync_id.setdefault(sync_id, {})[agent_id] = cell
             sources.append({"kind": "agent-build", "id": agent_id, "path": normalized_absolute(output), "status": "scanned", "skill_count": len(skills)})
-        except (OSError, json.JSONDecodeError, RelationshipError, TypeError) as error:
+        except (OSError, ValueError, RelationshipError, TypeError) as error:
             sources.append({"kind": "agent-build", "id": agent_id, "path": normalized_absolute(output), "status": "invalid", "skill_count": 0})
             issues.append({
                 "severity": "error",
@@ -689,17 +706,31 @@ def build_report(
     unlinked: list[dict[str, Any]] = []
     for copy in local_copies:
         real_path = str(Path(copy["path"]).resolve())
-        registry_match = registry_index.get(real_path)
+        registry_match = next((value for path, value in registry_index.items()
+                               if same_location(Path(path), Path(real_path))), None)
         sync_id = copy.get("sync_id")
-        if sync_id not in logical and registry_match and registry_match[0] in logical:
+        conflict_ids = {sid for path, first, second in registry_conflicts
+                        if same_location(Path(path), Path(real_path)) for sid in (first, second)}
+        if registry_match and sync_id and registry_match[0] != sync_id:
+            conflict_ids.update((sync_id, registry_match[0]))
+        if conflict_ids:
+            for conflicting_id in sorted(conflict_ids):
+                if conflicting_id in logical:
+                    logical[conflicting_id].setdefault("forced_statuses", set()).add("identity-conflict")
+            add_issue(issues, "error", "identity-conflict",
+                      "Registry and Skill metadata assign conflicting identities; the copy was not linked",
+                      path=copy["path"])
+        if not sync_id and registry_match and registry_match[0] in logical and not conflict_ids:
             sync_id = registry_match[0]
-        if sync_id in logical:
+        if sync_id in logical and not conflict_ids:
             entry = logical[sync_id]
             for agent_id in copy["agent_ids"]:
                 entry["local"].append({**copy, "agent_id": agent_id})
             assigned_local_paths.add(copy["path"])
         else:
             statuses = {"unlinked-local"}
+            if conflict_ids:
+                statuses.add("identity-conflict")
             if not sync_id:
                 statuses.add("missing-sync-id")
             unlinked.append({
@@ -829,7 +860,7 @@ def build_report(
     conflicting_ids = {sync_id for _, first, second in registry_conflicts for sync_id in (first, second)}
     for skill in report_skills:
         if skill["sync_id"] in conflicting_ids:
-            skill["statuses"] = sorted(set(skill["statuses"]) | {"identity-conflict"})
+            skill["statuses"] = sorted((set(skill["statuses"]) - {"synced"}) | {"identity-conflict"})
 
     copies_by_name: dict[str, set[str]] = {}
     for copy in [*portable_copies, *local_copies, *related_copies]:
@@ -890,7 +921,7 @@ def build_report(
         "related_project_count": len(related_projects),
         "build_complete_count": sum(
             1 for skill in report_skills
-            if all(cell["present"] for cell in skill["agent_builds"].values())
+            if skill["portable"]["present"] and all(cell["present"] for cell in skill["agent_builds"].values())
             and "agent-build-stale" not in skill["statuses"]
             and "agent-version-diverged" not in skill["statuses"]
         ),
@@ -930,14 +961,14 @@ def build_report(
 
 
 def validate_contract(report: dict[str, Any]) -> None:
-    validator_path = REPOSITORY_ROOT / "scripts" / "validate_skill_relationship_report.py"
+    validator_path = SKILL_ROOT / "scripts" / "validate_skill_relationship_report.py"
     spec = importlib.util.spec_from_file_location("skill_relationship_report_validator", validator_path)
     if spec is None or spec.loader is None:
         raise RelationshipError(f"cannot load report validator: {validator_path}")
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     try:
-        module.validate_report(report, REPOSITORY_ROOT / "schemas" / "skill-relationships.schema.json")
+        module.validate_report(report, SKILL_ROOT / "references" / "skill-relationships.schema.json")
     except module.ContractError as error:
         raise RelationshipError(f"generated report violates its contract: {error}") from error
 
@@ -1021,9 +1052,11 @@ def markdown_report(report: dict[str, Any]) -> str:
     return "\n".join(lines).rstrip() + "\n"
 
 
-def validate_output_directory(output_dir: Path, state_dir: Path, project_root: Path) -> Path:
+def validate_output_directory(
+    output_dir: Path, state_dir: Path, project_root: Path, protected_paths: Iterable[Path] = (),
+) -> Path:
     output = output_dir.expanduser().absolute()
-    forbidden = [project_root, state_dir / "registry.json", state_dir / "snapshots"]
+    forbidden = [project_root, state_dir / "registry.json", state_dir / "snapshots", *protected_paths]
     for target in forbidden:
         if same_location(output, target) or path_is_within(output, target) or path_is_within(target, output):
             if target == state_dir / "snapshots" and output == state_dir / "reports":
@@ -1063,6 +1096,7 @@ def atomic_write_report_set(contents: dict[Path, str]) -> None:
     staged: dict[Path, Path] = {}
     backups: dict[Path, Path] = {}
     replaced: list[Path] = []
+    preserve_staging = False
     try:
         for index, (target, content) in enumerate(contents.items()):
             staged_path = staging_root / f"staged-{index}"
@@ -1081,18 +1115,26 @@ def atomic_write_report_set(contents: dict[Path, str]) -> None:
         try:
             for target, staged_path in staged.items():
                 os.replace(staged_path, target)
-                os.chmod(target, 0o600)
                 replaced.append(target)
-        except BaseException:
-            for target in reversed(replaced):
-                backup = backups.get(target)
-                if backup and backup.exists():
-                    os.replace(backup, target)
-                elif target.exists():
-                    target.unlink()
+                os.chmod(target, 0o600)
+        except BaseException as write_error:
+            try:
+                for target in reversed(replaced):
+                    backup = backups.get(target)
+                    if backup and backup.exists():
+                        os.replace(backup, target)
+                    elif target.exists():
+                        target.unlink()
+            except BaseException as recovery_error:
+                preserve_staging = True
+                raise RelationshipError(
+                    f"Report replacement failed ({write_error}); recovery failed ({recovery_error}); "
+                    f"report backups preserved at {staging_root}"
+                ) from recovery_error
             raise
     finally:
-        shutil.rmtree(staging_root, ignore_errors=True)
+        if not preserve_staging:
+            shutil.rmtree(staging_root)
 
 
 def write_reports(
@@ -1102,10 +1144,21 @@ def write_reports(
     state_dir: Path,
     project_root: Path,
     output_format: str,
+    protected_paths: Iterable[Path] = (),
 ) -> dict[str, str]:
-    output = validate_output_directory(output_dir, state_dir, project_root)
-    output.mkdir(parents=True, exist_ok=True, mode=0o700)
-    os.chmod(output, 0o700)
+    if output_format not in {"json", "markdown", "both"}:
+        raise RelationshipError(f"unknown report format: {output_format}")
+    validate_contract(report)
+    # Protect all scanned roots (including malformed/unlinked copies) and explicit
+    # locations before mkdir/chmod, including calls directly to this entry point.
+    protected = [Path(source["path"]) for source in report["scan_sources"]
+                 if source.get("path") and source["kind"] in {"local", "related-project"}]
+    protected.extend(Path(location["path"]) for skill in report["skills"]
+                     for location in [*skill["locations"], *skill["local_installs"]])
+    protected.extend(protected_paths)
+    protected.extend(Path(item["path"]) for item in report["unlinked_local_skills"])
+    protected.extend(Path(issue["path"]) for issue in report["issues"] if issue.get("path"))
+    output = validate_output_directory(output_dir, state_dir, project_root, protected)
     json_path = output / "skill-relationships.json"
     markdown_path = output / "skill-relationships.md"
     selected_contents: dict[Path, str] = {}
@@ -1116,6 +1169,9 @@ def write_reports(
     for path in selected_contents:
         validate_report_target(path)
     lock_path = state_dir / ".relationships.lock"
+    validate_report_target(lock_path)
+    output.mkdir(parents=True, exist_ok=True, mode=0o700)
+    os.chmod(output, 0o700)
     state_dir.mkdir(parents=True, exist_ok=True)
     with lock_path.open("a+", encoding="utf-8") as lock:
         os.chmod(lock_path, 0o600)
@@ -1164,5 +1220,7 @@ def generate_and_write(
         state_dir=state_dir,
         project_root=project_root,
         output_format=output_format,
+        protected_paths=[Path(location["path"]) for locations in registry_location_view(registry)[0].values()
+                         for location in locations],
     )
     return report, paths

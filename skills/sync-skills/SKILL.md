@@ -3,7 +3,7 @@ name: sync-skills
 description: Use when linking, converting, synchronizing, inventorying, reporting, repairing Agent installs, versioning, auditing, or rolling back Skill copies across repository, project, machine-wide, or explicit external locations.
 metadata:
   sync_id: "sync-skills"
-  version: "0.2.0"
+  version: "0.2.1"
   urls:
     - type: repository
       value: https://github.com/wk1995/skill.git
@@ -156,7 +156,7 @@ python skills/sync-skills/scripts/skill_sync.py repair-agent-install my-skill-id
 - If versions are equal but digests differ, use normal conflict handling and require an explicit source unless only one linked role changed since the previous snapshot.
 - If two or more copies changed since the previous snapshot and no source was specified, stop and report the conflict instead of choosing silently.
 - Keep the immutable sync-group identity in `metadata.sync_id` and the logical Skill version in `metadata.version` in `SKILL.md`. New Skills must define a stable sync ID that does not change with `metadata.name`; `rename --to` is reserved for migrating legacy name-keyed registry entries and cannot change an existing stable ID.
-- Use this Skill's own sync ID as `sync-skills` and its version as `0.2.0`.
+- Use this Skill's own sync ID as `sync-skills` and its version as `0.2.1`.
 - Store registry and snapshot runtime state outside the repository. By default, use `$XDG_STATE_HOME/sync-skills/<checkout-id>/`, or `$HOME/.local/state/sync-skills/<checkout-id>/` when `XDG_STATE_HOME` is unset. Treat repository-local `.skill-sync/` as legacy migration input only.
 - Legacy registries keyed by a Skill name remain readable; run `rename <old-reference> --to <sync-id> --name <new-name>` to migrate the group and its snapshots before linking a renamed Skill.
 - Record Skill addresses in the registry: `skill_urls` for canonical repository/documentation/registry/source URLs, and `role_urls` for role-specific remote/source URLs.
@@ -194,3 +194,13 @@ For sync work, report:
 - rollback command for the created snapshot.
 
 For relationship inventory, write `skill-relationships.json` and `skill-relationships.md` only under the external state directory (or another validated repository-external output directory). Show dynamic Builder columns, complete absolute paths, related projects, unlinked local Skills, build/install derivation, all applicable statuses, and `report_status: stale` when a completed mutation could not refresh the previous report.
+
+## Exit Codes And Recovery
+
+`link`, `link-location`, `convert`, `sync`, `rollback`, `rename`, and `repair-agent-install` return exit code **2** when the mutation succeeded but report refresh failed (`report_status: stale`). Run only the returned `report_retry_command`; do not repeat the mutation just because a shell reports nonzero. Exit code 0 means the command and refresh completed.
+
+For the read-only `relationships --strict` command, exit code **2** instead means the freshly generated report contains findings or unlinked copies. Healthy `project-only` Skills pass, as do `synced` Skills. Without `--strict`, findings are reported in JSON without a nonzero exit code. Validation or execution errors fail separately with an error message.
+
+Use `rollback <sync-id> --snapshot <repair-snapshot-id> --roles local` to restore an Agent repair snapshot, including installations registered only as locations. Only that installation is restored. A repeated rollback of identical content creates no new snapshot. If installation recovery fails, keep the reported staging directory and snapshot path for recovery.
+
+The portable [contract validator](scripts/validate_skill_relationship_report.py) is the authoritative executable report contract and runs with Python's standard library. The [JSON Schema](references/skill-relationships.schema.json) is an informative interoperability document; runtime validation reads its shared status vocabulary but does not execute Draft 2020-12 constraints. The validator and schema ship inside the Skill so installed builds can generate reports independently of the repository CLI.

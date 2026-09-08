@@ -10,6 +10,7 @@ import json
 import os
 import re
 import shutil
+import shlex
 import subprocess
 import sys
 import tempfile
@@ -435,10 +436,8 @@ def refresh_relationship_report(
 ) -> tuple[int, dict[str, Any]]:
     state_dir = Path(args.state_dir).expanduser().resolve()
     project_root = relationship_project_root(args)
-    retry = (
-        f"python3 {project_root / 'skills/sync-skills/scripts/skill_sync.py'} "
-        f"--state-dir {state_dir} --project-root {project_root} relationships"
-    )
+    retry = shlex.join([sys.executable, str(SCRIPT_DIR / "skill_sync.py"),
+                        "--state-dir", str(state_dir), "--project-root", str(project_root), "relationships"])
     try:
         report, paths = generate_and_write(
             project_root=project_root,
@@ -1034,12 +1033,29 @@ def command_rollback(args: argparse.Namespace) -> int:
     registry = load_registry(state_dir)
     key, group = get_group(registry, args.group)
     group["roles"] = validate_role_paths(group.get("roles", {}))
+    if not re.fullmatch(r"[0-9]{8}T[0-9]{6}Z(?:-[0-9]+)?", args.snapshot):
+        raise SystemExit("invalid snapshot ID")
     snapshot_dir = state_dir / "snapshots" / key / args.snapshot
+    if snapshot_dir.is_symlink():
+        raise SystemExit("snapshot must not be a symbolic link")
     if not snapshot_dir.is_dir():
         raise SystemExit(f"snapshot not found: {args.snapshot}")
 
-    pre_rollback = create_snapshot(state_dir, key, group, "pre-rollback", None)
+    manifest_path = snapshot_dir / "manifest.json"
+    try:
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    except (OSError, ValueError) as error:
+        raise SystemExit(f"invalid snapshot manifest: {error}") from error
+    if not isinstance(manifest, dict):
+        raise SystemExit("snapshot manifest must be an object")
+    if manifest.get("operation") == "repair-agent-install":
+        return rollback_agent_install(args, registry, key, group, snapshot_dir, manifest)
+
     roles = args.roles or sorted(existing_members(group))
+    for role in roles:
+        if role not in group["roles"] or not (snapshot_dir / role).is_dir():
+            raise SystemExit(f"snapshot does not contain role: {role}")
+    pre_rollback = create_snapshot(state_dir, key, group, "pre-rollback", None)
     restored = []
     for role in roles:
         source = snapshot_dir / role
@@ -1060,6 +1076,53 @@ def command_rollback(args: argparse.Namespace) -> int:
     update_group_state(group)
     save_registry(state_dir, registry)
     return finish_mutation(args, registry, {"group": key, "name": group_name(key, group), "sync_id": group_id(key, group), "rolled_back_to": args.snapshot, "pre_rollback_snapshot": pre_rollback, "restored_roles": restored, "updated_at": operation_at})
+
+
+def rollback_agent_install(args: argparse.Namespace, registry: dict[str, Any], key: str,
+                           group: dict[str, Any], snapshot_dir: Path, manifest: dict[str, Any]) -> int:
+    agent_id = manifest.get("agent_id")
+    if not isinstance(agent_id, str) or not SYNC_ID.fullmatch(agent_id) or manifest.get("group") != key:
+        raise SystemExit("invalid Agent install snapshot identity")
+    if args.roles and args.roles not in (["local"], [f"local-{agent_id}"]):
+        raise SystemExit("Agent install snapshots restore only their local install")
+    adapters, roots = adapter_roots_for_project(args)
+    _, target = registered_agent_install(group, agent_id, roots)
+    validate_agent_target(agent_id, target, adapters, roots)
+    project_root = relationship_project_root(args)
+    if path_is_within(target, project_root) or path_is_within(project_root, target):
+        raise SystemExit("Agent install must not overlap the portable project")
+    validate_location_identity(registry, group_id(key, group), target)
+    if manifest.get("original_path") != normalized_absolute(target):
+        raise SystemExit("snapshot original_path does not match the registered install")
+    source = snapshot_dir / f"local-{agent_id}"
+    validate_install_directory(source)
+    expected_digest = manifest.get("original_digest")
+    if relationship_digest_tree(source) != expected_digest:
+        raise SystemExit("Agent install snapshot failed digest verification")
+    original_id = read_skill_metadata(source).get("sync_id")
+    if original_id not in (None, group_id(key, group)):
+        raise SystemExit("snapshot metadata.sync_id conflicts with the group")
+    if path_is_within(target, source) or path_is_within(source, target):
+        raise SystemExit("snapshot and install must not overlap")
+    if target.exists() and relationship_digest_tree(target) == expected_digest:
+        return finish_mutation(args, registry, {"group": key, "rolled_back_to": args.snapshot,
+                                               "pre_rollback_snapshot": None, "status": "already-current"})
+    state_dir = Path(args.state_dir).expanduser().resolve()
+    undo = None
+    if target.exists():
+        undo = create_agent_install_snapshot(state_dir, key, agent_id, target,
+                                             {"build_id": f"build:{agent_id}", "output_digest": expected_digest})
+    try:
+        atomic_install_build(source, target, original_id, expected_digest)
+    except (OSError, SystemExit, RelationshipError) as error:
+        raise SystemExit(f"{error}; recovery snapshot: {state_dir / 'snapshots' / key / undo if undo else snapshot_dir}") from error
+    if undo:
+        group.setdefault("snapshots", []).append(undo)
+    group["last_rollback"] = {"at": now_iso(), "snapshot": args.snapshot,
+                              "pre_rollback_snapshot": undo, "restored_roles": ["local"]}
+    save_registry(state_dir, registry)
+    return finish_mutation(args, registry, {"group": key, "rolled_back_to": args.snapshot,
+                                           "pre_rollback_snapshot": undo, "restored_roles": ["local"]})
 
 
 def get_group(registry: dict[str, Any], reference: str) -> tuple[str, dict[str, Any]]:
@@ -1277,7 +1340,7 @@ def command_relationships(args: argparse.Namespace) -> int:
     print(json.dumps(result, indent=2, sort_keys=True))
     if args.strict:
         non_clean = any(
-            status not in {"synced"}
+            status not in {"synced", "project-only"}
             for skill in report["skills"]
             for status in skill["statuses"]
         ) or bool(report["issues"] or report["unlinked_local_skills"])
@@ -1354,6 +1417,10 @@ def command_link_location(args: argparse.Namespace) -> int:
             adapter_root = Path(args.adapter_root).expanduser().absolute()
             project["adapter_root"] = normalized_absolute(adapter_root)
     elif args.kind == "local":
+        adapters, roots = adapter_roots_for_project(args)
+        validate_agent_target(args.agent_id, path, adapters, roots)
+        if args.derived_from and args.derived_from != f"build:{args.agent_id}":
+            raise SystemExit("derived_from must reference the same Agent build")
         location["agent_id"] = args.agent_id
         location["derived_from"] = args.derived_from or f"build:{args.agent_id}"
     else:
@@ -1455,6 +1522,11 @@ def create_agent_install_snapshot(
     local_path: Path,
     build: dict[str, Any],
 ) -> str:
+    validate_install_directory(local_path)
+    if path_is_within(state_dir, local_path) or path_is_within(local_path, state_dir):
+        raise SystemExit("snapshot state and Agent install must not overlap")
+    if not SYNC_ID.fullmatch(group_key) or not SYNC_ID.fullmatch(agent_id):
+        raise SystemExit("invalid Agent snapshot group or Agent ID")
     base = utc_snapshot_id()
     snapshot_id = base
     snapshot_dir = state_dir / "snapshots" / group_key / snapshot_id
@@ -1488,16 +1560,37 @@ def create_agent_install_snapshot(
         raise
 
 
-def atomic_install_build(build_path: Path, target: Path, sync_id: str, expected_digest: str) -> None:
-    if target.is_symlink():
-        raise SystemExit(f"refusing to replace a symbolic-link Agent install: {target}")
+def validate_install_directory(target: Path) -> None:
+    for component in (target, *target.parents):
+        if component.is_symlink():
+            raise SystemExit(f"refusing a symbolic-link Agent install path: {component}")
     if target.exists() and not target.is_dir():
         raise SystemExit(f"Agent install target is not a directory: {target}")
+
+
+def validate_agent_target(agent_id: str, target: Path, adapters: list[dict[str, Any]],
+                          roots: list[dict[str, Any]]) -> None:
+    if agent_id not in {adapter["id"] for adapter in adapters}:
+        raise SystemExit(f"unsupported Agent Builder: {agent_id}")
+    validate_install_directory(target)
+    if not any(root["agent_id"] == agent_id
+               and path_is_within(target, Path(root["path"]))
+               and not paths_refer_to_same_location(target, Path(root["path"])) for root in roots):
+        raise SystemExit(f"registered install is outside the {agent_id} adapter roots: {target}")
+
+
+def atomic_install_build(build_path: Path, target: Path, sync_id: str | None, expected_digest: str) -> None:
+    validate_install_directory(target)
+    validate_install_directory(build_path)
+    require_skill_dir(str(build_path), "Agent install source")
+    if path_is_within(target, build_path) or path_is_within(build_path, target) or paths_refer_to_same_location(target, build_path):
+        raise SystemExit("Agent install source and target must be separate, non-nested directories")
     target.parent.mkdir(parents=True, exist_ok=True)
     staging_root = Path(tempfile.mkdtemp(prefix=f".{target.name}-install-", dir=target.parent))
     staged = staging_root / "new"
     previous = staging_root / "previous"
     failed = staging_root / "failed"
+    preserve_staging = False
     try:
         shutil.copytree(build_path, staged)
         metadata = read_skill_metadata(staged)
@@ -1514,14 +1607,22 @@ def atomic_install_build(build_path: Path, target: Path, sync_id: str, expected_
             installed = True
             if relationship_digest_tree(target) != expected_digest:
                 raise SystemExit("installed Agent Skill failed post-install digest verification")
-        except BaseException:
-            if installed and target.exists():
-                os.replace(target, failed)
-            if had_target and previous.exists() and not target.exists():
-                os.replace(previous, target)
+        except BaseException as install_error:
+            try:
+                if installed and target.exists():
+                    os.replace(target, failed)
+                if had_target and previous.exists() and not target.exists():
+                    os.replace(previous, target)
+            except BaseException as recovery_error:
+                preserve_staging = True
+                raise SystemExit(
+                    f"Agent installation failed ({install_error}); recovery failed ({recovery_error}). "
+                    f"Recovery files preserved at {staging_root}; original copy: {previous}"
+                ) from recovery_error
             raise
     finally:
-        shutil.rmtree(staging_root, ignore_errors=True)
+        if not preserve_staging:
+            shutil.rmtree(staging_root)
 
 
 def command_repair_agent_install(args: argparse.Namespace) -> int:
@@ -1530,24 +1631,18 @@ def command_repair_agent_install(args: argparse.Namespace) -> int:
     key, group = get_group(registry, args.group)
     sync_id = group_id(key, group)
     adapters, roots = adapter_roots_for_project(args)
-    known_agents = {adapter["id"] for adapter in adapters}
-    if args.agent not in known_agents:
-        raise SystemExit(f"unsupported Agent Builder: {args.agent}")
     location_id, target = registered_agent_install(group, args.agent, roots)
-    matching_roots = [
-        Path(root["path"])
-        for root in roots
-        if root["agent_id"] == args.agent
-    ]
-    if not matching_roots or not any(path_is_within(target, root) for root in matching_roots):
-        raise SystemExit(f"registered install is outside the {args.agent} adapter roots: {target}")
+    validate_agent_target(args.agent, target, adapters, roots)
+    validate_location_identity(registry, sync_id, target)
+    if path_is_within(target, relationship_project_root(args)) or path_is_within(relationship_project_root(args), target):
+        raise SystemExit("Agent install must not overlap the portable project")
 
     try:
         builds, build_issues, _ = read_builds(relationship_project_root(args), adapters)
     except RelationshipError as error:
         raise SystemExit(str(error)) from error
     build = builds.get(sync_id, {}).get(args.agent)
-    if build is None:
+    if build is None or any(issue.get("agent_id") == args.agent for issue in build_issues):
         details = "; ".join(issue["message"] for issue in build_issues if issue.get("agent_id") == args.agent)
         raise SystemExit(
             f"no trusted {args.agent} manifest v2 build for {sync_id!r}"
@@ -1585,7 +1680,11 @@ def command_repair_agent_install(args: argparse.Namespace) -> int:
     snapshot_id = None
     if target.exists():
         snapshot_id = create_agent_install_snapshot(state_dir, key, args.agent, target, build)
-    atomic_install_build(build_path, target, sync_id, build["output_digest"])
+    try:
+        atomic_install_build(build_path, target, sync_id, build["output_digest"])
+    except (OSError, SystemExit, RelationshipError) as error:
+        recovery = f"; snapshot: {state_dir / 'snapshots' / key / snapshot_id}" if snapshot_id else ""
+        raise SystemExit(f"{error}{recovery}") from error
     location = {
         "kind": "local",
         "agent_id": args.agent,
@@ -1621,7 +1720,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Synchronize linked Agent Skill directory copies.")
     parser.add_argument(
         "--state-dir",
-        default=str(default_state_dir()),
+        default=None,
         help="Registry and snapshot directory. Default: an XDG state directory isolated per checkout.",
     )
     parser.add_argument(
@@ -1765,6 +1864,8 @@ def build_parser() -> argparse.ArgumentParser:
 def main(argv: list[str] | None = None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
+    if args.state_dir is None:
+        args.state_dir = str(default_state_dir(Path(args.project_root)))
     return args.func(args)
 
 

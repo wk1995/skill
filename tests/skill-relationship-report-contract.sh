@@ -2,7 +2,7 @@
 set -euo pipefail
 
 ROOT="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd -P)"
-SCHEMA="$ROOT/schemas/skill-relationships.schema.json"
+SCHEMA="$ROOT/skills/sync-skills/references/skill-relationships.schema.json"
 VALIDATOR="$ROOT/scripts/validate_skill_relationship_report.py"
 FIXTURE="$ROOT/tests/fixtures/skill-relationships/valid.json"
 PRD="$ROOT/docs/skill-relationship-report-prd.zh-CN.md"
@@ -240,5 +240,12 @@ unknown_top_level = copy.deepcopy(fixture)
 unknown_top_level["machine_username"] = "must-not-be-added"
 expect_invalid("unknown top-level field", unknown_top_level, "unknown fields: machine_username")
 
+# The root schema is a compatibility reference to the distributed vocabulary.
+root = validator_path.parent.parent
+module.validate_report(copy.deepcopy(fixture), root / "schemas/skill-relationships.schema.json")
+for name in ("README.md", "README.zh-CN.md", "SKILL.md"):
+    text = (root / "skills/sync-skills" / name).read_text()
+    assert "Draft 2020-12" in text and "scripts/validate_skill_relationship_report.py" in text
+    assert "informative" in text or "互操作文档" in text
 print("PASS: Skill relationship report structural and semantic contract")
 PY

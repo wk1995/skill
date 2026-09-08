@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+## [1.1.1] - 2026-09-08
+
+- Discover the current user Skill root `.agents/skills` alongside the legacy `.codex/skills` root; preserve shared-root Agent attribution.
+
 - No unreleased changes.
 
 ## [1.1.0] - 2026-09-07

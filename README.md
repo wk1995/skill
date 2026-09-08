@@ -157,7 +157,7 @@ skills/example-skill/
 
 These conventions are shared across Skills and management tools. They should be reflected in schemas, registries, CLI output, and MCP resources as those pieces are implemented.
 
-The proposed machine-local inventory and cross-project mapping output is specified in the [Skill Relationship Report PRD](docs/skill-relationship-report-prd.zh-CN.md), with a repository-versioned [technical design](docs/skill-relationship-report-technical-design.zh-CN.md) and [test plan](docs/skill-relationship-report-test-plan.zh-CN.md). The generated relationship reports remain local-only. Their current machine-readable contract is [skill-relationships.schema.json](schemas/skill-relationships.schema.json).
+The proposed machine-local inventory and cross-project mapping output is specified in the [Skill Relationship Report PRD](docs/skill-relationship-report-prd.zh-CN.md), with a repository-versioned [technical design](docs/skill-relationship-report-technical-design.zh-CN.md) and [test plan](docs/skill-relationship-report-test-plan.zh-CN.md). The generated relationship reports remain local-only. Their current machine-readable contract is [skill-relationships.schema.json](schemas/skill-relationships.schema.json). The executable report contract is the portable [validator](skills/sync-skills/scripts/validate_skill_relationship_report.py). JSON Schema is informative; runtime uses only its shared status vocabulary, not a Draft 2020-12 engine.
 
 ### Stable Skill information
 

@@ -145,3 +145,9 @@ bash tests/pr-review-gate.sh origin/main
 ```
 
 “测试完成”必须同时满足：对应矩阵用例已成为可执行测试；所有确认缺陷有回归测试；状态化/对抗性用例实际运行；未覆盖场景及环境原因被明确报告。CI 绿色或 repository gate 绿色本身不是完整审查结论。
+
+## PR #14 契约与恢复补充
+
+报告运行时以 `skills/sync-skills/scripts/validate_skill_relationship_report.py` 为权威；`references/skill-relationships.schema.json` 是随 Skill 分发的互操作文档及共享状态词汇。根目录 validator CLI 和 schema 引用入口保留兼容。运行时不执行 Draft 2020-12 约束，也不需要第三方 Python 包。
+
+`tests/skill-relationship-regressions.sh` 覆盖完整 manifest 拒绝、身份冲突、报告输出路径矩阵、真实构建产物脱离仓库运行、安装与恢复双故障、repair → rollback → 重复 rollback，以及退出码 2 的变更成功/报告过期语义。健康 `project-only` 不导致 strict 失败。

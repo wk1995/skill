@@ -43,7 +43,7 @@ done
 [[ -f "$codex_output/skills/sync-skills/agents/openai.yaml" ]] || fail "Codex override was not materialized"
 grep -Fq '## Codex Sync Adaptation' "$codex_output/skills/sync-skills/SKILL.md" || fail "per-Skill Codex instructions were not appended"
 grep -Fq '## WorkBuddy Sync Adaptation' "$workbuddy_output/sync-skills/SKILL.md" || fail "per-Skill WorkBuddy instructions were not appended"
-grep -Fq '"adapter_version": "1.1.0"' "$codex_output/.agent-build.json" || fail "adapter version missing from build manifest"
+grep -Fq '"adapter_version": "1.1.1"' "$codex_output/.agent-build.json" || fail "adapter version missing from build manifest"
 grep -Fq '"artifact_version": "0.1.0"' "$codex_output/.agent-build.json" || fail "artifact version missing from build manifest"
 grep -Fq '"schema_version": 2' "$codex_output/.agent-build.json" || fail "build manifest v2 is missing"
 grep -Fq '"sync_id": "sync-skills"' "$codex_output/.agent-build.json" || fail "stable Skill identity missing from build manifest"

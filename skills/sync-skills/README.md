@@ -48,3 +48,13 @@ Do not use this skill when the request:
 
 - only uses a Skill for its domain workflow and does not manage its copies; or
 - is ordinary code editing without Skill synchronization, conversion, auditing, or rollback.
+
+## Exit Codes And Recovery
+
+`link`, `link-location`, `convert`, `sync`, `rollback`, `rename`, and `repair-agent-install` return exit code **2** when the mutation succeeded but report refresh failed (`report_status: stale`). Run only the returned `report_retry_command`; do not repeat the mutation just because a shell reports nonzero. Exit code 0 means the command and refresh completed.
+
+For the read-only `relationships --strict` command, exit code **2** instead means the freshly generated report contains findings or unlinked copies. Healthy `project-only` Skills pass, as do `synced` Skills. Without `--strict`, findings are reported in JSON without a nonzero exit code. Validation or execution errors fail separately with an error message.
+
+Use `rollback <sync-id> --snapshot <repair-snapshot-id> --roles local` to restore an Agent repair snapshot, including installations registered only as locations. Only that installation is restored. A repeated rollback of identical content creates no new snapshot. If installation recovery fails, keep the reported staging directory and snapshot path for recovery.
+
+The portable [contract validator](scripts/validate_skill_relationship_report.py) is the authoritative executable report contract and runs with Python's standard library. The [JSON Schema](references/skill-relationships.schema.json) is an informative interoperability document; runtime validation reads its shared status vocabulary but does not execute Draft 2020-12 constraints. The validator and schema ship inside the Skill so installed builds can generate reports independently of the repository CLI.

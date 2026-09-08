@@ -125,6 +125,10 @@ plan["backup_confirmations"] = {
     "bob": "2026-09-07T02:03:04Z",
 }
 plan["status"] = "approved"
+plan["backup_evidence"] = {
+    "alice": "https://github.com/example/skills/issues/1#issuecomment-1",
+    "bob": "https://github.com/example/skills/issues/1#issuecomment-2",
+}
 path.write_text(json.dumps(plan, indent=2, sort_keys=True) + "\n", encoding="utf-8")
 PY
 }
@@ -134,6 +138,22 @@ git switch -qc migration-pending
 git rm -qr .skill-sync
 git commit -qm "remove state without confirmations"
 rejects "$MIGRATION_BASE" "migration plan is not approved"
+
+# Approval and deletion in one PR cannot authorize themselves.
+git switch -q --detach "$MIGRATION_BASE"
+git switch -qc migration-self-approved
+approve_migration
+git rm -qr .skill-sync
+git add migrations/skill-sync-state-v1.json
+git commit -qm "self-authorized removal"
+rejects "$MIGRATION_BASE" "approval must already be merged"
+
+git switch -q --detach "$MIGRATION_BASE"
+git switch -qc approval-base
+approve_migration
+git add migrations/skill-sync-state-v1.json
+git commit -qm "maintainer-reviewed backup approval"
+MIGRATION_BASE="$(git rev-parse HEAD)"
 
 git switch -q --detach "$MIGRATION_BASE"
 git switch -qc migration-partial
@@ -156,10 +176,12 @@ plan = json.loads(path.read_text(encoding="utf-8"))
 plan["expected_base_tree"] = "0000000000000000000000000000000000000000"
 path.write_text(json.dumps(plan, indent=2, sort_keys=True) + "\n", encoding="utf-8")
 PY
-git rm -qr .skill-sync
 git add migrations/skill-sync-state-v1.json
+git commit -qm "stale approved plan"
+STALE_BASE="$(git rev-parse HEAD)"
+git rm -qr .skill-sync
 git commit -qm "remove protected state from stale baseline"
-rejects "$MIGRATION_BASE" "does not match the reviewed migration baseline"
+rejects "$STALE_BASE" "does not match the reviewed migration baseline"
 
 git switch -q --detach "$MIGRATION_BASE"
 git switch -qc migration-invalid-confirmation
@@ -174,10 +196,12 @@ plan = json.loads(path.read_text(encoding="utf-8"))
 plan["backup_confirmations"]["bob"] = "2026-99-99T99:99:99Z"
 path.write_text(json.dumps(plan, indent=2, sort_keys=True) + "\n", encoding="utf-8")
 PY
-git rm -qr .skill-sync
 git add migrations/skill-sync-state-v1.json
+git commit -qm "malformed approved plan"
+INVALID_BASE="$(git rev-parse HEAD)"
+git rm -qr .skill-sync
 git commit -qm "remove protected state with malformed confirmation"
-rejects "$MIGRATION_BASE" "must contain UTC timestamps"
+rejects "$INVALID_BASE" "must contain non-future UTC timestamps"
 
 git switch -q --detach "$MIGRATION_BASE"
 git switch -qc migration-not-ignored
@@ -203,5 +227,21 @@ printf 'after migration\n' > after.txt
 git add after.txt
 git commit -qm "safe change after migration"
 python3 "$GUARD" --base "$MIGRATED_HEAD" >/dev/null
+
+# Future timestamps and timestamp-only acknowledgments are not approval evidence.
+python3 - "$GUARD" <<'PYTEST'
+import importlib.util
+import sys
+from unittest.mock import patch
+spec = importlib.util.spec_from_file_location("guard", sys.argv[1])
+guard = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(guard)
+assert not guard.valid_backup_time("2999-01-01T00:00:00Z")
+plan = guard.read_tree_json("approval-base", guard.SKILL_SYNC_MIGRATION_PLAN)
+del plan["backup_evidence"]
+with patch.object(guard, "read_tree_json", return_value=plan), patch.object(guard, "tree_object", side_effect=lambda tree, path: plan["expected_base_tree"]):
+    allowed, reason = guard.approved_skill_sync_removal("base", "head", [])
+    assert not allowed and "identity evidence" in reason, reason
+PYTEST
 
 echo "PASS: PR review guard negative, merge-simulation, and approved migration cases"
