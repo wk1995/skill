@@ -6,6 +6,8 @@ version, date, and a change summary.
 
 ## [Unreleased]
 
+- Expand the English and Chinese README coverage for every supported command, location role, source-selection rule, report workflow, installation repair path, state migration, and recovery behavior. This is a documentation-only change with no version or trigger-metadata change.
+
 ## [0.2.3] - 2026-09-08
 
 - Apply registry-wide location identity and containment checks to ordinary role registration, conversion, synchronization, and rollback before mutation.

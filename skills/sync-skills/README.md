@@ -2,63 +2,180 @@
 
 Language: **English** | [中文](README.zh-CN.md)
 
-`sync-skills` manages equivalent copies of one Agent Skill across repository, project, machine-wide, Agent-build, and explicit external locations. It also generates a machine-local relationship report for every supported AI Agent Builder and safely repairs incomplete Agent installations.
+`sync-skills` manages equivalent copies of one Agent Skill across this repository, other projects, machine-wide Agent installations, generated Agent builds, and explicit external locations. It records stable identity, provenance, versions, digests, snapshots, and audit times; compares or synchronizes copies; inventories Builder relationships; and repairs registered Agent installations from trusted builds.
 
 ## How To Use It
 
-Use the immutable `metadata.sync_id` declared in each `SKILL.md`, along with the paths or location roles involved and the desired operation. The Skill name is a display/trigger name and may change without changing the sync group. Common prompts include:
-
-```text
-Compare the repository and local copies of my-skill.
-Link this Skill's repository copy to a specified machine-wide Skill directory.
-Synchronize the project and external copies from the repository version.
-```
-
-Use the supplied script for deterministic changes:
+Run the bundled CLI from the skill-management repository:
 
 ```bash
-python skills/sync-skills/scripts/skill_sync.py migrate-state
-python skills/sync-skills/scripts/skill_sync.py status my-skill-id
-python skills/sync-skills/scripts/skill_sync.py sync my-skill-id --source repo
-python skills/sync-skills/scripts/skill_sync.py rename old-skill-name --to my-skill-id --name new-skill-name
-python skills/sync-skills/scripts/skill_sync.py relationships
-python skills/sync-skills/scripts/skill_sync.py repair-agent-install my-skill-id --agent codex --discard-local-changes
+python3 skills/sync-skills/scripts/skill_sync.py --help
 ```
 
-Runtime registry and snapshot data defaults to an XDG state directory outside the repository, isolated per checkout. Run `migrate-state` once in a checkout with legacy `.skill-sync/` data; it copies and verifies the complete tree without deleting the source and can be rerun safely. Do not remove the legacy directory until every collaborator has migrated or backed it up.
+Identify the Skill by the immutable `metadata.sync_id` in `SKILL.md`, not by its directory or display name. A managed group can contain these location roles:
 
-The `--to` option is for migrating a legacy name-keyed registry. For an existing stable group, keep `--to` equal to its current ID and use `--name` for display or trigger-name changes; stable IDs cannot be changed.
+| Role | Meaning |
+| --- | --- |
+| `repo` | Portable source in this Skill repository, usually `skills/<skill-name>` |
+| `local` | A machine-wide user or Agent installation at an explicit path |
+| `project` | A copy owned by another project workspace |
+| `external` | Another explicit copy, such as a plugin checkout or staging directory |
 
-Each location has a role or explicit location ID. The workflow validates `SKILL.md` and its stable `metadata.sync_id`, snapshots existing copies before an overwrite, reports conflicts instead of selecting a source silently, and records versions, digests, provenance, and differences. `relationships` dynamically discovers Builders from adapter manifests and writes JSON/Markdown only to machine-local external state. See [SKILL.md](SKILL.md) for the full command set and trust rules.
+Use absolute paths for locations outside this repository. Do not register a symlink, the same physical directory twice, or paths nested inside one another.
 
-Repair refuses a conflicting non-empty sync ID or a path nested with another registered Skill, even with `--discard-local-changes`. Repeated local roots are deduplicated; conflicting external/project copies are reported without being linked. An install without a trusted build is `agent-build-missing`. Both reports and their lock file must stay outside Skill inputs.
+### Create or extend a sync group
 
-Agent snapshot rollback also refuses a conflicting current install identity. Ordinary role commands protect every registered location, and installation protection stops when adapter discovery is incomplete. Repair detects and restores file execute bits as well as content, including permission-only damage. Explicitly registered local installs below the root's direct children are included in inventory. These checks retain manifest-v2 digest compatibility.
+Register the portable repository copy and any equivalent physical copies:
+
+```bash
+python3 skills/sync-skills/scripts/skill_sync.py link my-skill-id \
+  --name my-skill \
+  --repo skills/my-skill \
+  --local /absolute/path/to/my-skill \
+  --skill-url https://github.com/example/my-skill \
+  --repo-url https://github.com/example/skills
+```
+
+Use `link-location` when one group needs an additional named project, local Agent installation, or external location:
+
+```bash
+python3 skills/sync-skills/scripts/skill_sync.py link-location my-skill-id \
+  --location-id project:app-a \
+  --kind project \
+  --project-id app-a \
+  --path /projects/app-a/skills/my-skill
+```
+
+`link` and `link-location` register relationships; they do not make divergent copies equal. Use `status` before selecting a synchronization source.
+
+### Convert an existing copy
+
+Use `convert` to materialize a validated source at a new location and register both locations:
+
+```bash
+python3 skills/sync-skills/scripts/skill_sync.py convert my-skill-id \
+  --source-path /absolute/path/to/my-skill \
+  --source-role local \
+  --target-path skills/my-skill \
+  --target-role repo
+```
+
+The source must contain a valid `SKILL.md`. An existing target Skill is snapshotted before replacement; a non-Skill target, overlapping path, symlink, special file, or conflicting identity is rejected.
+
+### Inspect status, history, and differences
+
+```bash
+python3 skills/sync-skills/scripts/skill_sync.py status my-skill-id
+python3 skills/sync-skills/scripts/skill_sync.py versions my-skill-id
+python3 skills/sync-skills/scripts/skill_sync.py snapshots my-skill-id
+python3 skills/sync-skills/scripts/skill_sync.py diff my-skill-id \
+  --role local \
+  --from-snapshot 20260720T120000Z \
+  --to-current
+```
+
+- `status` shows the registered locations, versions, digests, and divergence.
+- `versions` shows observed versions and their creation/update times.
+- `snapshots` lists recovery points created before mutations.
+- `diff` compares snapshots, current roles, or explicit paths and reports added, removed, modified text, and modified binary files.
+
+### Synchronize and roll back
+
+Prefer an explicit source when copies differ:
+
+```bash
+python3 skills/sync-skills/scripts/skill_sync.py sync my-skill-id --source repo
+```
+
+Every existing linked copy is snapshotted before an overwrite. If more than one copy changed and no source is specified, synchronization stops and reports the conflict. On the repository's default branch, a version mismatch selects the higher `metadata.version`; on another branch, a version mismatch alone does not authorize synchronization.
+
+Restore all registered roles, or only the named roles, from a snapshot:
+
+```bash
+python3 skills/sync-skills/scripts/skill_sync.py rollback my-skill-id \
+  --snapshot 20260720T120000Z
+
+python3 skills/sync-skills/scripts/skill_sync.py rollback my-skill-id \
+  --snapshot 20260720T120000Z \
+  --roles local project
+```
+
+Rollback keeps the selected snapshot and creates a new pre-rollback snapshot before replacing current content.
+
+### Rename without changing identity
+
+Migrate a legacy name-keyed registry by assigning its first stable sync ID:
+
+```bash
+python3 skills/sync-skills/scripts/skill_sync.py rename old-skill-name \
+  --to my-skill-id \
+  --name new-skill-name
+```
+
+For a group that already has a stable ID, `--to` must equal that current ID. Use `--name` to change only the display/trigger name; an existing stable sync ID cannot be replaced.
+
+### Inventory Builder relationships
+
+Generate the machine-local JSON and Markdown reports:
+
+```bash
+python3 skills/sync-skills/scripts/skill_sync.py relationships
+python3 skills/sync-skills/scripts/skill_sync.py relationships \
+  --project app-a=/projects/app-a/skills \
+  --strict
+```
+
+Supported Builders come from `platforms/*/adapter.json`; the report is not limited to a hard-coded Agent list. It follows the derivation chain `portable source -> same-Agent manifest-v2 build -> local install`, includes explicitly registered projects and nested local locations, deduplicates physical paths, and reports missing builds, incomplete identities, divergence, and conflicts.
+
+Reports default to the checkout-specific external state directory. If `--output-dir` is supplied, it must remain outside the repository and every Skill input tree. `--strict` returns exit code 2 when the new report contains findings or unlinked copies; healthy `synced` and `project-only` entries pass.
+
+### Repair a registered Agent installation
+
+Build the current adapter output, then repair the registered installation from its trusted manifest-v2 build:
+
+```bash
+python3 scripts/agent_build.py codex --force
+python3 skills/sync-skills/scripts/skill_sync.py repair-agent-install my-skill-id \
+  --agent codex
+```
+
+Repair preserves a divergent installation by default. Add `--discard-local-changes` only when replacing it is intended; the current install is still snapshotted first. Repair checks Skill identity, content, and executable file modes, refuses a different non-empty sync ID, and is idempotent when the trusted build is already installed. Use ordinary `sync` only for portable copies, never to copy portable source directly into an Agent installation.
+
+### Migrate legacy repository state
+
+Runtime registry, snapshots, reports, and locks belong outside the repository in a checkout-specific XDG state directory. Copy and verify legacy `.skill-sync/` state without deleting the source:
+
+```bash
+python3 skills/sync-skills/scripts/skill_sync.py migrate-state
+```
+
+The migration preserves file modes, rejects unsafe paths and differing destinations, and succeeds without changes when rerun against an identical destination. Keep `.skill-sync/` until every collaborator has migrated or backed it up and its removal is handled in a dedicated change.
+
+See [SKILL.md](SKILL.md) for the complete operational and trust rules and [the sync model](references/sync-model.md) for identity, conflict, snapshot, version, and Agent-build policies.
 
 ## When It Triggers
 
-Use this skill when the request:
+Use this Skill when the request:
 
-- links, converts, synchronizes, versions, audits, compares, or rolls back Skill copies;
-- involves repository, project, machine-wide user, or external copies of the same Skill; or
-- needs Skill provenance URLs, version history, content digests, snapshots, or difference reports; or
-- migrates legacy repository-local Skill synchronization state to machine-local storage.
-- inventories local Skills, supported Builders, generated builds, and explicitly registered related projects; or
-- repairs an Agent installation whose stable identity or generated files are incomplete.
+- links, converts, synchronizes, compares, audits, or rolls back Skill copies;
+- involves repository, project, machine-wide, Agent-build, or explicit external copies of the same Skill;
+- needs stable identity, provenance URLs, version history, digests, snapshots, audit times, or file differences;
+- inventories local Skills, supported Builders, generated builds, Agent installations, or related projects;
+- repairs an incomplete or diverged registered Agent installation; or
+- migrates legacy repository-local Skill synchronization state.
 
 ## When It Does Not Trigger
 
-Do not use this skill when the request:
+Do not use this Skill when the request:
 
-- only uses a Skill for its domain workflow and does not manage its copies; or
-- is ordinary code editing without Skill synchronization, conversion, auditing, or rollback.
+- only uses a Skill for its domain workflow and does not manage its copies or installation;
+- creates or updates the behavior of one Skill without any copy-management work; or
+- is ordinary application or repository work unrelated to Skill synchronization, conversion, inventory, repair, or rollback.
 
 ## Exit Codes And Recovery
 
-`link`, `link-location`, `convert`, `sync`, `rollback`, `rename`, and `repair-agent-install` return exit code **2** when the mutation succeeded but report refresh failed (`report_status: stale`). Run only the returned `report_retry_command`; do not repeat the mutation just because a shell reports nonzero. Exit code 0 means the command and refresh completed.
+`link`, `link-location`, `convert`, `sync`, `rollback`, `rename`, and `repair-agent-install` return exit code **2** when the mutation succeeded but report refresh failed (`report_status: stale`). Run only the returned `report_retry_command`; do not repeat the mutation. Exit code 0 means both the requested operation and report refresh completed.
 
-For the read-only `relationships --strict` command, exit code **2** instead means the freshly generated report contains findings or unlinked copies. Healthy `project-only` Skills pass, as do `synced` Skills. Without `--strict`, findings are reported in JSON without a nonzero exit code. Validation or execution errors fail separately with an error message.
+For read-only `relationships --strict`, exit code **2** instead means the newly generated report contains findings or unlinked copies. Without `--strict`, those findings remain in the report without changing the command's exit status.
 
-Use `rollback <sync-id> --snapshot <repair-snapshot-id> --roles local` to restore an Agent repair snapshot, including installations registered only as locations. Only that installation is restored. A repeated rollback of identical content creates no new snapshot. If installation recovery fails, keep the reported staging directory and snapshot path for recovery.
-
-The portable [contract validator](scripts/validate_skill_relationship_report.py) is the authoritative executable report contract and runs with Python's standard library. The [JSON Schema](references/skill-relationships.schema.json) is an informative interoperability document; runtime validation reads its shared status vocabulary but does not execute Draft 2020-12 constraints. The validator and schema ship inside the Skill so installed builds can generate reports independently of the repository CLI.
+For a repair snapshot, use `rollback <sync-id> --snapshot <snapshot-id> --roles local`. If installation recovery fails, keep the reported staging directory and snapshot path. The portable [relationship-report validator](scripts/validate_skill_relationship_report.py) is the authoritative executable report contract; the [JSON Schema](references/skill-relationships.schema.json) is an informative interoperability document. Runtime validation reads the shared status vocabulary but does not execute the Draft 2020-12 constraints.
