@@ -1,6 +1,6 @@
 ---
 name: choose-project-doc-location
-description: Decide whether requested project documentation belongs in README, repository docs, or GitHub Wiki before creating or updating it. MUST use before editing documentation when the user asks to create, update, rewrite, or organize README/readme, Wiki/wiki, docs/doc, project documentation, project details, workflow/workflows, 流程, 项目文档, 项目说明, 仓库说明, 使用说明, skill 列表, skill 作用, skill 使用说明, architecture notes, onboarding guides, or repository documentation. Treat the user's words "README" and "Wiki" as tentative labels, not final placement decisions.
+description: Choose where to create or update project documentation, including README, Wiki, PRDs, technical documents, and machine-readable state-machine specifications. Place requirement artifacts in a requirement subdirectory under root doc/ for projects with a unified code entry point, or in the owning independent project's doc/ directory, such as an individual Skill's doc/.
 metadata:
   sync_id: "choose-project-doc-location"
   version: "0.0.1"
@@ -8,8 +8,9 @@ metadata:
     include:
       - "Create, update, rewrite, or organize project documentation."
       - "Choose between README, repository docs, or GitHub Wiki for project information."
+      - "Create, update, or place PRDs, technical documents, and machine-readable state-machine specifications."
     exclude:
-      - "Edit application code or non-documentation assets."
+      - "Edit application code, runtime state data, or non-documentation assets; machine-readable state-machine specifications used as project documentation are included."
       - "Manage copies or versions of an Agent Skill."
   urls:
     - type: repository
@@ -22,19 +23,54 @@ metadata:
 
 ## Overview
 
-Use this skill before editing project documentation when the requested destination may be README, GitHub Wiki, or detailed docs. The goal is to choose the right documentation surface first, then create or update the matching artifact.
+Use this skill before editing project documentation, including PRDs, technical documents, and machine-readable state-machine specifications. Choose both the documentation surface and the owning project's directory before creating or updating the artifact.
 
 ## Decision Workflow
 
 0. Announce that this skill is being used before inspecting or editing files.
 1. Identify the real content type, not just the user's requested label.
-2. Inspect the repository for existing conventions before choosing a destination:
+2. Identify whether the repository has a unified code entry point (for example, an Android application) or contains independently maintained projects (for example, separate Skills). Determine which project owns the requirement; multiple code modules alone do not make an application a collection of independent projects.
+3. Inspect the repository for existing conventions before choosing a destination:
    - `README.md`, `README.*`
    - `docs/`, `doc/`, `documentation/`
    - `CONTRIBUTING.md`, `ARCHITECTURE.md`, `CHANGELOG.md`
    - existing wiki checkout or `.wiki` repository if present
-3. Prefer the repository's existing documentation pattern unless it conflicts with the decision rules below.
-4. If writing to GitHub Wiki requires remote access or a separate wiki repository that is not available locally, explain the intended Wiki placement and create a repo-local draft only when useful.
+4. Apply the requirement-artifact placement rules below before the general surface rules. For other documentation, prefer the repository's existing pattern unless it conflicts with the general rules. Respect an explicit user-selected destination; explain any relevant tradeoff without silently redirecting it.
+5. If writing to GitHub Wiki requires remote access or a separate wiki repository that is not available locally, explain the intended Wiki placement. Create a local Wiki draft only if the user requests one.
+
+## Requirement Artifact Placement
+
+PRDs (product requirements documents), technical documents for a requirement, and machine-readable state-machine specifications belong with the project that owns the requirement:
+
+| Project structure | Required location |
+| --- | --- |
+| Unified code entry point, such as an Android application | `<project-root>/doc/<requirement>/` |
+| Independent projects in one repository, such as this Skill collection | `<owning-project>/doc/`; for a Skill, `skills/<skill-name>/doc/` |
+
+Use the singular directory name `doc` for these artifacts. In an independent project's `doc/`, use a requirement subdirectory when needed to separate multiple requirements. Keep artifacts for the same requirement together. A repository-level `docs/` directory for shared guidance does not replace these locations.
+
+For example (filenames and serialization formats are illustrative):
+
+```text
+android-project/
+  doc/
+    device-pairing/
+      prd.md
+      technical-design.md
+      state-machine.yaml
+
+skill-repository/
+  skills/
+    example-skill/
+      doc/
+        prd.md
+        technical-design.md
+        state-machine.json
+```
+
+Choose a machine-readable format compatible with the intended consumer and preserve its schema when updating an existing specification. Such specifications are documentation even when serialized as JSON or YAML; runtime state snapshots, caches, and application implementation files are outside this placement rule. Create only the artifacts requested, not every file shown in the example.
+
+For an update, find the existing artifact first. If its location differs from these rules, explain the target location and migrate it when organization or relocation is within the requested scope, updating references. Otherwise update it in place and report the placement mismatch; do not create a competing copy. Keep shared repository guidance at repository level and link to the owning project's requirement artifacts rather than duplicating them.
 
 ## Placement Rules
 
@@ -46,7 +82,7 @@ Choose `README.md` for:
 - Short summaries of workflows, skills, architecture, or contribution model.
 - Anything a first-time visitor must see on the repository landing page.
 
-Choose repo-local `docs/` for:
+Choose versioned repository documentation for the following content. Use the requirement-artifact locations above where applicable; otherwise follow existing `docs/`, `doc/`, or per-project documentation conventions:
 
 - Workflow details that change with code.
 - Skill inventories, skill purpose tables, usage instructions, inputs, outputs, examples, and troubleshooting.
@@ -60,11 +96,11 @@ Choose GitHub Wiki for:
 - Content edited by non-code collaborators when PR review is not required.
 - Cross-project information that would clutter the repository.
 
-Avoid placing version-sensitive workflow or skill usage docs only in Wiki. Prefer `docs/` and link from `README.md`.
+Avoid placing version-sensitive workflow or skill usage docs only in Wiki. Prefer versioned repository documentation and link from `README.md`.
 
 ## Recommended Structure
 
-For repositories containing workflows and skills, prefer:
+For shared repository guidance, the following is one possible layout. Preserve existing per-Skill README conventions; requirement artifacts follow the owning project's `doc/` rule above:
 
 ```text
 README.md
@@ -86,13 +122,14 @@ Use `README.md` as the entry point:
 
 ## Handling User Wording
 
-When the user says "update README" or "create Wiki", treat that as intent to update project documentation, not as a final storage decision. Make the placement decision from the content:
+When the user says "update README" or "create Wiki", check the content against the placement rules and explain a different recommendation when appropriate. Preserve an explicit destination requirement. When no destination is fixed:
 
 - If the content is an entry-point summary, put it in README.
-- If the content is detailed, version-sensitive, or tightly connected to repository behavior, put it in `docs/` and add/update README links.
+- If the content is a PRD, requirement technical document, or machine-readable state-machine specification, use the owning project's `doc/` location above.
+- For other detailed, version-sensitive content, use the repository's documentation conventions and add/update README links.
 - If the content is broad team knowledge or non-versioned reference, put it in Wiki or prepare a Wiki draft.
 
-If the user explicitly insists on a destination after the tradeoff is clear, follow that destination unless it would break repository conventions or overwrite important content.
+Follow explicit user placement instructions and preserve existing content when editing or relocating documents.
 
 ## Editing Guidance
 
