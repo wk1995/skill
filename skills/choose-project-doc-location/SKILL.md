@@ -6,6 +6,7 @@ metadata:
   version: "0.0.1"
   triggering:
     include:
+      - "Create, update, rewrite, or organize project documentation."
       - "Choose document locations before creating or updating project documentation."
       - "Inspect or organize document locations within a specified folder or project."
       - "Choose between README, repository docs, or GitHub Wiki for project information."
