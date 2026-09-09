@@ -36,7 +36,9 @@ python3 skills/sync-skills/scripts/skill_sync.py link my-skill-id \
   --repo-url https://github.com/example/skills
 ```
 
-当一个同步组需要额外的命名项目、本机 Agent 安装或外部位置时，使用 `link-location`：
+对于需要参与普通角色同步的便携副本，在指定同步组 ID 的 `link` 命令中使用 `--project /absolute/path/to/my-skill` 或 `--external /absolute/path/to/my-skill` 登记。
+
+使用 `link-location` 登记额外的命名项目或外部位置以供关系盘点，或登记本机 Agent 安装以供盘点和修复：
 
 ```bash
 python3 skills/sync-skills/scripts/skill_sync.py link-location my-skill-id \
@@ -46,7 +48,7 @@ python3 skills/sync-skills/scripts/skill_sync.py link-location my-skill-id \
   --path /projects/app-a/skills/my-skill
 ```
 
-`link` 和 `link-location` 只登记关系，不会让存在差异的副本自动变成一致。选择同步来源前，请先运行 `status`。
+`link` 和 `link-location` 只登记关系，不会让存在差异的副本自动变成一致。选择同步来源前，使用 `status` 检查通过 `link` 或 `convert` 登记的角色。通过 `link-location` 登记的命名位置请用 `relationships` 检查：普通 `status`、`versions`、`sync`、角色快照、当前角色 `diff` 和角色回滚都不包含这些位置。Agent 修复快照使用独立的本机安装回滚路径，见下文。
 
 ### 转换现有副本
 
@@ -60,7 +62,7 @@ python3 skills/sync-skills/scripts/skill_sync.py convert my-skill-id \
   --target-role repo
 ```
 
-来源必须包含有效的 `SKILL.md`。已有目标 Skill 会在替换前创建快照；非 Skill 目标、重叠路径、符号链接、特殊文件或身份冲突都会被拒绝。
+来源必须包含有效的 `SKILL.md`。目标可以不存在、为空目录或为已有 Skill；已有目标 Skill 会在替换前创建快照。执行前请核实来源和目标的物理路径：`convert` 会解析符号链接，并可能覆盖目标链接指向的目录。来源与目标重叠，或路径与其他已登记位置冲突时会被拒绝。复制前请遵循 [SKILL.md](SKILL.md) 中的检查和信任规则。
 
 ### 检查状态、历史与差异
 
@@ -74,7 +76,7 @@ python3 skills/sync-skills/scripts/skill_sync.py diff my-skill-id \
   --to-current
 ```
 
-- `status` 显示已登记位置、版本、摘要与分歧状态。
+- `status` 显示已登记角色、版本、摘要与分歧状态。无分歧结果仅覆盖这些角色；命名位置请使用 `relationships` 检查。
 - `versions` 显示曾观察到的版本及其创建/更新时间。
 - `snapshots` 列出变更前创建的恢复点。
 - `diff` 比较快照、当前角色或明确路径，并报告新增、删除、修改的文本及二进制文件。
@@ -87,9 +89,9 @@ python3 skills/sync-skills/scripts/skill_sync.py diff my-skill-id \
 python3 skills/sync-skills/scripts/skill_sync.py sync my-skill-id --source repo
 ```
 
-覆盖前会为所有现有已链接副本创建快照。如果多份副本都发生过变化且未指定来源，同步会停止并报告冲突。在仓库默认分支上，版本不一致时会选择较高的 `metadata.version`；在其他分支上，只有版本不一致并不足以授权同步。
+`sync` 覆盖角色前会为所有现有角色副本创建快照。仅通过 `link-location` 登记的命名位置不会参与同步，也不会包含在这些快照中。如果多份副本都发生过变化且未指定来源，同步会停止并报告冲突。在仓库默认分支上，版本不一致时会选择较高的 `metadata.version`；在其他分支上，只有版本不一致并不足以授权同步。
 
-从快照恢复所有已登记角色，或只恢复指定角色：
+从角色快照恢复所有现有已登记角色，或只恢复指定角色：
 
 ```bash
 python3 skills/sync-skills/scripts/skill_sync.py rollback my-skill-id \

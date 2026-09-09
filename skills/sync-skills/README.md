@@ -36,7 +36,9 @@ python3 skills/sync-skills/scripts/skill_sync.py link my-skill-id \
   --repo-url https://github.com/example/skills
 ```
 
-Use `link-location` when one group needs an additional named project, local Agent installation, or external location:
+Use `link --project /absolute/path/to/my-skill` or `link --external /absolute/path/to/my-skill` with the group ID to add portable copies that should participate in ordinary role-based synchronization.
+
+Use `link-location` to register additional named project or external locations for relationship inventory, or local Agent installations for inventory and repair:
 
 ```bash
 python3 skills/sync-skills/scripts/skill_sync.py link-location my-skill-id \
@@ -46,7 +48,7 @@ python3 skills/sync-skills/scripts/skill_sync.py link-location my-skill-id \
   --path /projects/app-a/skills/my-skill
 ```
 
-`link` and `link-location` register relationships; they do not make divergent copies equal. Use `status` before selecting a synchronization source.
+`link` and `link-location` register relationships; they do not make divergent copies equal. Use `status` to inspect roles registered by `link` or `convert` before selecting a synchronization source. Use `relationships` to inspect named locations registered by `link-location`: they are not included in ordinary `status`, `versions`, `sync`, role snapshots, current-role `diff`, or role rollback. Agent repair snapshots have their own local-install rollback path, described below.
 
 ### Convert an existing copy
 
@@ -60,7 +62,7 @@ python3 skills/sync-skills/scripts/skill_sync.py convert my-skill-id \
   --target-role repo
 ```
 
-The source must contain a valid `SKILL.md`. An existing target Skill is snapshotted before replacement; a non-Skill target, overlapping path, symlink, special file, or conflicting identity is rejected.
+The source must contain a valid `SKILL.md`. The target may be absent, an empty directory, or an existing Skill; an existing target Skill is snapshotted before replacement. Verify the physical source and target paths before running the command: `convert` resolves symbolic links and can overwrite the directory a target link points to. It rejects overlapping source/target paths and paths that conflict with other registered locations. Follow the inspection and trust rules in [SKILL.md](SKILL.md) before copying.
 
 ### Inspect status, history, and differences
 
@@ -74,7 +76,7 @@ python3 skills/sync-skills/scripts/skill_sync.py diff my-skill-id \
   --to-current
 ```
 
-- `status` shows the registered locations, versions, digests, and divergence.
+- `status` shows registered roles, versions, digests, and divergence. A clean result covers only those roles; use `relationships` for named locations.
 - `versions` shows observed versions and their creation/update times.
 - `snapshots` lists recovery points created before mutations.
 - `diff` compares snapshots, current roles, or explicit paths and reports added, removed, modified text, and modified binary files.
@@ -87,9 +89,9 @@ Prefer an explicit source when copies differ:
 python3 skills/sync-skills/scripts/skill_sync.py sync my-skill-id --source repo
 ```
 
-Every existing linked copy is snapshotted before an overwrite. If more than one copy changed and no source is specified, synchronization stops and reports the conflict. On the repository's default branch, a version mismatch selects the higher `metadata.version`; on another branch, a version mismatch alone does not authorize synchronization.
+Every existing role copy is snapshotted before `sync` overwrites a role. Named locations registered only by `link-location` are not synchronized or included in these snapshots. If more than one copy changed and no source is specified, synchronization stops and reports the conflict. On the repository's default branch, a version mismatch selects the higher `metadata.version`; on another branch, a version mismatch alone does not authorize synchronization.
 
-Restore all registered roles, or only the named roles, from a snapshot:
+Restore all existing registered roles, or only the selected roles, from a role snapshot:
 
 ```bash
 python3 skills/sync-skills/scripts/skill_sync.py rollback my-skill-id \
