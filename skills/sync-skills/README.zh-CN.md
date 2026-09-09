@@ -2,63 +2,182 @@
 
 语言：[English](README.md) | **中文**
 
-`sync-skills` 用于管理同一个 Agent Skill 在仓库、项目、本机 Agent 安装目录、Agent 构建产物和明确指定的外部路径中的等价副本。它还会按项目支持的全部 AI Agent Builders 生成本机关系报告，并安全修复身份不完整的 Agent 安装副本。
+`sync-skills` 用于管理同一个 Agent Skill 在本仓库、其他项目、本机 Agent 安装目录、生成的 Agent 构建产物和明确指定的外部位置中的等价副本。它会记录稳定身份、来源、版本、摘要、快照与审计时间；比较或同步副本；盘点 Builder 关系；并从可信构建修复已登记的 Agent 安装。
 
 ## 如何使用
 
-请使用每个 `SKILL.md` 中声明的不可变 `metadata.sync_id`，并提供涉及的路径或位置角色以及希望执行的操作。Skill 名称只是展示/触发名称，可以变化而不改变同步组。常见请求包括：
-
-```text
-比较 my-skill 的仓库副本和本机副本。
-将此 Skill 的仓库副本链接到指定的本机 Skill 目录。
-以仓库版本为来源同步项目和外部副本。
-```
-
-需要确定性变更时使用随附脚本：
+在 Skill 管理仓库中运行随附 CLI：
 
 ```bash
-python skills/sync-skills/scripts/skill_sync.py migrate-state
-python skills/sync-skills/scripts/skill_sync.py status my-skill-id
-python skills/sync-skills/scripts/skill_sync.py sync my-skill-id --source repo
-python skills/sync-skills/scripts/skill_sync.py rename old-skill-name --to my-skill-id --name new-skill-name
-python skills/sync-skills/scripts/skill_sync.py relationships
-python skills/sync-skills/scripts/skill_sync.py repair-agent-install my-skill-id --agent codex --discard-local-changes
+python3 skills/sync-skills/scripts/skill_sync.py --help
 ```
 
-运行期 registry 和快照数据默认存放在仓库外、按 checkout 隔离的 XDG state 目录。对于仍有 `.skill-sync/` 旧状态的 checkout，应先运行一次 `migrate-state`；它会完整复制并校验数据、保留源目录，且可安全重复执行。在所有协作者都完成迁移或备份前，不要删除旧目录。
+请使用 `SKILL.md` 中不可变的 `metadata.sync_id` 标识 Skill，不要使用目录名或展示名称作为身份。一个同步组可以包含以下位置角色：
 
-`--to` 仅用于迁移按名称作为键的旧 registry。对于已有稳定同步组，`--to` 必须保持为当前 ID；如需修改展示或触发名称，请使用 `--name`，稳定 ID 不可变。
+| 角色 | 含义 |
+| --- | --- |
+| `repo` | 本 Skill 仓库中的便携源码，通常位于 `skills/<skill-name>` |
+| `local` | 明确路径中的机器级用户副本或 Agent 安装 |
+| `project` | 另一个项目工作区拥有的副本 |
+| `external` | 其他明确副本，例如插件 checkout 或 staging 目录 |
 
-每个位置使用角色或显式 Location ID。流程会校验 `SKILL.md` 及其稳定的 `metadata.sync_id`，在覆盖前为已有副本创建快照；多份副本发生冲突时会报告而不会自行选择来源，并记录版本、摘要、来源和差异。`relationships` 从 adapter 清单动态发现 Builder，生成的 JSON/Markdown 仅写入仓库外的本机状态目录。完整命令及信任规则见 [SKILL.md](SKILL.md)。
+仓库外的位置请使用绝对路径。不要登记符号链接、重复登记同一物理目录，也不要登记互相嵌套的路径。
 
-即使传入 `--discard-local-changes`，修复也会拒绝非空 sync ID 冲突或与其他已登记 Skill 嵌套的路径。重复的本机扫描根会去重；身份冲突的外部或项目副本只报告问题，不建立关联。缺少可信构建的安装标为 `agent-build-missing`。报告与锁文件都必须位于 Skill 输入目录之外。
+### 创建或扩展同步组
 
-安装快照回滚同样拒绝当前安装的身份冲突。普通角色命令会保护全部已登记位置；adapter 发现不完整时，安装保护会阻止修改。修复同时检查和恢复文件执行权限与内容，也能处理仅执行权限丢失的情况。显式登记在根目录多层子目录中的本机安装也会进入清单。这些检查保留 manifest v2 的摘要兼容性。
+登记便携仓库副本和等价的物理副本：
+
+```bash
+python3 skills/sync-skills/scripts/skill_sync.py link my-skill-id \
+  --name my-skill \
+  --repo skills/my-skill \
+  --local /absolute/path/to/my-skill \
+  --skill-url https://github.com/example/my-skill \
+  --repo-url https://github.com/example/skills
+```
+
+对于需要参与普通角色同步的便携副本，在指定同步组 ID 的 `link` 命令中使用 `--project /absolute/path/to/my-skill` 或 `--external /absolute/path/to/my-skill` 登记。
+
+使用 `link-location` 登记额外的命名项目或外部位置以供关系盘点，或登记本机 Agent 安装以供盘点和修复：
+
+```bash
+python3 skills/sync-skills/scripts/skill_sync.py link-location my-skill-id \
+  --location-id project:app-a \
+  --kind project \
+  --project-id app-a \
+  --path /projects/app-a/skills/my-skill
+```
+
+`link` 和 `link-location` 只登记关系，不会让存在差异的副本自动变成一致。选择同步来源前，使用 `status` 检查通过 `link` 或 `convert` 登记的角色。通过 `link-location` 登记的命名位置请用 `relationships` 检查：普通 `status`、`versions`、`sync`、角色快照、当前角色 `diff` 和角色回滚都不包含这些位置。Agent 修复快照使用独立的本机安装回滚路径，见下文。
+
+### 转换现有副本
+
+使用 `convert` 将经过校验的来源物化到新位置，并同时登记两处位置：
+
+```bash
+python3 skills/sync-skills/scripts/skill_sync.py convert my-skill-id \
+  --source-path /absolute/path/to/my-skill \
+  --source-role local \
+  --target-path skills/my-skill \
+  --target-role repo
+```
+
+来源必须包含有效的 `SKILL.md`。目标可以不存在、为空目录或为已有 Skill；已有目标 Skill 会在替换前创建快照。执行前请核实来源和目标的物理路径：`convert` 会解析符号链接，并可能覆盖目标链接指向的目录。来源与目标重叠，或路径与其他已登记位置冲突时会被拒绝。复制前请遵循 [SKILL.md](SKILL.md) 中的检查和信任规则。
+
+### 检查状态、历史与差异
+
+```bash
+python3 skills/sync-skills/scripts/skill_sync.py status my-skill-id
+python3 skills/sync-skills/scripts/skill_sync.py versions my-skill-id
+python3 skills/sync-skills/scripts/skill_sync.py snapshots my-skill-id
+python3 skills/sync-skills/scripts/skill_sync.py diff my-skill-id \
+  --role local \
+  --from-snapshot 20260720T120000Z \
+  --to-current
+```
+
+- `status` 显示已登记角色、版本、摘要与分歧状态。无分歧结果仅覆盖这些角色；命名位置请使用 `relationships` 检查。
+- `versions` 显示曾观察到的版本及其创建/更新时间。
+- `snapshots` 列出变更前创建的恢复点。
+- `diff` 比较快照、当前角色或明确路径，并报告新增、删除、修改的文本及二进制文件。
+
+### 同步与回滚
+
+副本存在差异时，建议明确指定来源：
+
+```bash
+python3 skills/sync-skills/scripts/skill_sync.py sync my-skill-id --source repo
+```
+
+`sync` 覆盖角色前会为所有现有角色副本创建快照。仅通过 `link-location` 登记的命名位置不会参与同步，也不会包含在这些快照中。如果多份副本都发生过变化且未指定来源，同步会停止并报告冲突。在仓库默认分支上，版本不一致时会选择较高的 `metadata.version`；在其他分支上，只有版本不一致并不足以授权同步。
+
+从角色快照恢复所有现有已登记角色，或只恢复指定角色：
+
+```bash
+python3 skills/sync-skills/scripts/skill_sync.py rollback my-skill-id \
+  --snapshot 20260720T120000Z
+
+python3 skills/sync-skills/scripts/skill_sync.py rollback my-skill-id \
+  --snapshot 20260720T120000Z \
+  --roles local project
+```
+
+回滚不会删除选中的快照，并会在替换当前内容前创建新的回滚前快照。
+
+### 重命名但不改变身份
+
+为旧版名称键控 registry 分配第一个稳定 sync ID：
+
+```bash
+python3 skills/sync-skills/scripts/skill_sync.py rename old-skill-name \
+  --to my-skill-id \
+  --name new-skill-name
+```
+
+对于已经拥有稳定 ID 的同步组，`--to` 必须等于当前 ID。只使用 `--name` 修改展示/触发名称；现有稳定 sync ID 不可替换。
+
+### 盘点 Builder 关系
+
+生成本机 JSON 和 Markdown 报告：
+
+```bash
+python3 skills/sync-skills/scripts/skill_sync.py relationships
+python3 skills/sync-skills/scripts/skill_sync.py relationships \
+  --project app-a=/projects/app-a/skills \
+  --strict
+```
+
+支持的 Builder 来自 `platforms/*/adapter.json`，报告不依赖硬编码 Agent 列表。报告遵循 `便携源码 -> 同 Agent 的 manifest-v2 构建 -> 本机安装` 推导链，包含显式登记的项目和多层本机位置，按物理路径去重，并报告构建缺失、身份不完整、内容分歧和冲突。
+
+报告默认写入 checkout 专属的仓库外状态目录。如果使用 `--output-dir`，目标必须位于仓库和所有 Skill 输入树之外。使用 `--strict` 时，新报告只要含有问题或未关联副本就返回退出码 2；健康的 `synced` 与 `project-only` 项会通过。
+
+### 修复已登记的 Agent 安装
+
+先构建当前 adapter 产物，再从可信 manifest-v2 构建修复已登记安装：
+
+```bash
+python3 scripts/agent_build.py codex --force
+python3 skills/sync-skills/scripts/skill_sync.py repair-agent-install my-skill-id \
+  --agent codex
+```
+
+默认会保留存在分歧的安装。只有确实希望替换时才添加 `--discard-local-changes`，并且替换前仍会创建快照。修复会检查 Skill 身份、内容和文件执行权限；遇到不同的非空 sync ID 会拒绝操作；可信构建已经安装时可安全重复执行。普通 `sync` 只用于便携副本，绝不能用它把便携源码直接复制进 Agent 安装目录。
+
+### 迁移旧版仓库状态
+
+运行期 registry、快照、报告和锁应放在仓库外、按 checkout 隔离的 XDG 状态目录中。下面的命令会复制并校验旧版 `.skill-sync/` 状态，而不会删除来源：
+
+```bash
+python3 skills/sync-skills/scripts/skill_sync.py migrate-state
+```
+
+迁移会保留文件权限，拒绝不安全路径和不同的已有目标；对相同目标重复运行时不会产生额外变更。在所有协作者都已迁移或备份，并通过独立变更处理旧目录前，请保留 `.skill-sync/`。
+
+完整操作和信任规则见 [SKILL.md](SKILL.md)；身份、冲突、快照、版本与 Agent 构建策略见[同步模型](references/sync-model.md)。
 
 ## 何时触发
 
-在以下情况使用此 Skill：
+在以下情况使用本 Skill：
 
-- 需要链接、转换、同步、记录版本、审计、比较或回滚 Skill 副本；
-- 涉及同一个 Skill 的仓库、项目、本机用户目录或外部副本；
-- 需要处理 Skill 的来源 URL、版本历史、内容摘要、快照或差异报告；
-- 需要把仓库内旧版 Skill 同步状态迁移到本机状态目录。
-- 需要盘点本机 Skill、项目支持的 Builders、构建产物及显式登记的关联项目；
-- 需要修复缺少稳定身份或构建文件不完整的 Agent 安装副本。
+- 链接、转换、同步、比较、审计或回滚 Skill 副本；
+- 涉及同一个 Skill 的仓库、项目、机器级、Agent 构建或明确外部副本；
+- 需要稳定身份、来源 URL、版本历史、摘要、快照、审计时间或文件差异；
+- 盘点本机 Skills、支持的 Builders、生成构建、Agent 安装或关联项目；
+- 修复不完整或存在分歧的已登记 Agent 安装；
+- 将旧版仓库内 Skill 同步状态迁移到仓库外。
 
 ## 何时不触发
 
-在以下情况不要使用此 Skill：
+在以下情况不要使用本 Skill：
 
-- 只是使用某个 Skill 的业务工作流，并不管理它的副本；
-- 只是普通代码修改，且不涉及 Skill 同步、转换、审计或回滚。
+- 只是使用某个 Skill 的业务工作流，并不管理它的副本或安装；
+- 只创建或修改一个 Skill 的行为，不涉及副本管理；
+- 普通应用或仓库工作，与 Skill 同步、转换、盘点、修复或回滚无关。
 
 ## 退出码与恢复
 
-`link`、`link-location`、`convert`、`sync`、`rollback`、`rename` 和 `repair-agent-install` 返回退出码 **2** 时，表示变更已成功、报告刷新失败（`report_status: stale`）。此时只运行返回的 `report_retry_command`；不要因为 shell 显示非零退出码就重复变更。退出码 0 表示命令与报告刷新均已完成。
+`link`、`link-location`、`convert`、`sync`、`rollback`、`rename` 和 `repair-agent-install` 返回退出码 **2** 时，表示变更已成功，但报告刷新失败（`report_status: stale`）。此时只运行返回的 `report_retry_command`，不要重复执行变更。退出码 0 表示请求的操作和报告刷新都已完成。
 
-对于只读的 `relationships --strict`，退出码 **2** 表示新报告中存在问题或未关联副本。健康的 `project-only` 和 `synced` 均可通过；不加 `--strict` 时，发现的问题只记录在 JSON 中，不因此返回非零退出码。校验或执行错误会另行失败并给出错误信息。
+对于只读的 `relationships --strict`，退出码 **2** 表示新生成的报告中存在问题或未关联副本。不加 `--strict` 时，问题仍会保留在报告中，但不改变命令退出状态。
 
-使用 `rollback <sync-id> --snapshot <repair-snapshot-id> --roles local` 恢复安装修复快照，也支持只通过 location 登记的安装。它只恢复对应安装；对相同内容重复回滚不会创建新快照。若安装恢复失败，请保留错误中列出的 staging 目录和快照路径以便恢复。
-
-随 Skill 分发的[契约校验器](scripts/validate_skill_relationship_report.py)是报告运行时契约的权威实现，仅依赖 Python 标准库。[JSON Schema](references/skill-relationships.schema.json)用于互操作文档；运行时只读取其中共享的状态词汇，不执行 Draft 2020-12 约束。校验器和 schema 均包含在 Skill 内，安装产物生成报告无需依赖仓库 CLI。
+修复快照可通过 `rollback <sync-id> --snapshot <snapshot-id> --roles local` 恢复。若安装恢复失败，请保留返回的 staging 目录和快照路径。随 Skill 分发的[关系报告校验器](scripts/validate_skill_relationship_report.py)是权威的可执行报告契约；[JSON Schema](references/skill-relationships.schema.json)是说明性的互操作文档。运行时校验只读取共享状态词汇，不执行 Draft 2020-12 约束。
