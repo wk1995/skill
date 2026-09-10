@@ -75,6 +75,11 @@ The `agent-builds/` directory is required on every managed Skill so the override
 
 ## Version Policy
 
+All three versions follow the required [Versioning Policy](versioning-policy.md):
+PATCH for compatible fixes, MINOR for compatible additions, and MAJOR for breaking
+changes with migration evidence. Assess each version within its own boundary;
+integer manifest schema versions follow their separate format contract.
+
 Three versions have distinct meanings:
 
 - `metadata.version` in `SKILL.md`: portable Skill behavior.

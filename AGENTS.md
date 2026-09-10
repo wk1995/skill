@@ -82,6 +82,36 @@ necessary evidence, not proof of review coverage. The agent must:
 
 The `skill-catalog` required status check invokes the same gate in GitHub Actions. Runtime sync state belongs in the external XDG location selected by `sync-skills`. Legacy local state under `.skill-sync/` must have no net PR changes until every collaborator has migrated or backed it up; stopping tracking requires a dedicated migration change rather than an ordinary cleanup commit.
 
+## Version Upgrade Rules
+
+Follow [docs/versioning-policy.md](docs/versioning-policy.md) when selecting or
+reviewing a version. These rules apply to Skill `metadata.version`, adapter
+`version`, and generated `artifact_version`, each within its own compatibility
+boundary; they do not apply to integer schema versions or external projects.
+
+- Use exactly `MAJOR.MINOR.PATCH`: three non-negative decimal integers without
+  leading zeroes, a `v` prefix, prerelease suffixes, or build metadata.
+- PATCH (`1.2.3 -> 1.2.4`): compatible bug fixes, small optimizations, and internal
+  refactoring that preserve the documented contract. These must not bump MAJOR.
+- MINOR (`1.2.3 -> 1.3.0`): backward-compatible new capabilities or optional
+  inputs. Reset PATCH to zero.
+- MAJOR (`1.2.3 -> 2.0.0`): incompatible changes to supported workflows, triggers,
+  inputs, outputs, persisted formats, or requirements. Reset MINOR and PATCH to
+  zero. Require a concrete old/new behavior example and migration instructions;
+  change size, effort, bug severity, or release count alone never justify MAJOR.
+- Apply the same impact rules to `0.x.x`; promotion to `1.0.0` may also explicitly
+  declare the first stable contract, but must not disguise an ordinary fix.
+- Compare all changes since the last release of the same component. Increment
+  only the highest required level once, by one, and reset lower levels. Do not
+  bump once per commit or carry digits at nine (`1.2.9 -> 1.2.10`).
+- Documentation-only clarifications, tests, and repository maintenance do not
+  require a component bump when behavior and its contract stay unchanged.
+  Agent-facing instructions that change behavior are not documentation-only.
+- Before a bump, record the component, old/new versions, level, compatibility
+  evidence, and migration needs in the change description. Record released
+  changes in the owning changelog with a UTC date; keep pending changes under
+  `[Unreleased]`. Never rewrite a published version to distribute different content.
+
 ## Changelog Requirement
 
 Every Skill must maintain a `CHANGELOG.md` in its own directory, next to `SKILL.md`.

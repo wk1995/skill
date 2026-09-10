@@ -11,6 +11,18 @@ For documentation-only changes, identify the affected rules and consumers.
 
 ## Validation
 
+### Version Decision
+
+Follow [the versioning policy](https://github.com/wk1995/skill/blob/main/docs/versioning-policy.md).
+For each affected versioned component, state its version field, previous release,
+proposed version, and PATCH / MINOR / MAJOR / no-bump decision with compatibility
+evidence. For repository-only changes, state why no component version is affected.
+A MAJOR bump needs a concrete old/new behavior example and migration steps, or
+an explicit first-stable contract and readiness evidence. Link the owning
+changelog entry with its UTC date when assigning a release version.
+
+### Checks
+
 - [ ] I ran `bash tests/pr-review-gate.sh origin/main` from a clean, committed worktree.
 - [ ] I reviewed deletions, renames, executable-bit changes, and generated files in the full PR diff.
 - [ ] I added negative and state-sequence tests for changed behavior where applicable.
