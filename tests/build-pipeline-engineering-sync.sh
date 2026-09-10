@@ -15,7 +15,7 @@ fail() {
 name="$(sed -n 's/^name: //p' "$SKILL_DIR/SKILL.md" | head -n 1)"
 version="$(sed -n 's/^  version: "\([^"]*\)"/\1/p' "$SKILL_DIR/SKILL.md" | head -n 1)"
 [[ "$name" == "build-pipeline-engineering" ]] || fail "unexpected name: $name"
-[[ "$version" == "2.0.0" ]] || fail "unexpected version: $version"
+[[ "$version" == "2.1.0" ]] || fail "unexpected version: $version"
 
 references=(
   android-app-build.md
@@ -24,6 +24,8 @@ references=(
   gradle-plugin-build.md
   paired-android-submodule-build.md
   build-pipeline-model.md
+  windows-app-build.md
+  linux-app-build.md
 )
 
 for reference in "${references[@]}"; do
@@ -31,7 +33,7 @@ for reference in "${references[@]}"; do
 done
 
 reference_count="$(find "$SKILL_DIR/references" -maxdepth 1 -type f -name '*.md' | wc -l | tr -d ' ')"
-[[ "$reference_count" == "6" ]] || fail "expected 6 references, found $reference_count"
+[[ "$reference_count" == "${#references[@]}" ]] || fail "expected ${#references[@]} references, found $reference_count"
 
 if grep -R -n -E 'release-publishing|Release Publishing|artifact-build-engineering|Artifact Build Engineering|release-build-engineering|Release Build Engineering' "$SKILL_DIR"; then
   fail "old Skill name remains"
@@ -59,6 +61,9 @@ target_real="$(cd -- "$target" && pwd -P)"
 [[ -f "$target/agents/openai.yaml" ]] || fail "Codex metadata was not materialized"
 [[ ! -e "$target/agent-builds" ]] || fail "source-only agent-builds leaked into installed output"
 grep -Fq '## Codex Build Adaptation' "$target/SKILL.md" || fail "Codex instructions were not appended"
+for reference in "${references[@]}"; do
+  cmp "$SKILL_DIR/references/$reference" "$target/references/$reference" || fail "packaged reference differs: $reference"
+done
 
 CODEX_HOME="$first_home" "$LINK_SCRIPT"
 
