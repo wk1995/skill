@@ -20,6 +20,9 @@ evidence. For repository-only changes, state why no component version is affecte
 A MAJOR bump needs a concrete old/new behavior example and migration steps, or
 an explicit first-stable contract and readiness evidence. Link the owning
 changelog entry with its UTC date when assigning a release version.
+The owning entry must include the policy's `Change-Type`, `Summary`, and
+`Compatibility` fields and any required breaking/stable evidence. CI compares
+the declaration with the actual version increment; reviewers verify its truth.
 
 ### Checks
 

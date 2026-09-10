@@ -3,7 +3,8 @@
 语言：[English](versioning-policy.md) | 简体中文
 
 本文是本仓库选择版本升级级别的强制规则，适用于今后的发布，不重新编号历史版本。
-约束通过贡献规则和评审执行；现有校验脚本不会自动判断一个改动是否破坏兼容性。
+约束通过 CI、贡献规则和评审执行。CI 校验版本格式、递增和发布声明；
+评审负责判断兼容性声明是否真实反映实现。
 
 ## 格式与归属
 
@@ -81,3 +82,52 @@ Skill 的公开契约包括已约定的触发与不触发场景、操作流程�
 仅修改仓库文档不需要发布 Skill。如果主动把更新的文档分发为新产物，
 则评估产物的 PATCH 发布，保持行为未变的 Skill 和适配器版本。
 根 README 中规划的 `.changes/` 流程不是前置要求，目前由变更说明和所属 changelog 承载依据。
+
+## CI 校验
+
+提交改动后运行 `python3 scripts/version_guard.py --base origin/main`。
+必需的 `skill-catalog` 检查会在生成或提交目录前执行版本校验，
+`tests/pr-review-gate.sh <base>` 也会执行它。CI 使用精确的 PR base SHA。
+可选参数 `--head <commit>` 默认为 `HEAD`；未提交的工作区修改不参与校验。
+
+校验器读取 Git 提交中的文件，将 base 记录的版本与模拟合并结果比较。
+默认分支的无关更新不会被误判为 PR 降级；有合并冲突时必须先解决。
+它可能创建临时 Git 合并对象，但不修改工作区、暂存区、引用或版本文件。
+缺少 Git、引用不存在、元数据格式错误、身份重复或发布记录不可读时都会失败。
+组件目录及元数据不能是符号链接或子模块。Skill 元数据使用块状 YAML `metadata`
+映射，`sync_id` 和 `version` 是其直接标量字段；适配器清单使用 JSON。
+
+CI 检查全部当前 Skill、适配器和产物的版本格式。新增组件或修改版本时，
+必须在所属 changelog 中新增唯一标题的条目，使用合法且不晚于当前 UTC 日期的日期，
+并填写以下非空字段：
+
+```markdown
+## [1.2.4] - 2026-09-10
+
+- Change-Type: fix
+- Summary: Correct handling of an already supported input.
+- Compatibility: Existing inputs and outputs remain supported.
+```
+
+Skill 和适配器使用 `## [<version>] - YYYY-MM-DD`；
+产物使用 `## [artifact <version>] - YYYY-MM-DD`，避免适配器与产物版本相同时误用同一份依据。
+字段必须是对应发布章节内的单行 Markdown 列表项；字段名和枚举值始终使用英文。
+
+| `Change-Type` | 允许的版本变化 | 额外必填字段 |
+| --- | --- | --- |
+| `fix` | PATCH + 1；包括兼容优化、重构或产物文档维护 | 无 |
+| `feature` | MINOR + 1，PATCH = 0 | 无 |
+| `breaking` | MAJOR + 1，MINOR = PATCH = 0，包括 `0.x.x -> 1.0.0` | `Breaking-Change`（旧/新行为及受影响使用方）、`Migration`（迁移步骤） |
+| `stable` | 仅限 `0.x.x -> 1.0.0` | `Stable-Contract`、`Readiness` |
+| `initial` | 新组件使用 `0.1.0` 或 `1.0.0` | 使用 `1.0.0` 时填写 `Stable-Contract`、`Readiness` |
+
+声明为 `fix` 的发布不能把 `1.2.3` 改成 `2.0.0`。
+降级、跳号、低位未归零、重复或复用发布标题、缺少声明都会失败。
+Skill 通过不可变的 `metadata.sync_id` 匹配，目录改名不会重置版本历史。
+适配器和产物分别按适配器 ID 检查各自的历史。
+
+版本未变化时，以及已有的历史条目，不要求补填这些新字段；待发布变更仍可写入 `[Unreleased]`。
+比较基线是 PR base 中记录的版本，而非远端发布标签。
+CI 不推断实现变化是否必须发版、不判断破坏兼容性的声明是否属实，也不强制检查全部历史内容不可变，
+这些仍由评审负责。历史或外部版本的同步解析、独立构建的解析继续保留兼容性；
+本次严格发布格式的自动检查入口是仓库 CI 校验器。

@@ -4,8 +4,9 @@ Language: English | [简体中文](versioning-policy.zh-CN.md)
 
 This is the repository's required policy for choosing version increments. It
 applies to new releases; it does not renumber existing releases. The policy is
-enforced through contribution and review rules. Existing validation scripts do
-not automatically determine whether a change is breaking.
+enforced through CI, contribution, and review rules. CI checks version syntax,
+increments, and release declarations; reviewers determine whether compatibility
+claims accurately describe the implementation.
 
 ## Format And Ownership
 
@@ -99,3 +100,61 @@ documentation is deliberately distributed in a new artifact, evaluate a PATCH
 artifact release while leaving unchanged Skill and adapter behavior versions
 alone. The future `.changes/` workflow mentioned in the root README is not a
 prerequisite: the change description and owning changelog carry this evidence.
+
+## CI Validation
+
+Run `python3 scripts/version_guard.py --base origin/main` after committing the
+change. The required `skill-catalog` check runs this validator before generating
+or committing catalogs, and `tests/pr-review-gate.sh <base>` runs it again. CI
+passes the exact PR base SHA. The optional `--head <commit>` defaults to `HEAD`;
+uncommitted working-tree changes are not inputs.
+
+The validator reads committed Git blobs and compares the base's recorded versions
+with the simulated merge result. An unrelated base advance does not count as a
+PR downgrade; conflicting changes fail until resolved. It may create temporary
+Git merge objects but does not change the checkout, index, refs, or version files.
+Missing Git, missing refs, malformed metadata, ambiguous identities, or unreadable
+release records fail the check. Component directories and metadata cannot be
+symlinks or submodules. Skill metadata uses a block-style YAML `metadata` mapping
+with direct scalar `sync_id` and `version` keys; adapter manifests use JSON.
+
+CI checks the format of all current Skill, adapter, and artifact versions. For
+each added component or changed version, it requires a new, uniquely headed entry
+in its owning changelog, a valid non-future UTC date, and these non-empty fields:
+
+```markdown
+## [1.2.4] - 2026-09-10
+
+- Change-Type: fix
+- Summary: Correct handling of an already supported input.
+- Compatibility: Existing inputs and outputs remain supported.
+```
+
+Use `## [<version>] - YYYY-MM-DD` for Skill and adapter releases. Use
+`## [artifact <version>] - YYYY-MM-DD` for artifact releases so the adapter and
+artifact cannot accidentally share evidence when their numbers match. The fields
+are literal, single-line Markdown bullets inside that release section; their
+names and enum values remain English in all changelogs.
+
+| `Change-Type` | Permitted version change | Additional required fields |
+| --- | --- | --- |
+| `fix` | PATCH + 1; includes compatible optimization, refactoring, or artifact documentation maintenance | None |
+| `feature` | MINOR + 1, PATCH = 0 | None |
+| `breaking` | MAJOR + 1, MINOR = PATCH = 0, including `0.x.x -> 1.0.0` | `Breaking-Change` (old/new behavior and affected consumers), `Migration` (steps) |
+| `stable` | Only `0.x.x -> 1.0.0` | `Stable-Contract`, `Readiness` |
+| `initial` | New component at `0.1.0` or `1.0.0` | For `1.0.0`: `Stable-Contract`, `Readiness` |
+
+A release declared as `fix` cannot change `1.2.3` to `2.0.0`. Downgrades, skipped
+numbers, missing resets, duplicate or reused release headings, and missing
+declarations fail. Skill versions are matched by immutable `metadata.sync_id`,
+so renaming a directory does not reset its version history. Adapter and artifact
+histories are checked independently by adapter ID.
+
+Unchanged versions and existing historical entries do not need these new fields;
+pending changes can continue to use `[Unreleased]`. The comparison baseline is
+the recorded version on the PR base, not remote release tags. CI does not infer
+whether an implementation change needs a release or whether a claimed breaking
+change is real, and it does not enforce immutability of all historical content.
+Those decisions remain review requirements. Legacy/external sync parsing and
+standalone build parsing retain their compatibility; the strict release-format
+boundary introduced here is the repository CI validator.

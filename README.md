@@ -287,7 +287,10 @@ PATCH for compatible fixes and small optimizations, MINOR for compatible new
 capabilities, and MAJOR for breaking changes with migration evidence. Small fixes
 must not increase MAJOR. Increment one level once per release and reset lower
 levels. Behavior-neutral documentation and repository maintenance need no component
-bump. These contribution rules apply now; release automation below remains planned.
+bump. CI enforces version formats, increments, and changelog declarations with
+`python3 scripts/version_guard.py --base <PR-base>`; compatibility claims still
+require review. Version validation applies now; packaging and publishing
+automation below remain planned.
 
 - The single source of truth for a Skill version is `metadata.version` in `SKILL.md`.
 - `.changes/` records the affected Skill, bump level, and change summary.

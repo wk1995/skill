@@ -89,6 +89,16 @@ reviewing a version. These rules apply to Skill `metadata.version`, adapter
 `version`, and generated `artifact_version`, each within its own compatibility
 boundary; they do not apply to integer schema versions or external projects.
 
+Run `python3 scripts/version_guard.py --base <PR-base>` on committed changes.
+The required CI gate checks canonical formats, one-step increments, and changelog
+declarations before catalog generation. Every new or changed version needs
+`Change-Type`, `Summary`, and `Compatibility` bullets in its dated release entry;
+breaking releases also need `Breaking-Change` and `Migration`, and first-stable
+releases need `Stable-Contract` and `Readiness`. Artifact release headings use
+`[artifact <version>]` to keep their evidence separate from adapter releases.
+See the policy's CI section for enum values and initial-release requirements.
+CI validates declared impact; reviewers must still verify the declaration.
+
 - Use exactly `MAJOR.MINOR.PATCH`: three non-negative decimal integers without
   leading zeroes, a `v` prefix, prerelease suffixes, or build metadata.
 - PATCH (`1.2.3 -> 1.2.4`): compatible bug fixes, small optimizations, and internal
