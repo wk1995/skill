@@ -81,9 +81,9 @@ class VersionGuardTests(unittest.TestCase):
                 files[str(p.relative_to(self.root))] = (p.stat().st_mode, p.read_bytes())
         return self.git("status", "--porcelain"), self.git("write-tree"), self.git("show-ref"), files
 
-    def run_guard(self, expected=None, base=None, env=None, head=None):
+    def run_guard(self, expected=None, base=None, env=None, head=None, mode="pr"):
         before = self.snapshot()
-        command = [sys.executable, str(GUARD), "--base", base or self.base]
+        command = [sys.executable, str(GUARD), "--base", base or self.base, "--mode", mode]
         if head:
             command.extend(["--head", head])
         result = subprocess.run(command, cwd=self.root, env=env, capture_output=True, text=True)
@@ -340,6 +340,68 @@ class VersionGuardTests(unittest.TestCase):
         self.assertIn('run: python3 scripts/version_guard.py --base "$BASE_SHA"', workflow)
         self.assertLess(workflow.index("scripts/version_guard.py"), workflow.index("scripts/skill_catalog.py --write"))
         self.assertIn('python3 scripts/version_guard.py --base "$BASE_REF"', gate)
+
+    def test_push_all_owners_allow_only_single_step_upgrades(self):
+        for kind in ("skill", "adapter", "artifact"):
+            for value, change_type, extra in (
+                ("1.2.4", "fix", ""), ("1.3.0", "feature", ""),
+                ("2.0.0", "breaking", "- Breaking-Change: Old command removed.\n- Migration: Switch to the new command.\n"),
+                ("1.2.5", "fix", ""), ("1.3.1", "feature", ""), ("3.0.0", "breaking", ""),
+            ):
+                with self.subTest(kind=kind, version=value):
+                    self.reset()
+                    self.set_version(kind, value)
+                    self.add_release(kind, value, change_type, extra)
+                    after = self.commit()
+                    expected = None if value in {"1.2.4", "1.3.0", "2.0.0"} else "does not match Change-Type"
+                    self.run_guard(expected, mode="push", head=after)
+
+    def test_push_uses_event_before_not_last_commit(self):
+        self.run_guard(mode="push")  # Unchanged versions are also valid.
+        self.set_version("skill", "1.2.4")
+        self.add_release("skill", "1.2.4", "fix")
+        first = self.commit()
+        self.run_guard(mode="push", head=first)
+        self.set_version("skill", "1.2.5")
+        self.add_release("skill", "1.2.5", "fix")
+        second = self.commit()
+        # Two separate pushes are valid; the same two commits in one push skip a version.
+        self.run_guard(mode="push", base=first, head=second)
+        self.run_guard("does not match Change-Type", mode="push", head=second)
+
+    def test_push_rejects_rewinds_and_divergent_history(self):
+        self.write(self.root / "README.md", "First timeline.\n")
+        before = self.commit()
+        self.run_guard("before to be an ancestor", base=before, head=self.base, mode="push")
+        self.git("checkout", "-q", "--detach", self.base)
+        self.write(self.root / "other.md", "Independent timeline.\n")
+        after = self.commit()
+        self.run_guard("before to be an ancestor", base=before, head=after, mode="push")
+
+    def test_push_checks_merge_commit_against_premerge_tip(self):
+        self.git("checkout", "-qb", "feature")
+        self.set_version("skill", "1.2.4")
+        self.add_release("skill", "1.2.4", "fix")
+        self.commit()
+        self.git("checkout", "-q", "main")
+        self.git("merge", "--no-ff", "-m", "[codex] Merge feature fixture", "feature")
+        after = self.git("rev-parse", "HEAD")
+        self.run_guard(mode="push", head=after)
+
+    def test_default_branch_workflow_uses_exact_event_revisions(self):
+        workflow = (ROOT / ".github/workflows/default-branch-version.yml").read_text()
+        self.assertIn("  push:\n    branches:\n      - '**'", workflow)
+        self.assertIn("github.ref == format('refs/heads/{0}', github.event.repository.default_branch)", workflow)
+        self.assertIn("!github.event.created && !github.event.deleted", workflow)
+        self.assertIn("ref: ${{ github.event.after }}", workflow)
+        self.assertIn("BEFORE_SHA: ${{ github.event.before }}", workflow)
+        self.assertIn("AFTER_SHA: ${{ github.event.after }}", workflow)
+        self.assertIn('run: python3 scripts/version_guard.py --mode push --base "$BEFORE_SHA" --head "$AFTER_SHA"', workflow)
+        self.assertIn("contents: read", workflow)
+        self.assertIn("fetch-depth: 0", workflow)
+        self.assertIn("persist-credentials: false", workflow)
+        self.assertNotIn("HEAD^", workflow)
+        self.assertNotIn("skill_catalog.py --write", workflow)
 
 
 if __name__ == "__main__":

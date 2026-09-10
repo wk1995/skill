@@ -291,6 +291,9 @@ bump. CI enforces version formats, increments, and changelog declarations with
 `python3 scripts/version_guard.py --base <PR-base>`; compatibility claims still
 require review. Version validation applies now; packaging and publishing
 automation below remain planned.
+The `default-branch-version` workflow also validates the entire before/after
+change after a push or merge to the default branch, allowing only unchanged
+versions or one-step upgrades with lower parts reset.
 
 - The single source of truth for a Skill version is `metadata.version` in `SKILL.md`.
 - `.changes/` records the affected Skill, bump level, and change summary.

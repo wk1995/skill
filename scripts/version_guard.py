@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Validate repository release versions and declarations in committed PR trees."""
+"""Validate release versions in committed PR merges or default-branch pushes."""
 
 from __future__ import annotations
 
@@ -188,15 +188,20 @@ def validate_release(base: Tree, result: Tree, old: Component | None, new: Compo
         declaration(body, "Readiness", new.changelog)
 
 
-def check(base_ref: str, head_ref: str) -> int:
+def check(base_ref: str, head_ref: str, mode: str = "pr") -> int:
+    require(mode in {"pr", "push"}, f"unknown comparison mode: {mode}")
     base_sha = git("rev-parse", "--verify", "--end-of-options", f"{base_ref}^{{commit}}").stdout.strip()
     head_sha = git("rev-parse", "--verify", "--end-of-options", f"{head_ref}^{{commit}}").stdout.strip()
+    if mode == "push":
+        ancestry = git("merge-base", "--is-ancestor", base_sha, head_sha, check=False)
+        require(ancestry.returncode == 0,
+                "push comparison requires before to be an ancestor of after; rewinds or divergent history are not allowed")
     base = Tree(base_sha)
     head = Tree(head_sha)
     # Validate authored inputs as well as the simulated merge; an unrelated base
     # advance must not look like a PR downgrade or disappear from final checks.
     components(head)
-    result = Tree(merge_tree(base_sha, head_sha))
+    result = head if mode == "push" else Tree(merge_tree(base_sha, head_sha))
     before, after = components(base), components(result)
     old_paths = {item.path: item for item in before.values() if item.key[0] == "skill"}
     changed = 0
@@ -213,11 +218,13 @@ def check(base_ref: str, head_ref: str) -> int:
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--base", required=True, help="exact PR base commit or ref")
-    parser.add_argument("--head", default="HEAD", help="committed PR head; working-tree edits are not read")
+    parser.add_argument("--base", required=True, help="exact PR base or push before commit")
+    parser.add_argument("--head", default="HEAD", help="committed PR head or push after commit; working-tree edits are not read")
+    parser.add_argument("--mode", choices=("pr", "push"), default="pr",
+                        help="pr: simulate merge; push: compare exact before/after and require forward history")
     args = parser.parse_args()
     try:
-        changed = check(args.base, args.head)
+        changed = check(args.base, args.head, args.mode)
     except (ValueError, RuntimeError, OSError) as error:
         message = str(error)
         print(f"FAIL: {message}", file=sys.stderr)

@@ -232,6 +232,8 @@ Codex 插件产物和 Codex 适配器分别拥有自己的版本；二者都不�
 不改变行为的文档和仓库维护无需提升组件版本。
 CI 通过 `python3 scripts/version_guard.py --base <PR-base>` 校验格式、递增和 changelog 声明；
 声明的兼容性影响仍需评审。版本校验立即适用，下述打包与发布自动化仍为规划。
+`default-branch-version` workflow 也会在默认分支合并或推送后检查整次更新前后的版本，
+只允许版本不变，或者选中一位加一并将低位归零。
 
 - Skill 版本的单一事实源是 `SKILL.md` 中的 `metadata.version`。
 - `.changes/` 记录受影响 Skill、升级级别和变更摘要。

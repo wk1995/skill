@@ -98,6 +98,12 @@ releases need `Stable-Contract` and `Readiness`. Artifact release headings use
 `[artifact <version>]` to keep their evidence separate from adapter releases.
 See the policy's CI section for enum values and initial-release requirements.
 CI validates declared impact; reviewers must still verify the declaration.
+After updates to the default branch, the `default-branch-version` workflow also
+checks the entire push with `--mode push --base <event.before> --head <event.after>`.
+Use the event's previous tip, not `HEAD^`; two increments of the same selected
+part in one push must not be accepted as one. Existing versions may stay unchanged;
+changed versions must increment exactly one selected part by one and reset all
+lower parts.
 
 - Use exactly `MAJOR.MINOR.PATCH`: three non-negative decimal integers without
   leading zeroes, a `v` prefix, prerelease suffixes, or build metadata.

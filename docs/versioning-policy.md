@@ -109,6 +109,23 @@ or committing catalogs, and `tests/pr-review-gate.sh <base>` runs it again. CI
 passes the exact PR base SHA. The optional `--head <commit>` defaults to `HEAD`;
 uncommitted working-tree changes are not inputs.
 
+After a merge or push to the repository's default branch, the separate
+`default-branch-version` workflow job checks the exact push event's `before` and
+`after` commits with `--mode push --base <before> --head <after>`. It discovers
+the default branch from the event instead of hard-coding its name. Other branches
+and branch creation/deletion events are skipped because they are outside the
+existing-default-branch comparison. The workflow has read-only permissions and
+does not generate catalogs, rewrite versions, or revert a failed merge.
+
+Push mode requires forward history and compares the actual resulting tree;
+rewinds, divergent history, or unavailable revisions fail. The unit of comparison
+is the entire push, not `HEAD^`: two patch increments `1.2.3 -> 1.2.4 -> 1.2.5`
+in one push fail, while two separate pushes may each increment once. With an
+existing `1.2.3` version, the only changed values are `1.2.4`, `1.3.0`, or `2.0.0`,
+with the corresponding declaration and evidence. Unchanged versions remain valid.
+The PR check continues to catch these errors before merging; the push job detects
+violations after updates to the default branch.
+
 The validator reads committed Git blobs and compares the base's recorded versions
 with the simulated merge result. An unrelated base advance does not count as a
 PR downgrade; conflicting changes fail until resolved. It may create temporary
