@@ -17,6 +17,7 @@ fi
 echo "Reviewing committed PR tree against $BASE_REF"
 git diff --name-status --find-renames "${BASE_REF}...HEAD"
 python3 scripts/pr_review_guard.py --base "$BASE_REF"
+python3 scripts/version_guard.py --base "$BASE_REF"
 git diff --check "${BASE_REF}...HEAD"
 
 python3 - <<'PY'

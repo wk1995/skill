@@ -280,7 +280,20 @@ dist/codex/
 
 The Codex plugin has its own artifact version, and the Codex adapter has its own version. Neither replaces or automatically bumps the independent version of each portable Skill. The plugin shape follows the [official OpenAI plugin documentation](https://developers.openai.com/plugins/build/plugins).
 
-## Versioning And Releases (Planned)
+## Versioning And Releases
+
+The required [Versioning Policy](docs/versioning-policy.md) uses `MAJOR.MINOR.PATCH`:
+PATCH for compatible fixes and small optimizations, MINOR for compatible new
+capabilities, and MAJOR for breaking changes with migration evidence. Small fixes
+must not increase MAJOR. Increment one level once per release and reset lower
+levels. Behavior-neutral documentation and repository maintenance need no component
+bump. CI enforces version formats, increments, and changelog declarations with
+`python3 scripts/version_guard.py --base <PR-base>`; compatibility claims still
+require review. Version validation applies now; packaging and publishing
+automation below remain planned.
+The `default-branch-version` workflow also validates the entire before/after
+change after a push or merge to the default branch, allowing only unchanged
+versions or one-step upgrades with lower parts reset.
 
 - The single source of truth for a Skill version is `metadata.version` in `SKILL.md`.
 - `.changes/` records the affected Skill, bump level, and change summary.
