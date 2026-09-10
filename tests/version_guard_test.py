@@ -98,6 +98,165 @@ class VersionGuardTests(unittest.TestCase):
             self.assertIn("::error::", output)
         return output
 
+    def test_ambiguous_metadata_is_rejected_before_consumption(self):
+        for field, value in (("version", "9.0.0"), ("sync_id", "other-skill")):
+            for location in ("before", "after", "top", "comment"):
+                with self.subTest(field=field, location=location):
+                    self.reset()
+                    original = self.skill.read_text()
+                    nested = f'  upstream:\n    {field}: "{value}"\n'
+                    if location == "before":
+                        content = original.replace("metadata:\n", "metadata:\n" + nested)
+                    elif location == "after":
+                        content = original.replace('\n---\n# Demo', '\n' + nested + '---\n# Demo')
+                    elif location == "top":
+                        content = original.replace("metadata:\n", f'{field}: "{value}"\nmetadata:\n')
+                    else:
+                        content = re.sub(rf'^(  {field}: .*?)$', r'\1 # example', original, flags=re.M)
+                    self.skill.write_text(content)
+                    self.commit()
+                    for mode in ("pr", "push"):
+                        self.run_guard("ambiguous metadata", mode=mode)
+                    self.skill.write_text(original)
+                    self.commit()
+                    for mode in ("pr", "push"):
+                        self.run_guard(mode=mode)
+                        self.run_guard(mode=mode)
+
+    def test_metadata_duplicate_keys_cannot_hide_empty_values(self):
+        original = self.skill.read_text()
+        for key, value in (("version", "1.2.3"), ("sync_id", "demo")):
+            for extra in ('""', "''", "", f'"{value}"'):
+                with self.subTest(key=key, extra=extra):
+                    content = original.replace("metadata:\n", f"metadata:\n  upstream:\n    {key}: {extra}\n")
+                    with self.assertRaisesRegex(ValueError, "ambiguous metadata"):
+                        version_guard.metadata(content, "SKILL.md")
+
+    def test_markdown_fence_and_comment_state(self):
+        for hidden in (
+            "````markdown\n```\n## hidden\n<!--\n````",
+            "~~~\n```\n## hidden\n<!--\n~~~~",
+            "<!--\n```\n## hidden\n-->",
+            "<!-- ## hidden -->",
+        ):
+            with self.subTest(hidden=hidden):
+                rendered = version_guard.markdown_prose(hidden + "\n## visible\n")
+                self.assertNotIn("hidden", rendered)
+                self.assertIn("## visible", rendered)
+        for opening in ("```", "~~~", "<!--"):
+            self.assertNotIn("hidden", version_guard.markdown_prose(opening + "\n## hidden"))
+        rendered = version_guard.markdown_prose("- Summary: <!-- hidden -->")
+        with self.assertRaisesRegex(ValueError, "Summary"):
+            version_guard.declaration(rendered, "Summary", "CHANGELOG.md")
+
+    def test_unambiguous_metadata_agrees_with_real_consumers(self):
+        from contextlib import ExitStack
+        from unittest.mock import patch
+        import agent_build
+        import skill_catalog
+
+        sync_scripts = str(ROOT / "skills/sync-skills/scripts")
+        sys.path.insert(0, sync_scripts)
+        self.addCleanup(sys.path.remove, sync_scripts)
+        import skill_sync
+        import skill_relationships
+
+        shutil.rmtree(self.skill.parent)
+        shutil.copytree(ROOT / "skills/choose-project-doc-location", self.skill.parent)
+        content = self.skill.read_text().replace("name: choose-project-doc-location", "name: demo")
+        content = content.replace('sync_id: "choose-project-doc-location"', 'sync_id: "demo"')
+        self.skill.write_text(content)
+        self.base = self.commit()
+        expected = version_guard.metadata(content, str(self.skill))
+        # Reproduce and then remove the ambiguity before producing a real artifact.
+        self.skill.write_text(content.replace("metadata:\n", 'metadata:\n  upstream:\n    version: "9.0.0"\n'))
+        self.commit()
+        self.run_guard("ambiguous metadata")
+        self.skill.write_text(content)
+        self.commit()
+        self.run_guard()
+        self.run_guard(mode="push")
+        shutil.rmtree(self.root / "platforms")
+        shutil.copytree(ROOT / "platforms", self.root / "platforms")
+        with ExitStack() as stack:
+            for module in (agent_build, skill_catalog):
+                stack.enter_context(patch.object(module, "ROOT", self.root))
+            stack.enter_context(patch.object(agent_build, "SKILLS_DIR", self.root / "skills"))
+            stack.enter_context(patch.object(agent_build, "PLATFORMS_DIR", self.root / "platforms"))
+            stack.enter_context(patch.object(agent_build, "DEFAULT_OUTPUT_DIR", self.root / "dist"))
+            skill_catalog.validate_skill(self.skill.parent)
+            self.assertEqual(skill_catalog.frontmatter(self.skill)["version"], expected["version"])
+            self.assertEqual(agent_build.skill_metadata(self.skill.parent)[1:],
+                             (expected["sync_id"], expected["version"]))
+            for field in ("sync_id", "version"):
+                self.assertEqual(skill_sync.read_skill_metadata(self.skill.parent)[field], expected[field])
+            related = skill_relationships.read_skill(self.skill.parent)
+            self.assertEqual(related["sync_id"], expected["sync_id"])
+            self.assertEqual(related["core_version"], expected["version"])
+            output = agent_build.build("codex", [], str(self.root / "dist/codex"), False)
+            manifest = json.loads((output / ".agent-build.json").read_text())
+            self.assertEqual(manifest["skills"][0]["core_version"], expected["version"])
+
+    def test_hidden_release_headings_and_fields_are_not_evidence(self):
+        wrappers = (("```markdown", "```"), ("~~~~markdown", "~~~~"),
+                    ("   ```markdown", "   ````"), ("<!--", "-->"))
+        for kind in ("skill", "adapter", "artifact"):
+            for opening, closing in wrappers:
+                for hidden in ("entry", "fields"):
+                    with self.subTest(kind=kind, opening=opening, hidden=hidden):
+                        self.reset()
+                        self.set_version(kind, "2.0.0")
+                        self.add_release(kind, "2.0.0", "breaking",
+                                         "- Breaking-Change: Old inputs removed.\n- Migration: Update inputs.\n")
+                        path = (self.skill if kind == "skill" else self.adapter).with_name("CHANGELOG.md")
+                        content = path.read_text()
+                        start = content.index("## [artifact 2.0.0]" if kind == "artifact" else "## [2.0.0]")
+                        if hidden == "fields":
+                            start = content.index("- Change-Type:", start)
+                        end = content.index("## [1.2.3]", start)
+                        path.write_text(content[:start] + opening + "\n" + content[start:end]
+                                        + closing + "\n\n" + content[end:])
+                        self.commit()
+                        for mode in ("pr", "push"):
+                            self.run_guard("release entry" if hidden == "entry" else "Change-Type", mode=mode)
+
+    def test_release_examples_do_not_shadow_real_entries(self):
+        for kind in ("skill", "adapter", "artifact"):
+            for opening, closing in (("````markdown", "````"), ("~~~", "~~~"), ("<!--", "-->")):
+                with self.subTest(kind=kind, opening=opening):
+                    self.reset()
+                    original_base = self.base
+                    path = (self.skill if kind == "skill" else self.adapter).with_name("CHANGELOG.md")
+                    label = "artifact 1.2.4" if kind == "artifact" else "1.2.4"
+                    path.write_text(path.read_text() + f"\n{opening}\n## [{label}] - 2026-01-02\n"
+                                    "- Change-Type: breaking\n- Summary: Example only.\n"
+                                    f"{closing}\n")
+                    example_base = self.commit()
+                    self.set_version(kind, "1.2.4")
+                    self.add_release(kind, "1.2.4", "fix")
+                    self.commit()
+                    for mode in ("pr", "push"):
+                        self.run_guard(base=example_base, mode=mode)
+                        self.run_guard(base=example_base, mode=mode)
+                    self.base = original_base
+
+    def test_renamed_skill_can_release_its_old_directory(self):
+        self.skill.parent.rename(self.root / "skills/renamed")
+        moved = self.root / "skills/renamed/SKILL.md"
+        moved.write_text(moved.read_text().replace("name: demo", "name: renamed"))
+        self.write(self.skill, '---\nname: demo\nmetadata:\n  sync_id: new-skill\n  version: "0.1.0"\n---\n# New Skill\n')
+        self.write(self.skill.with_name("CHANGELOG.md"), "# Changelog\n\n## [Unreleased]\n\n")
+        self.add_release("skill", "0.1.0", "initial")
+        self.commit()
+        for mode in ("pr", "push"):
+            self.run_guard(mode=mode)
+            self.run_guard(mode=mode)
+        # Removing the continuing identity makes this an actual replacement.
+        shutil.rmtree(moved.parent)
+        self.commit()
+        for mode in ("pr", "push"):
+            self.run_guard("sync_id is immutable", mode=mode)
+
     def test_all_owners_reject_invalid_formats(self):
         for kind in ("skill", "adapter", "artifact"):
             for value in ("01.2.3", "1.02.3", "1.2.03", "1.2", "1.2.3.4", "v1.2.3",
@@ -278,7 +437,7 @@ class VersionGuardTests(unittest.TestCase):
     def test_scoped_metadata_and_malformed_inputs(self):
         self.skill.write_text(self.skill.read_text().replace('  version: "1.2.3"', '  version: "01.2.3"\n  urls:\n    version: "1.2.3"'))
         self.commit()
-        self.run_guard("canonical MAJOR.MINOR.PATCH")
+        self.run_guard("ambiguous metadata")
         for replacement in ('  version: "1.2.3"\n  version: "1.2.4"', '  version: [1, 2, 3]'):
             self.reset()
             self.skill.write_text(self.skill.read_text().replace('  version: "1.2.3"', replacement))

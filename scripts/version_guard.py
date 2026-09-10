@@ -70,6 +70,16 @@ def metadata(content: str, path: str) -> dict[str, str]:
         require(scalar, f"{path}: metadata.{key} must be a plain or quoted scalar")
         values[key] = next(value for value in scalar.groups() if value is not None)
     require(set(values) == {"sync_id", "version"}, f"{path}: require metadata.sync_id and metadata.version")
+    # Existing builders/sync readers select the first scalar match anywhere in
+    # frontmatter; the catalog selects the last. Until those external-compatible
+    # readers share a scoped parser, admit only inputs on which they all agree.
+    for key, value in values.items():
+        occurrences = re.findall(r"^\s*" + key + r"\s*:", match[1], re.MULTILINE)
+        matches = re.findall(r"^\s*" + key + r'''\s*:\s*["']?([^"'\n]+)["']?\s*$''',
+                             match[1], re.MULTILINE)
+        require(len(occurrences) == len(matches) == 1 and matches[0].strip() == value,
+                f"{path}: ambiguous metadata.{key}; use one direct scalar without inline comments "
+                "and no other occurrence of that key in frontmatter")
     return values
 
 
@@ -134,9 +144,49 @@ def unique_json_keys(pairs: list[tuple[str, object]]) -> dict:
     return result
 
 
+def markdown_prose(content: str) -> str:
+    """Mask fenced examples and HTML comments before interpreting release fields."""
+    result = []
+    fence = None
+    in_comment = False
+    for line in content.splitlines():
+        if fence:
+            if re.fullmatch(r" {0,3}" + re.escape(fence[0]) + "{" + str(fence[1]) + r",}[ \t]*", line):
+                fence = None
+            result.append("")
+            continue
+        opening = re.match(r"^ {0,3}(`{3,}|~{3,})(.*)$", line) if not in_comment else None
+        if opening and (opening[1][0] == "~" or "`" not in opening[2]):
+            fence = (opening[1][0], len(opening[1]))
+            result.append("")
+            continue
+        # Preserve columns outside comments so hidden text cannot create a new
+        # column-zero heading or bullet. Fence markers inside comments are inert.
+        visible = ""
+        while line:
+            if in_comment:
+                end = line.find("-->")
+                if end < 0:
+                    visible += " " * len(line)
+                    break
+                visible += " " * (end + 3)
+                line = line[end + 3:]
+                in_comment = False
+            else:
+                start = line.find("<!--")
+                if start < 0:
+                    visible += line
+                    break
+                visible += line[:start] + " " * 4
+                line = line[start + 4:]
+                in_comment = True
+        result.append(visible)
+    return "\n".join(result)
+
+
 def release_entry(tree: Tree, component: Component) -> tuple[str, str]:
     label = ("artifact " if component.artifact else "") + component.version
-    content = tree.read(component.changelog)
+    content = markdown_prose(tree.read(component.changelog))
     headings = list(re.finditer(r"^## (.+)$", content, re.MULTILINE))
     matches = [(i, heading) for i, heading in enumerate(headings)
                if heading[1].startswith(f"[{label}]")]
@@ -161,7 +211,7 @@ def declaration(body: str, field: str, path: str) -> str:
 def validate_release(base: Tree, result: Tree, old: Component | None, new: Component) -> None:
     label, body = release_entry(result, new)
     if old:
-        previous = base.read(old.changelog)
+        previous = markdown_prose(base.read(old.changelog))
         require(not re.search(r"^## \[" + re.escape(label) + r"\]", previous, re.MULTILINE),
                 f"{new.changelog}: cannot reuse existing release [{label}]")
     change_type = declaration(body, "Change-Type", new.changelog)
@@ -208,7 +258,8 @@ def check(base_ref: str, head_ref: str, mode: str = "pr") -> int:
     for key, new in after.items():
         previous_at_path = old_paths.get(new.path)
         if new.key[0] == "skill" and previous_at_path:
-            require(previous_at_path.key == key, f"{new.path}: metadata.sync_id is immutable")
+            require(previous_at_path.key == key or previous_at_path.key in after,
+                    f"{new.path}: metadata.sync_id is immutable")
         old = before.get(key)
         if old is None or old.version != new.version:
             validate_release(base, result, old, new)

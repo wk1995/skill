@@ -134,6 +134,12 @@ Missing Git, missing refs, malformed metadata, ambiguous identities, or unreadab
 release records fail the check. Component directories and metadata cannot be
 symlinks or submodules. Skill metadata uses a block-style YAML `metadata` mapping
 with direct scalar `sync_id` and `version` keys; adapter manifests use JSON.
+Each of those YAML keys must occur only once in the frontmatter, without inline
+comments. Nested or other duplicate occurrences are rejected, even when values
+match, so the CI validator, catalog, builder, and sync readers agree on the
+identity and version. Put an upstream version under a distinct key such as
+`upstream_version`. This restriction is on repository inputs, not external sync
+compatibility.
 
 CI checks the format of all current Skill, adapter, and artifact versions. For
 each added component or changed version, it requires a new, uniquely headed entry
@@ -151,7 +157,9 @@ Use `## [<version>] - YYYY-MM-DD` for Skill and adapter releases. Use
 `## [artifact <version>] - YYYY-MM-DD` for artifact releases so the adapter and
 artifact cannot accidentally share evidence when their numbers match. The fields
 are literal, single-line Markdown bullets inside that release section; their
-names and enum values remain English in all changelogs.
+names and enum values remain English in all changelogs. Headings and fields in
+backtick/tilde fenced code blocks or HTML comments are examples, not release
+evidence; they also do not count as duplicate or previously released entries.
 
 | `Change-Type` | Permitted version change | Additional required fields |
 | --- | --- | --- |
@@ -164,7 +172,9 @@ names and enum values remain English in all changelogs.
 A release declared as `fix` cannot change `1.2.3` to `2.0.0`. Downgrades, skipped
 numbers, missing resets, duplicate or reused release headings, and missing
 declarations fail. Skill versions are matched by immutable `metadata.sync_id`,
-so renaming a directory does not reset its version history. Adapter and artifact
+so renaming a directory does not reset its version history. A new Skill may use
+the freed directory if the original identity continues at another path; the new
+identity must satisfy the initial-release rules. Adapter and artifact
 histories are checked independently by adapter ID.
 
 Unchanged versions and existing historical entries do not need these new fields;
