@@ -1,11 +1,13 @@
 ---
 name: version-upgrade-policy
-description: Define, choose, validate, or apply a project's own release versions, including initial values, compatibility-based increments, custom formats, changelog evidence, and version-policy CI checks. Do not use for dependency/tool upgrades, ordinary code fixes, or build/publish execution alone.
+description: Define and apply project release-version rules, custom formats, initial values, changelog evidence, and CI checks. Add or update AGENTS.md rules that trigger proactive version-impact assessment after code changes. Use when version-policy work is requested or required by project instructions; exclude dependency/tool upgrades or build/publish execution alone.
 metadata:
   sync_id: "version-upgrade-policy"
   version: "0.1.0"
   triggering:
     include:
+      - Add, update, or review AGENTS.md instructions that require proactive version-impact assessment after features, fixes, optimizations, or public-contract changes.
+      - The applicable project instructions require version-impact assessment after a change, even when the user did not explicitly request a version bump.
       - Define or explain a project's own release-version format, component meanings, ordering, successor rules, resets, or initial value.
       - Decide whether released changes need a version bump and which level matches fixes, features, or breaking compatibility.
       - Validate or apply a requested release version in the project's authoritative source version fields using its existing policy.
@@ -14,7 +16,7 @@ metadata:
     exclude:
       - Only update dependencies, lockfiles, runtimes, SDKs, or tools, resolve package versions, or compare third-party versions under package-manager rules, without deciding the project's own release version.
       - Only compile, test, sign, package, create branches or tags, merge, publish, deploy, or roll back an already-selected release; a supplied version is only an execution input.
-      - Only implement a feature, fix a bug, optimize code, or edit documentation, without a requested or project-required release-version decision.
+      - Only implement a feature, fix a bug, optimize code, or edit documentation, without requested or project-required version-policy work or release-impact assessment.
       - Only format or translate existing release notes without assessing the version decision or its required evidence.
       - Only install, synchronize, inventory, or restore Skill copies without designing or reviewing their release-version policy.
 ---
@@ -30,6 +32,14 @@ Select this Skill when the requested deliverable, or an explicit project require
 For a mixed request, apply this Skill only to its version-policy portion. For example, upgrading a dependency and deciding the application's next version includes a policy decision; upgrading that dependency alone does not. Building version `1.2.4` uses a selected version, while changing the source version to `1.2.4` requires validation and applies this Skill. An existing policy remains authoritative when implementing its checks; do not redesign it merely because this Skill was selected.
 
 If "upgrade the version" does not identify whether the target is the project's release, a dependency, or a tool, inspect task context and the relevant version fields. Ask which target is intended if it remains unclear before changing versions. Selection does not authorize unrelated branches, tags, publication, deployment, or synchronization.
+
+When the applicable AGENTS.md requires proactive version assessment, feature and bug-fix tasks trigger this Skill for that assessment even without an explicit bump request. Assessing an impact can conclude no bump or pending release notes; it is not an instruction to increment after every commit.
+
+## Install Persistent Project Rules
+
+When asked to add version constraints to AGENTS.md, read [Add Version Rules To AGENTS.md](references/agents-integration.md). Resolve the target scope, inspect existing instructions and version conventions, then merge a concise proactive-assessment section. Preserve unrelated content and established formats, avoid duplicate sections on repeated use, and retain a self-contained fallback if this Skill is unavailable.
+
+This integration is performed when requested; ordinary version decisions do not silently create or change AGENTS.md. Report the edited file and the rule that will make future feature/fix work assess version impact. Keep development notes separate from the project's release-finalization step.
 
 ## Establish the format
 
