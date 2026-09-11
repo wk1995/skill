@@ -2,15 +2,41 @@
 
 Language: English | [简体中文](versioning-policy.zh-CN.md)
 
-This is the repository's required policy for choosing version increments. It
-applies to new releases; it does not renumber existing releases. The policy is
-enforced through CI, contribution, and review rules. CI checks version syntax,
-increments, and release declarations; reviewers determine whether compatibility
-claims accurately describe the implementation.
+This document describes upgrade principles for project-defined version formats,
+then records the concrete rules currently enforced in this repository. General
+versions need not contain three numbers: projects define the component count,
+token types, and meanings. Repository rules apply to new releases without
+renumbering existing ones. CI checks syntax, increments, and declarations;
+reviewers determine whether compatibility evidence describes the implementation.
 
-## Format And Ownership
+## General Version Formats
 
-Use `MAJOR.MINOR.PATCH` (`x.x.x`), matching
+A version consists of project-defined components: two, three, four, or another
+count. Components may contain numbers, letters, enum labels, or mixed tokens;
+separators are also project-defined. `1.2`, `1.2.3.4`, `A.B`, and `1-rc-7` can
+all be project version formats, but their appearance does not establish their
+component meanings or upgrade rules.
+
+Define each component's meaning, allowed values, precedence, successor rule,
+reset value, and whether component counts may change. One step usually means
+adding one for a numeric counter; letters and enums require an explicit
+successor table. Do not invent what follows `Z` or substitute lexical ordering
+for the project's version order. A two-part scheme without a separate feature
+component may assign compatible features and fixes to the same component.
+An additional fourth component also needs a meaning; do not assume it is an
+irrelevant suffix.
+
+For a new project with neither an explicit nor a project-required initial value,
+default to numeric `0.0.1`. If an explicitly chosen two-part, four-part, or
+alphabetic format cannot represent it, resolve a compatible starting value
+without changing the format to fit the default. Never reset existing releases.
+See the reusable [version-upgrade-policy Skill](../skills/version-upgrade-policy/README.md).
+
+## Current Repository Format And Ownership
+
+The following is this repository's implemented CI format, not a universal
+restriction on other projects. Stored Skill, adapter, and artifact versions use
+`MAJOR.MINOR.PATCH` (`x.x.x`), matching
 `^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$`.
 Each part is a non-negative decimal integer, not a single digit: `1.2.10` is valid.
 Leading zeroes, a `v` prefix, prerelease suffixes, and build metadata are not
@@ -30,13 +56,41 @@ packaging-only change does not bump the portable Skill. Evaluate a released
 bundle against its own previous release, including changes in bundled Skills.
 See [Agent Build Architecture](agent-build-architecture.md) for ownership details.
 Integer `schema_version` fields and versions in external user projects are
-outside this policy. Reading legacy or external version strings is not the same
+outside this repository-specific profile. Reading legacy or external version strings is not the same
 as authoring a repository release; this policy does not narrow sync parsers.
 
-## Select The Increment
+## Select The Version Component
 
-Choose the lowest level that fully describes the compatibility impact of all
-changes since the same component's last release.
+Compare with the same component's previous release, assess compatibility impact,
+and select the part assigned that meaning by the project. Choose the lowest
+level that covers all released changes; neither the number of parts nor whether
+the tokens are numeric determines that level.
+
+| Change impact | General upgrade rule |
+| --- | --- |
+| Compatible fix or equivalent optimization | Advance the project's maintenance component |
+| Compatible new capability | Advance the feature component, or the shared component if features and fixes share one |
+| Break an existing contract | Advance the compatibility component and provide migration evidence |
+| No behavior or contract change needing release | Keep the version unchanged |
+
+Advance the highest necessary level once per release. Keep more significant
+components unchanged; reset or retain less significant components as the project
+specifies. Reset values need not be `0`; precedence cannot be inferred solely
+from left-to-right position.
+
+Each example below has its own explicit contract; it is not a rule for every
+version string with the same shape:
+
+| Format and contract | One-step examples |
+| --- | --- |
+| Two numbers: compatibility, compatible updates; second part starts at `0` | Fix `1.2 → 1.3`; breaking change `1.2 → 2.0` |
+| Four numbers: compatibility, feature, maintenance, build; reset lower parts to `0` | Fix `1.2.3.4 → 1.2.4.0`; build-only revision `1.2.3.4 → 1.2.3.5` |
+| Two letters: compatibility, maintenance; successor table `A → B → C`, maintenance starts at `A` | Fix `A.B → A.C`; breaking change `A.B → B.A` |
+
+### Repository Three-Number Mapping
+
+This repository currently maps those impact levels to `MAJOR.MINOR.PATCH`.
+The following table describes that specific contract.
 
 | Level | Required condition | Examples | From `1.2.3` |
 | --- | --- | --- | --- |
@@ -58,7 +112,7 @@ determine the level. A severe bug can still be PATCH; a one-line contract break
 can be MAJOR. If compatibility is unclear, investigate the affected callers and
 document the result before choosing a level. Do not default to MAJOR to be safe.
 
-## Increment Mechanics And Early Versions
+## Repository Increment Mechanics And Early Versions
 
 - Increment the selected part by exactly one and set every lower part to zero:
   PATCH `1.2.3 -> 1.2.4`, MINOR `1.2.3 -> 1.3.0`, MAJOR `1.2.3 -> 2.0.0`.
@@ -77,7 +131,7 @@ document the result before choosing a level. Do not default to MAJOR to be safe.
   (`0.x.x -> 1.0.0`). Document the supported contract and readiness evidence.
   A small fix or optimization alone is not evidence of stable-release readiness.
 
-## Required Release Evidence
+## Required Repository Release Evidence
 
 Before changing a version, record the following in the PR or change description:
 
@@ -101,7 +155,12 @@ artifact release while leaving unchanged Skill and adapter behavior versions
 alone. The future `.changes/` workflow mentioned in the root README is not a
 prerequisite: the change description and owning changelog carry this evidence.
 
-## CI Validation
+## Repository CI Validation
+
+The current `scripts/version_guard.py` enforces only the three-number rules
+below. It does not parse the custom two-part, four-part, or alphabetic formats
+above. Other projects applying the general principles need parsing and shared
+validation that implement their own format.
 
 Run `python3 scripts/version_guard.py --base origin/main` after committing the
 change. The required `skill-catalog` check runs this validator before generating
