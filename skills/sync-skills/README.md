@@ -131,6 +131,24 @@ Supported Builders come from `platforms/*/adapter.json`; the report is not limit
 
 Reports default to the checkout-specific external state directory. If `--output-dir` is supplied, it must remain outside the repository and every Skill input tree. `--strict` returns exit code 2 when the new report contains findings or unlinked copies; healthy `synced` and `project-only` entries pass.
 
+### Synchronize all repository Skills to this machine
+
+Ask: "Synchronize all current repository Skills to my local Agent installations,
+and resolve incomplete build coverage." The workflow inventories current sources
+and declared Builders, builds missing or stale outputs for all supported Builders
+unless you limit the Agent scope, and installs only into the selected local targets.
+An inventory command alone does not build anything; building all adapters does
+not install into every discovered root.
+
+Completion reports distinguish build coverage, selected installation results, and
+machine-wide warnings. Zero version or content drift does not mean missing builds
+or identities have been resolved. Old machine paths need verified registration
+correction; removed or split Skills need a retirement decision with backup, not
+automatic restoration or reassignment of their identity. Other local Skills keep
+their metadata warnings until their own sources can be repaired. See the
+[repository-to-machine workflow](references/sync-model.md#repository-to-machine-synchronization)
+for the detailed procedure and recovery boundaries.
+
 ### Repair a registered Agent installation
 
 Build the current adapter output, then repair the registered installation from its trusted manifest-v2 build:

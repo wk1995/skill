@@ -131,6 +131,18 @@ python3 skills/sync-skills/scripts/skill_sync.py relationships \
 
 报告默认写入 checkout 专属的仓库外状态目录。如果使用 `--output-dir`，目标必须位于仓库和所有 Skill 输入树之外。使用 `--strict` 时，新报告只要含有问题或未关联副本就返回退出码 2；健康的 `synced` 与 `project-only` 项会通过。
 
+### 将本仓库全部 Skill 同步到本机
+
+可以这样提出请求：“把本仓库当前全部 Skill 同步到本机 Agent 安装目录，并处理构建覆盖不完整的问题。”
+流程会盘点当前源码和已声明的 Builders；除非你限定 Agent 范围，否则为所有受支持的 Builder
+补齐缺失或过期构建，再仅安装到选定的本机目标。盘点命令本身不会构建；构建所有 adapter
+也不代表会向每个发现的安装根目录写入内容。
+
+完成报告会分别说明构建覆盖、选定安装的结果和全机警告。版本或内容零漂移不代表缺失构建或
+身份问题已经解决。旧机器路径需要经核实后修正登记；已删除或拆分的 Skill 需要在备份后按
+用户选择退役，不能自动恢复或改写身份。其他本机 Skill 的元数据警告会保留，直到能够从各自
+来源修复。详细流程和恢复边界见[仓库到本机同步流程](references/sync-model.md#repository-to-machine-synchronization)。
+
 ### 修复已登记的 Agent 安装
 
 先构建当前 adapter 产物，再从可信 manifest-v2 构建修复已登记安装：

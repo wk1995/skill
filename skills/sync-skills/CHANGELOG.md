@@ -6,9 +6,15 @@ version, date, and a change summary.
 
 ## [Unreleased]
 
-- Correct both README guides to distinguish role synchronization from named-location inventory and Agent repair, and explain that conversion resolves symbolic links rather than rejecting them. No runtime behavior, triggers, or versions change.
+## [0.2.4] - 2026-09-11
 
-- Expand the English and Chinese README coverage for every supported command, location role, source-selection rule, report workflow, installation repair path, state migration, and recovery behavior. This is a documentation-only change with no version or trigger-metadata change.
+- Change-Type: fix
+- Summary: Complete the existing repository-to-machine sync instructions with declared-Builder coverage, selected install verification, and diagnosis of stale registrations, retired Skills, and unrelated local metadata warnings.
+- Compatibility: Existing triggers, CLI commands, state formats, and replacement authorization remain unchanged; no migration is required. Inventory stays read-only with respect to builds and installations.
+
+- Correct both README guides to distinguish role synchronization from named-location inventory and Agent repair, and explain that conversion resolves symbolic links rather than rejecting them.
+
+- Expand the English and Chinese README coverage for every supported command, location role, source-selection rule, report workflow, installation repair path, state migration, and recovery behavior.
 
 ## [0.2.3] - 2026-09-08
 
