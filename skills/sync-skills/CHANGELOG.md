@@ -6,17 +6,12 @@ version, date, and a change summary.
 
 ## [Unreleased]
 
-## [0.3.0] - 2026-09-11
-
-- Change-Type: feature
-- Summary: Add an offline HTML relationship dashboard with search, abnormal-Skill filtering, dynamic Builder columns, full installation provenance, and warning details. Add html/all format choices and generate all three formats by default, including mutation-triggered refreshes.
-- Compatibility: JSON report schema, Markdown output, explicit json/markdown/both selections, exit codes, and snapshot contracts remain supported. Default report paths add an html key; no migration or new dependency is required. HTML shares protected paths, private permissions, and transactional replacement/recovery with existing formats.
-
 ## [0.2.4] - 2026-09-11
 
 - Change-Type: fix
-- Summary: Complete the existing repository-to-machine sync instructions with declared-Builder coverage, selected install verification, and diagnosis of stale registrations, retired Skills, and unrelated local metadata warnings.
-- Compatibility: Existing triggers, CLI commands, state formats, and replacement authorization remain unchanged; no migration is required. Inventory stays read-only with respect to builds and installations.
+- Summary: Complete repository-to-machine sync instructions with declared-Builder coverage, selected install verification, and diagnosis of stale registrations, retired Skills, and unrelated local metadata warnings. Add an offline HTML relationship dashboard with search, abnormal-Skill filtering, dynamic Builder columns, full installation provenance, and warning details.
+- Compatibility: Existing triggers, JSON report schema, Markdown output, explicit json/markdown/both selections, exit codes, state formats, replacement authorization, and snapshot contracts remain supported. Optional html/all format choices are added; default report paths add an html key and mutation-triggered refreshes generate all three formats. No migration or new dependency is required. HTML shares protected paths, private permissions, and transactional replacement/recovery with existing formats. Inventory stays read-only with respect to builds and installations.
+- Release-Version: The maintainer explicitly selected 0.2.4 for this combined release, including the new HTML capability, overriding the usual minor-version classification. The earlier branch-only 0.3.0 entry is consolidated here before publication.
 
 - Correct both README guides to distinguish role synchronization from named-location inventory and Agent repair, and explain that conversion resolves symbolic links rather than rejecting them.
 
