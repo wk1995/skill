@@ -6,6 +6,12 @@ version, date, and a change summary.
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-09-11
+
+- Change-Type: feature
+- Summary: Add an offline HTML relationship dashboard with search, abnormal-Skill filtering, dynamic Builder columns, full installation provenance, and warning details. Add html/all format choices and generate all three formats by default, including mutation-triggered refreshes.
+- Compatibility: JSON report schema, Markdown output, explicit json/markdown/both selections, exit codes, and snapshot contracts remain supported. Default report paths add an html key; no migration or new dependency is required. HTML shares protected paths, private permissions, and transactional replacement/recovery with existing formats.
+
 ## [0.2.4] - 2026-09-11
 
 - Change-Type: fix

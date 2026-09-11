@@ -3,8 +3,10 @@
 
 from __future__ import annotations
 
+import base64
 import fcntl
 import hashlib
+import html
 import importlib.util
 import json
 import os
@@ -25,6 +27,15 @@ ENV_NAME = re.compile(r"^[A-Z_][A-Z0-9_]*$")
 IGNORED_DIRECTORY_NAMES = {".git", "dist", "node_modules", "__pycache__", ".pytest_cache"}
 IGNORED_FILE_NAMES = {".DS_Store"}
 BYTECODE_SUFFIXES = {".pyc", ".pyo"}
+REPORT_FILENAMES = {
+    "json": "skill-relationships.json",
+    "markdown": "skill-relationships.md",
+    "html": "skill-relationships.html",
+}
+REPORT_FORMATS = {
+    "json": ("json",), "markdown": ("markdown",), "html": ("html",),
+    "both": ("json", "markdown"), "all": ("json", "markdown", "html"),
+}
 
 
 class RelationshipError(Exception):
@@ -1153,6 +1164,203 @@ def markdown_report(report: dict[str, Any]) -> str:
     return "\n".join(lines).rstrip() + "\n"
 
 
+def html_report(report: dict[str, Any]) -> str:
+    """Render untrusted inventory text as an offline, accessible HTML document."""
+    def escaped(value: Any) -> str:
+        return html.escape(str(value if value is not None else "—"), quote=True)
+
+    def code(value: Any) -> str:
+        return f"<code>{escaped(value)}</code>"
+
+    def badges(statuses: Iterable[str]) -> str:
+        return " ".join(
+            f'<span class="badge {"ok" if status == "synced" else "neutral" if status == "project-only" else "warning"}">{escaped(status)}</span>'
+            for status in statuses
+        )
+
+    def detail(label: str, value: Any) -> str:
+        return f'<div class="detail"><span>{escaped(label)}</span>{code(value)}</div>'
+
+    builders = report["agent_builders"]
+    summary_labels = {
+        "current_project_skill_count": "仓库 Skills", "build_complete_count": "构建完整",
+        "local_skill_count": "本机 Skills", "issue_count": "问题与警告",
+        "build_partial_count": "构建部分完成", "build_missing_count": "构建缺失",
+        "agent_version_diverged_count": "版本漂移", "agent_install_diverged_count": "安装内容漂移",
+        "related_project_count": "关联项目",
+    }
+    metrics = "".join(
+        f'<div class="metric"><dt>{label}</dt><dd>{escaped(report["summary"][key])}</dd></div>'
+        for key, label in summary_labels.items()
+    )
+    builder_headers = "".join(
+        f'<th scope="col">{escaped(builder["id"])}<small>adapter {escaped(builder["adapter_version"])} · artifact {escaped(builder["artifact_version"])}</small></th>'
+        for builder in builders
+    )
+    rows = []
+    for skill in report["skills"]:
+        portable = skill["portable"]
+        attention = any(status not in {"synced", "project-only"} for status in skill["statuses"])
+        cells = [
+            f'<th scope="row">{escaped(skill["name"])}<small>{code(skill["sync_id"])}</small>'
+            + (detail("别名", ", ".join(skill["aliases"])) if skill["aliases"] else "") + "</th>",
+            "<td>" + detail("core", portable.get("core_version"))
+            + ("" if portable["present"] else '<p class="warning-text">源码缺失</p>')
+            + '<details><summary>源码路径与摘要</summary>' + detail("路径", portable["path"])
+            + detail("digest", portable.get("digest")) + "</details></td>",
+        ]
+        for builder in builders:
+            agent_id = builder["id"]
+            build = skill["agent_builds"][agent_id]
+            cell = "<td>"
+            if build["present"]:
+                cell += detail("构建 core", build["core_version"])
+                cell += '<details><summary>构建信息</summary>'
+                for label, key in (("adapter", "adapter_version"), ("artifact", "artifact_version"),
+                                   ("路径", "path"), ("manifest", "manifest_path"),
+                                   ("源码摘要", "portable_digest"), ("构建摘要", "output_digest")):
+                    cell += detail(label, build.get(key))
+                cell += "</details>"
+            else:
+                cell += '<p class="warning-text">构建缺失</p>'
+            installs = [item for item in skill["local_installs"] if item["agent_id"] == agent_id]
+            for install in installs:
+                cell += '<div class="install">' + badges(install["statuses"])
+                cell += detail("本机 core", install.get("core_version"))
+                cell += '<details><summary>安装信息</summary>'
+                for label, key in (("路径", "path"), ("sync ID", "sync_id"),
+                                   ("身份", "identity_status"), ("来源", "derived_from"), ("摘要", "digest")):
+                    cell += detail(label, install.get(key))
+                cell += "</details></div>"
+            if not installs:
+                cell += '<p class="muted">无本机安装</p>'
+            cells.append(cell + "</td>")
+        cells.append("<td>" + badges(skill["statuses"]) + "</td>")
+        rows.append(f'<tr data-skill-row data-attention="{str(attention).lower()}">' + "".join(cells) + "</tr>")
+
+    related = "".join(
+        '<li>' + code(skill["sync_id"]) + detail("类型", location["kind"])
+        + detail("所属项目 / 来源", location.get("project_id") or location.get("source_id"))
+        + detail("位置", location["path"]) + detail("core", location["core_version"]) + "</li>"
+        for skill in report["skills"] for location in skill["locations"]
+    )
+    unlinked = "".join(
+        "<li><strong>" + escaped(item["name"]) + "</strong> " + badges(item["statuses"])
+        + detail("位置", item["path"]) + detail("Builders", ", ".join(item["agent_ids"]))
+        + detail("sync ID", item.get("sync_id")) + detail("core", item.get("core_version")) + "</li>"
+        for item in report["unlinked_local_skills"]
+    )
+    issues = "".join(
+        '<li><strong>' + escaped(issue["severity"].upper()) + " · " + escaped(issue["code"]) + "</strong>"
+        + "<p>" + escaped(issue["message"]) + "</p>"
+        + "".join(detail(label, issue[key]) for label, key in
+                  (("Skill", "sync_id"), ("Agent", "agent_id"), ("路径", "path")) if key in issue) + "</li>"
+        for issue in report["issues"]
+    )
+    sources = "".join(
+        '<li><strong>' + escaped(source["kind"]) + " · " + escaped(source["id"]) + "</strong>"
+        + detail("位置 / resolver", source.get("path") or source.get("resolver"))
+        + detail("扫描状态", source["status"]) + detail("Skill 数", source["skill_count"]) + "</li>"
+        for source in report["scan_sources"]
+    )
+    empty = '<li class="muted">无记录。</li>'
+    script = """const query = document.getElementById('search');
+const attention = document.getElementById('attention');
+const rows = [...document.querySelectorAll('[data-skill-row]')];
+function filterRows() {
+  const term = query.value.trim().toLocaleLowerCase();
+  let count = 0;
+  for (const row of rows) {
+    row.hidden = !(row.textContent.toLocaleLowerCase().includes(term) &&
+      (!attention.checked || row.dataset.attention === 'true'));
+    if (!row.hidden) count++;
+  }
+  document.getElementById('visible-count').textContent = `显示 ${count} / ${rows.length} 个 Skill`;
+  document.getElementById('empty-results').hidden = count !== 0;
+}
+query.addEventListener('input', filterRows);
+attention.addEventListener('change', filterRows);
+filterRows();"""
+    script_hash = base64.b64encode(hashlib.sha256(script.encode("utf-8")).digest()).decode("ascii")
+    return f"""<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; script-src 'sha256-{script_hash}'; base-uri 'none'; form-action 'none'">
+<title>Skill 关系报表 · {escaped(report['project']['id'])}</title>
+<style>
+:root {{ color-scheme: light; --ink:#172a3a; --muted:#526779; --line:#dbe4eb; --accent:#176c66; }}
+* {{ box-sizing:border-box; }}
+body {{ margin:0; background:#f3f6f8; color:var(--ink); font:15px/1.6 system-ui,sans-serif; }}
+main {{ max-width:1600px; margin:auto; padding:40px 28px; }}
+header {{ margin-bottom:24px; }}
+.eyebrow {{ color:var(--accent); font-size:12px; font-weight:700; letter-spacing:.12em; }}
+h1 {{ font-size:32px; line-height:1.2; margin:10px 0; }}
+h2 {{ font-size:21px; margin:0 0 16px; }}
+p {{ margin:8px 0; }}
+.muted, small {{ color:var(--muted); }}
+small {{ display:block; font-weight:400; margin-top:5px; }}
+code {{ font:12px/1.6 ui-monospace,monospace; overflow-wrap:anywhere; white-space:normal; }}
+nav {{ display:flex; flex-wrap:wrap; gap:10px 22px; margin-top:20px; }}
+a {{ color:var(--accent); text-underline-offset:4px; }}
+.metrics {{ display:grid; grid-template-columns:repeat(20,minmax(0,1fr)); gap:12px; margin:0 0 24px; }}
+.metric {{ grid-column:span 5; border:1px solid var(--line); border-radius:12px; background:white; padding:16px 20px; }}
+.metric dt {{ color:var(--muted); font-size:13px; }}
+.metric dd {{ margin:4px 0 0; font-size:28px; font-weight:650; }}
+.metric:nth-child(n+5) {{ grid-column:span 4; background:transparent; padding:10px 20px; }}
+.metric:nth-child(n+5) dd {{ font-size:21px; }}
+section {{ background:white; border:1px solid var(--line); border-radius:14px; padding:22px; margin-bottom:20px; }}
+.toolbar {{ display:flex; align-items:center; flex-wrap:wrap; gap:14px; margin:14px 0; }}
+.search {{ flex:1; min-width:180px; max-width:480px; }}
+.search span {{ display:block; font-size:13px; margin-bottom:4px; }}
+input[type=search] {{ width:100%; border:1px solid #9bafbd; border-radius:7px; padding:10px; font:inherit; }}
+input[type=checkbox] {{ accent-color:var(--accent); }}
+:focus-visible {{ outline:3px solid #258b82; outline-offset:3px; }}
+.table-wrap {{ overflow:auto; border:1px solid var(--line); border-radius:9px; }}
+table {{ width:100%; min-width:900px; border-collapse:collapse; table-layout:fixed; }}
+caption {{ text-align:left; padding:12px; color:var(--muted); font-size:13px; }}
+th,td {{ text-align:left; vertical-align:top; padding:16px 12px; border-top:1px solid var(--line); overflow-wrap:anywhere; }}
+thead th {{ background:#edf3f6; font-size:13px; }}
+tbody th {{ font-size:14px; }}
+.badge {{ display:inline-block; padding:3px 7px; margin:2px 1px; border-radius:5px; font:11px/1.6 ui-monospace,monospace; overflow-wrap:anywhere; }}
+.ok {{ color:#125c43; background:#e1f2e9; }}
+.neutral {{ color:#405d73; background:#eaf0f5; }}
+.warning {{ color:#754705; background:#fff0cf; }}
+.warning-text {{ color:#85520c; font-size:13px; }}
+.detail {{ margin-top:7px; font-weight:400; }}
+.detail>span {{ display:block; color:var(--muted); font-size:11px; }}
+details {{ margin-top:10px; }}
+summary {{ cursor:pointer; color:var(--accent); font-size:12px; }}
+.install {{ margin-top:14px; border-top:1px dashed var(--line); padding-top:10px; }}
+.records {{ list-style:none; padding:0; margin:0; display:grid; gap:12px; }}
+.records li {{ padding:14px; background:#f6f8fa; border-radius:8px; overflow-wrap:anywhere; }}
+.columns {{ display:grid; grid-template-columns:1fr 1fr; gap:20px; }}
+footer {{ color:var(--muted); font-size:12px; }}
+[hidden] {{ display:none !important; }}
+@media(max-width:700px) {{ main {{ padding:24px 14px; }} h1 {{ font-size:27px; }} .metrics {{ grid-template-columns:repeat(2,minmax(0,1fr)); }} .metric,.metric:nth-child(n+5) {{ grid-column:span 1; }} .columns {{ display:block; }} section {{ padding:16px; }} }}
+@media print {{ body {{ background:white; }} main {{ max-width:none; padding:0; }} .toolbar,nav {{ display:none; }} .table-wrap {{ overflow:visible; }} table {{ min-width:0; }} section {{ break-inside:avoid; }} }}
+</style></head><body><main>
+<header><div class="eyebrow">SYNC SKILLS / LOCAL INVENTORY</div><h1>本机 Skill 关系报表</h1>
+<p>{escaped(report['project']['id'])} · 生成于 <time>{escaped(report['generated_at'])}</time></p>
+<p class="muted">{code(report['project']['root'])}</p>
+<nav aria-label="报表导航"><a href="#skills">构建与安装</a><a href="#issues">问题与警告</a><a href="#related">关联位置</a><a href="#sources">扫描来源</a></nav></header>
+<dl class="metrics">{metrics}</dl>
+<section id="skills"><h2>构建与安装</h2><p class="muted">按同一 Agent 的构建核对本机安装；完整构建不代表已在本机安装。</p>
+<div class="toolbar"><label class="search"><span>搜索 Skill、状态或路径</span><input id="search" type="search" placeholder="输入名称、状态或路径"></label>
+<label><input id="attention" type="checkbox"> 仅看异常 Skill</label><span id="visible-count" role="status" aria-live="polite">共 {len(rows)} 个 Skill</span></div>
+<noscript><p>浏览器未启用 JavaScript，全部记录仍可阅读；搜索和筛选不可用。</p></noscript>
+<div class="table-wrap" tabindex="0" role="region" aria-label="可横向滚动的 Skill 关系表"><table>
+<caption>展开详情可查看完整路径、身份和构建摘要。筛选仅影响此表；下方警告始终显示。</caption>
+<thead><tr><th scope="col">Skill / Sync ID</th><th scope="col">Portable source</th>{builder_headers}<th scope="col">汇总状态</th></tr></thead>
+<tbody>{''.join(rows)}</tbody></table></div><p id="empty-results"{' hidden' if rows else ''}>没有匹配的 Skill。</p></section>
+<section id="issues"><h2>问题与警告 · {len(report['issues'])}</h2><ul class="records">{issues or empty}</ul></section>
+<div class="columns"><section id="related"><h2>跨项目与外部位置</h2><ul class="records">{related or empty}</ul></section>
+<section><h2>未关联的本机 Skill</h2><ul class="records">{unlinked or empty}</ul></section></div>
+<section id="sources"><h2>扫描来源</h2><ul class="records">{sources or empty}</ul></section>
+<footer>此文件为离线快照，页面不会自动扫描或同步。输入指纹：{code(report['input_fingerprint'])}</footer>
+</main><script>{script}</script></body></html>
+"""
+
+
 def validate_output_directory(
     output_dir: Path, state_dir: Path, project_root: Path, protected_paths: Iterable[Path] = (),
 ) -> Path:
@@ -1244,7 +1452,7 @@ def write_reports(
     output_format: str,
     protected_paths: Iterable[Path] = (),
 ) -> dict[str, str]:
-    if output_format not in {"json", "markdown", "both"}:
+    if output_format not in REPORT_FORMATS:
         raise RelationshipError(f"unknown report format: {output_format}")
     state_dir = state_dir.expanduser().absolute()
     validate_contract(report)
@@ -1258,13 +1466,11 @@ def write_reports(
     protected.extend(Path(item["path"]) for item in report["unlinked_local_skills"])
     protected.extend(Path(issue["path"]) for issue in report["issues"] if issue.get("path"))
     output = validate_output_directory(output_dir, state_dir, project_root, protected)
-    json_path = output / "skill-relationships.json"
-    markdown_path = output / "skill-relationships.md"
-    selected_contents: dict[Path, str] = {}
-    if output_format in {"json", "both"}:
-        selected_contents[json_path] = canonical_json(report)
-    if output_format in {"markdown", "both"}:
-        selected_contents[markdown_path] = markdown_report(report)
+    renderers = {"json": canonical_json, "markdown": markdown_report, "html": html_report}
+    selected_contents = {
+        output / REPORT_FILENAMES[format_name]: renderers[format_name](report)
+        for format_name in REPORT_FORMATS[output_format]
+    }
     for path in selected_contents:
         validate_report_target(path)
     lock_path = state_dir / ".relationships.lock"
@@ -1283,11 +1489,8 @@ def write_reports(
         except BlockingIOError as error:
             raise RelationshipError("another relationship report refresh is already running") from error
         atomic_write_report_set(selected_contents)
-        written: dict[str, str] = {}
-        if json_path in selected_contents:
-            written["json"] = normalized_absolute(json_path)
-        if markdown_path in selected_contents:
-            written["markdown"] = normalized_absolute(markdown_path)
+        written = {format_name: normalized_absolute(output / REPORT_FILENAMES[format_name])
+                   for format_name in REPORT_FORMATS[output_format]}
         directory_descriptor = os.open(output, os.O_RDONLY)
         try:
             os.fsync(directory_descriptor)
@@ -1304,10 +1507,10 @@ def generate_and_write(
     local_root_args: Iterable[str] = (),
     project_args: Iterable[str] = (),
     output_dir: Path | None = None,
-    output_format: str = "both",
+    output_format: str = "all",
     environment: dict[str, str] | None = None,
 ) -> tuple[dict[str, Any], dict[str, str]]:
-    if output_format not in {"json", "markdown", "both"}:
+    if output_format not in REPORT_FORMATS:
         raise RelationshipError(f"unknown report format: {output_format}")
     report = build_report(
         project_root,
