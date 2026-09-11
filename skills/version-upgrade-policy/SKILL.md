@@ -1,22 +1,35 @@
 ---
 name: version-upgrade-policy
-description: Define, review, and apply a project's version upgrade rules when version components may use any count, separator, ordering, or character set. Use this to classify changes, choose the smallest valid increment, document compatibility, and design checks without assuming numeric x.x.x SemVer.
+description: Define, choose, validate, or apply a project's own release versions, including initial values, compatibility-based increments, custom formats, changelog evidence, and version-policy CI checks. Do not use for dependency/tool upgrades, ordinary code fixes, or build/publish execution alone.
 metadata:
   sync_id: "version-upgrade-policy"
   version: "0.1.0"
   triggering:
     include:
-      - The user asks how a version should change after a fix, feature, breaking change, or compatibility change.
-      - A project needs a versioning policy, upgrade matrix, changelog requirements, or CI validation for custom version strings.
-      - A review must decide whether a proposed version bump matches the impact of a change.
+      - Define or explain a project's own release-version format, component meanings, ordering, successor rules, resets, or initial value.
+      - Decide whether released changes need a version bump and which level matches fixes, features, or breaking compatibility.
+      - Validate or apply a requested release version in the project's authoritative source version fields using its existing policy.
+      - Design, implement, review, or fix checks of the project's release-version grammar, increments, initial values, or required release evidence, including CI under an already-defined policy.
+      - Prepare or review changelog declarations and compatibility or migration evidence needed to justify a release-version decision.
     exclude:
-      - The task requires implementing a repository-specific CI checker without first defining its version contract.
-      - The task is only about dependency resolution, package selection, or comparing versions under an existing package manager rule.
+      - Only update dependencies, lockfiles, runtimes, SDKs, or tools, resolve package versions, or compare third-party versions under package-manager rules, without deciding the project's own release version.
+      - Only compile, test, sign, package, create branches or tags, merge, publish, deploy, or roll back an already-selected release; a supplied version is only an execution input.
+      - Only implement a feature, fix a bug, optimize code, or edit documentation, without a requested or project-required release-version decision.
+      - Only format or translate existing release notes without assessing the version decision or its required evidence.
+      - Only install, synchronize, inventory, or restore Skill copies without designing or reviewing their release-version policy.
 ---
 
 # Version Upgrade Policy
 
 Define the version contract before changing a version. A version is a sequence of ordered components chosen by the project; it is not automatically SemVer.
+
+## Apply the trigger boundary
+
+Select this Skill when the requested deliverable, or an explicit project requirement for the task, involves the project's own release-version contract, value, validation, or justification. A version string or the word "upgrade" alone is insufficient. The exclusions describe tasks that contain no such work; they take priority over broad keyword matches.
+
+For a mixed request, apply this Skill only to its version-policy portion. For example, upgrading a dependency and deciding the application's next version includes a policy decision; upgrading that dependency alone does not. Building version `1.2.4` uses a selected version, while changing the source version to `1.2.4` requires validation and applies this Skill. An existing policy remains authoritative when implementing its checks; do not redesign it merely because this Skill was selected.
+
+If "upgrade the version" does not identify whether the target is the project's release, a dependency, or a tool, inspect task context and the relevant version fields. Ask which target is intended if it remains unclear before changing versions. Selection does not authorize unrelated branches, tags, publication, deployment, or synchronization.
 
 ## Establish the format
 
