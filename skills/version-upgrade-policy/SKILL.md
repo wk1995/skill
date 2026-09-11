@@ -31,6 +31,14 @@ Record, for the project:
 
 Do not reject `A.B.C`, `2026.09.1`, `1-rc-7`, or a four-component version merely because it is not `x.x.x`. Reject it only when it violates the project's declared grammar.
 
+## Choose an initial version
+
+For a component with no previous release, use the initial value explicitly supplied by the user or required by the project's existing policy. If neither specifies a value, default to the numeric version `0.0.1`; do not silently choose `0.1.0`, `1.0.0`, or an alphabetic starting value.
+
+Validate that initial value against the project's grammar before writing it. If the default `0.0.1` conflicts with an explicitly chosen format (for example four mandatory components or alphabetic-only tokens), ask for the initial value instead of coercing the format or inventing a token. If no format is established, use three dot-separated numeric components for this default, with compatibility, feature, and maintenance meanings respectively. An explicitly specified initial value can use the project's custom component count and tokens.
+
+Apply this default only to a genuinely new component. A missing local version file or unavailable release history is not evidence that no release exists; inspect the project's authoritative release records. Keep existing releases on their established upgrade path and record the initial value and its source in the release evidence.
+
 ## Select one upgrade
 
 Choose the smallest level that describes all released changes since the component's previous version. Change exactly the component assigned to that level. Reset or replace every less-significant component according to the project's contract. Leave more-significant components unchanged.

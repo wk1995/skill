@@ -16,6 +16,8 @@ Review whether 1-rc-7 -> 1-rc-8 is a valid maintenance upgrade.
 
 The Skill records the grammar, component meanings, successor rules, compatibility evidence, changelog requirements, and validation cases. See [SKILL.md](SKILL.md) for the operational guidance.
 
+For an initial release, provide a starting value or use the project's required value. Otherwise the default is numeric `0.0.1`. If an explicit custom format cannot represent `0.0.1`, the Skill asks for a compatible initial value. Existing releases are never reset to this default; a missing version file alone does not make a component new.
+
 ## When It Triggers
 
 Use it for versioning policies, release bump decisions, custom version formats, changelog release evidence, or CI checks that enforce those rules.
