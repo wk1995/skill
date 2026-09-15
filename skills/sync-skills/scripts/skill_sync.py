@@ -25,6 +25,8 @@ if str(SCRIPT_DIR) not in sys.path:
 
 from skill_relationships import (  # noqa: E402
     RelationshipError,
+    REPORT_FILENAMES,
+    REPORT_FORMATS,
     digest_tree as relationship_digest_tree,
     execution_modes,
     generate_and_write,
@@ -455,10 +457,7 @@ def refresh_relationship_report(
         reports_dir = state_dir / "reports"
         previous = {
             output_format: str(path.resolve())
-            for output_format, path in {
-                "json": reports_dir / "skill-relationships.json",
-                "markdown": reports_dir / "skill-relationships.md",
-            }.items()
+            for output_format, path in ((key, reports_dir / filename) for key, filename in REPORT_FILENAMES.items())
             if path.is_file() and not path.is_symlink()
         }
         return 2, {
@@ -1773,7 +1772,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     relationships = subparsers.add_parser(
         "relationships",
-        help="Generate machine-local JSON and Markdown Skill relationship reports.",
+        help="Generate machine-local HTML, JSON and Markdown Skill relationship reports.",
     )
     relationships.add_argument(
         "--local-root",
@@ -1789,7 +1788,10 @@ def build_parser() -> argparse.ArgumentParser:
         metavar="NAME=PATH",
         help="Scan one explicitly named related-project Skill root.",
     )
-    relationships.add_argument("--format", choices=("markdown", "json", "both"), default="both")
+    relationships.add_argument(
+        "--format", choices=tuple(REPORT_FORMATS), default="all",
+        help="Output format (default: all); both preserves JSON + Markdown output.",
+    )
     relationships.add_argument("--output-dir", help="Report directory; must remain outside the repository.")
     relationships.add_argument("--strict", action="store_true", help="Return 2 when the report contains non-clean findings.")
     relationships.set_defaults(func=command_relationships)

@@ -3,7 +3,7 @@ name: sync-skills
 description: Use when linking, converting, synchronizing, inventorying, reporting, repairing Agent installs, versioning, auditing, or rolling back Skill copies across repository, project, machine-wide, or explicit external locations.
 metadata:
   sync_id: "sync-skills"
-  version: "0.2.3"
+  version: "0.2.4"
   urls:
     - type: repository
       value: https://github.com/wk1995/skill.git
@@ -35,6 +35,7 @@ Use this skill to keep equivalent Skill directories connected across this reposi
 4. Use `scripts/skill_sync.py` for deterministic operations whenever copying, snapshotting, status checking, or rollback is needed.
 5. Keep runtime state outside the repository. The default is an XDG state directory isolated by checkout; migrate a legacy `.skill-sync/` directory before its tracked files are removed.
 6. Read [references/sync-model.md](references/sync-model.md) before repairing an Agent install or interpreting relationship-report statuses.
+7. For a request to synchronize all current repository Skills to this machine, follow the repository-to-machine workflow in that reference. Resolve build coverage and installation scope separately; an inventory command does not generate missing builds.
 
 ## Location Roles
 
@@ -121,8 +122,17 @@ Generate the machine-local relationship report using every supported Builder dec
 
 ```bash
 python skills/sync-skills/scripts/skill_sync.py relationships
+python skills/sync-skills/scripts/skill_sync.py relationships --format html
 python skills/sync-skills/scripts/skill_sync.py relationships --project app-a=/projects/app-a/skills --strict
 ```
+
+The default `--format all` writes JSON, Markdown, and a standalone HTML view.
+Use `--format html` for the browser view alone; `--format both` retains JSON plus
+Markdown. Open the returned `report_paths.html` for viewing. HTML supports local
+search, an abnormal-Skill filter, and expandable provenance; it loads no remote
+assets. Without JavaScript all records remain readable. The page is a snapshot:
+rerun `relationships` to refresh it. Explicit format selection updates only the
+selected files, so other previously generated formats may show an older snapshot.
 
 Register another project or a local Agent installation explicitly:
 
@@ -159,7 +169,7 @@ python skills/sync-skills/scripts/skill_sync.py repair-agent-install my-skill-id
 - If versions are equal but digests differ, use normal conflict handling and require an explicit source unless only one linked role changed since the previous snapshot.
 - If two or more copies changed since the previous snapshot and no source was specified, stop and report the conflict instead of choosing silently.
 - Keep the immutable sync-group identity in `metadata.sync_id` and the logical Skill version in `metadata.version` in `SKILL.md`. New Skills must define a stable sync ID that does not change with `metadata.name`; `rename --to` is reserved for migrating legacy name-keyed registry entries and cannot change an existing stable ID.
-- Use this Skill's own sync ID as `sync-skills` and its version as `0.2.3`.
+- Use this Skill's own sync ID as `sync-skills` and its version as `0.2.4`.
 - Store registry and snapshot runtime state outside the repository. By default, use `$XDG_STATE_HOME/sync-skills/<checkout-id>/`, or `$HOME/.local/state/sync-skills/<checkout-id>/` when `XDG_STATE_HOME` is unset. Treat repository-local `.skill-sync/` as legacy migration input only.
 - Legacy registries keyed by a Skill name remain readable; run `rename <old-reference> --to <sync-id> --name <new-name>` to migrate the group and its snapshots before linking a renamed Skill.
 - Record Skill addresses in the registry: `skill_urls` for canonical repository/documentation/registry/source URLs, and `role_urls` for role-specific remote/source URLs.
@@ -196,7 +206,7 @@ For sync work, report:
 - conflicts, trust concerns, or invalid paths;
 - rollback command for the created snapshot.
 
-For relationship inventory, write `skill-relationships.json` and `skill-relationships.md` only under the external state directory (or another validated repository-external output directory). Show dynamic Builder columns, complete absolute paths, related projects, unlinked local Skills, build/install derivation, all applicable statuses, and `report_status: stale` when a completed mutation could not refresh the previous report.
+For relationship inventory, write `skill-relationships.json`, `skill-relationships.md`, and `skill-relationships.html` only under the external state directory (or another validated repository-external output directory). Show dynamic Builder columns, complete absolute paths, related projects, unlinked local Skills, build/install derivation, all applicable statuses, and `report_status: stale` when a completed mutation could not refresh the previous report. HTML must escape inventory data as text, retain every same-Agent installation even when its build is missing, and use the same protected, private, transactional report writer. Completed mutations refresh all three default outputs; report-only retries do the same.
 
 Report and lock writes must remain outside Skill inputs. Repeated local roots are deduplicated by filesystem identity. Conflicting external/project identities and duplicate sync IDs within a related project are reported without associating those copies. An installation without a trusted same-Agent build is `agent-build-missing`, never `synced`.
 

@@ -118,10 +118,11 @@ python3 skills/sync-skills/scripts/skill_sync.py rename old-skill-name \
 
 ### 盘点 Builder 关系
 
-生成本机 JSON 和 Markdown 报告：
+生成本机 HTML、JSON 和 Markdown 报告：
 
 ```bash
 python3 skills/sync-skills/scripts/skill_sync.py relationships
+python3 skills/sync-skills/scripts/skill_sync.py relationships --format html
 python3 skills/sync-skills/scripts/skill_sync.py relationships \
   --project app-a=/projects/app-a/skills \
   --strict
@@ -130,6 +131,29 @@ python3 skills/sync-skills/scripts/skill_sync.py relationships \
 支持的 Builder 来自 `platforms/*/adapter.json`，报告不依赖硬编码 Agent 列表。报告遵循 `便携源码 -> 同 Agent 的 manifest-v2 构建 -> 本机安装` 推导链，包含显式登记的项目和多层本机位置，按物理路径去重，并报告构建缺失、身份不完整、内容分歧和冲突。
 
 报告默认写入 checkout 专属的仓库外状态目录。如果使用 `--output-dir`，目标必须位于仓库和所有 Skill 输入树之外。使用 `--strict` 时，新报告只要含有问题或未关联副本就返回退出码 2；健康的 `synced` 与 `project-only` 项会通过。
+
+默认 `--format all` 会生成三种格式。打开命令结果中的 `report_paths.html`，即可浏览离线报表：
+汇总数据、动态 Builder 列、按名称/状态/路径搜索、仅看异常 Skill、可展开的构建与安装详情，
+以及全部警告。搜索只筛选 Skill 表格，警告始终显示。同一 Agent 的多个安装会全部保留，
+即使对应构建缺失也会展示。页面不加载远程资源；关闭 JavaScript 后仍可阅读全部记录，
+但搜索和筛选不可用。
+
+使用 `--format html`、`--format json` 或 `--format markdown` 可单独生成一种格式；
+`--format both` 仍表示 JSON + Markdown。只有选定文件会被刷新，其他已有格式可能保留旧快照。
+运行默认命令可同时刷新三种格式，成功的变更操作也会刷新这三份默认报表。HTML 是静态快照，
+不是实时监控。全部格式共用私有权限、路径保护和替换失败回滚机制。
+
+### 将本仓库全部 Skill 同步到本机
+
+可以这样提出请求：“把本仓库当前全部 Skill 同步到本机 Agent 安装目录，并处理构建覆盖不完整的问题。”
+流程会盘点当前源码和已声明的 Builders；除非你限定 Agent 范围，否则为所有受支持的 Builder
+补齐缺失或过期构建，再仅安装到选定的本机目标。盘点命令本身不会构建；构建所有 adapter
+也不代表会向每个发现的安装根目录写入内容。
+
+完成报告会分别说明构建覆盖、选定安装的结果和全机警告。版本或内容零漂移不代表缺失构建或
+身份问题已经解决。旧机器路径需要经核实后修正登记；已删除或拆分的 Skill 需要在备份后按
+用户选择退役，不能自动恢复或改写身份。其他本机 Skill 的元数据警告会保留，直到能够从各自
+来源修复。详细流程和恢复边界见[仓库到本机同步流程](references/sync-model.md#repository-to-machine-synchronization)。
 
 ### 修复已登记的 Agent 安装
 

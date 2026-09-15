@@ -6,9 +6,16 @@ version, date, and a change summary.
 
 ## [Unreleased]
 
-- Correct both README guides to distinguish role synchronization from named-location inventory and Agent repair, and explain that conversion resolves symbolic links rather than rejecting them. No runtime behavior, triggers, or versions change.
+## [0.2.4] - 2026-09-11
 
-- Expand the English and Chinese README coverage for every supported command, location role, source-selection rule, report workflow, installation repair path, state migration, and recovery behavior. This is a documentation-only change with no version or trigger-metadata change.
+- Change-Type: fix
+- Summary: Complete repository-to-machine sync instructions with declared-Builder coverage, selected install verification, and diagnosis of stale registrations, retired Skills, and unrelated local metadata warnings. Add an offline HTML relationship dashboard with search, abnormal-Skill filtering, dynamic Builder columns, full installation provenance, and warning details.
+- Compatibility: Existing triggers, JSON report schema, Markdown output, explicit json/markdown/both selections, exit codes, state formats, replacement authorization, and snapshot contracts remain supported. Optional html/all format choices are added; default report paths add an html key and mutation-triggered refreshes generate all three formats. No migration or new dependency is required. HTML shares protected paths, private permissions, and transactional replacement/recovery with existing formats. Inventory stays read-only with respect to builds and installations.
+- Release-Version: The maintainer explicitly selected 0.2.4 for this combined release, including the new HTML capability, overriding the usual minor-version classification. The earlier branch-only 0.3.0 entry is consolidated here before publication.
+
+- Correct both README guides to distinguish role synchronization from named-location inventory and Agent repair, and explain that conversion resolves symbolic links rather than rejecting them.
+
+- Expand the English and Chinese README coverage for every supported command, location role, source-selection rule, report workflow, installation repair path, state migration, and recovery behavior.
 
 ## [0.2.3] - 2026-09-08
 

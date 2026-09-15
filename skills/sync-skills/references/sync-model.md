@@ -49,6 +49,57 @@ Role registration and overwrite commands check their paths against all registry 
 
 Install equivalence includes file execute bits, checked separately from the unchanged manifest-v2 content digest. A permission mismatch is `agent-install-diverged` and requires authorized snapshot/replacement. Repair and rollback verify staged and installed execute bits; Agent snapshot rollback also checks the current target's non-empty sync ID before modifying it.
 
+## Repository-To-Machine Synchronization
+
+For a request to synchronize all current repository Skills to this machine:
+
+1. Run `relationships` to identify current portable sources, supported Builders,
+   trusted builds, registered installs, and diagnostics. Select current repository
+   Skills by their declared sync IDs; an old registry entry whose source is gone
+   is not an additional current Skill.
+2. Resolve installation targets from existing registrations, adapter roots, and
+   the user's requested Agents. Building an adapter does not authorize installing
+   into every discovered root. If Agents share a physical root, retain explicit
+   same-Agent ownership rather than installing different outputs onto one path.
+3. Check build coverage across the declared adapters. For an unrestricted request,
+   generate missing or stale builds for all supported Builders using the repository
+   builder (`python3 scripts/agent_build.py --list`, then
+   `python3 scripts/agent_build.py <adapter-id> --force` for each affected adapter).
+   Build all current Skills together; a sequence of `--skill` builds into one
+   output can replace earlier coverage. Honor a request limited to one Agent and
+   explain remaining coverage outside that scope. Read-only inventory never
+   builds implicitly. If the builder is unavailable in an installed copy, locate
+   the trusted source checkout or report the missing prerequisite.
+4. Register selected sources with `link --repo` and selected installations with
+   `link-location --kind local --agent-id <adapter-id>`, then use
+   `repair-agent-install` for each selected pair. Inspect differences and honor
+   the user's source/replacement authorization before using
+   `--discard-local-changes`; every existing replacement still needs its snapshot.
+   Repeat repairs to verify `already-current` without another snapshot.
+5. Refresh `relationships` after building and installing. Report current-project
+   build coverage, selected-install results, and outstanding diagnostics separately.
+   Zero version/content drift does not establish completeness when builds, copies,
+   or identities are missing. A nonzero machine-wide strict result can remain
+   after the requested project installs are current; identify the exact warnings.
+
+Investigate diagnostics by their full message and path before attempting repair:
+
+- For a missing legacy local path, verify whether it belongs to a previous
+  machine and whether a current registered install already supersedes it. Back up
+  the external registry before an authorized registration correction; preserve
+  version history and snapshots. Do not create directories at obsolete paths just
+  to satisfy the report, or drop a temporarily unavailable intended copy.
+- For an installation whose portable source was removed, inspect repository
+  history for a rename, split, or retirement. A replacement with a different sync
+  ID is a separate Skill. Do not invent a build, add identity fields by hand, or
+  revive removed source automatically. Retire the old install only within the
+  user's authorization, retaining a verified external backup and its registry
+  history for recovery; otherwise keep the finding visible.
+- For other local Skills outside the selected repository, preserve their content
+  and report the actual metadata problem. A warning labeled `missing-sync-id` may
+  carry a message about an invalid or missing version. Do not assign invented
+  identities/versions or suppress these findings to obtain a zero warning count.
+
 ## URL Policy
 
 Record addresses separately from local paths:
@@ -87,7 +138,7 @@ For this skill, use:
 
 ```yaml
 metadata:
-  version: "0.2.3"
+  version: "0.2.4"
 ```
 
 When a group is synchronized, copy the selected source version to all targets. If target versions differ before sync, record them in the pre-sync snapshot and report the difference.

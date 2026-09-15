@@ -118,10 +118,11 @@ For a group that already has a stable ID, `--to` must equal that current ID. Use
 
 ### Inventory Builder relationships
 
-Generate the machine-local JSON and Markdown reports:
+Generate the machine-local HTML, JSON, and Markdown reports:
 
 ```bash
 python3 skills/sync-skills/scripts/skill_sync.py relationships
+python3 skills/sync-skills/scripts/skill_sync.py relationships --format html
 python3 skills/sync-skills/scripts/skill_sync.py relationships \
   --project app-a=/projects/app-a/skills \
   --strict
@@ -130,6 +131,39 @@ python3 skills/sync-skills/scripts/skill_sync.py relationships \
 Supported Builders come from `platforms/*/adapter.json`; the report is not limited to a hard-coded Agent list. It follows the derivation chain `portable source -> same-Agent manifest-v2 build -> local install`, includes explicitly registered projects and nested local locations, deduplicates physical paths, and reports missing builds, incomplete identities, divergence, and conflicts.
 
 Reports default to the checkout-specific external state directory. If `--output-dir` is supplied, it must remain outside the repository and every Skill input tree. `--strict` returns exit code 2 when the new report contains findings or unlinked copies; healthy `synced` and `project-only` entries pass.
+
+The default `--format all` produces three files. Open `report_paths.html` from the
+command result to view the offline dashboard: summary counts, dynamic Builder
+columns, search by name/status/path, an abnormal-Skill filter, expandable build
+and installation details, and all warnings. Search filters only the Skill table;
+warnings remain visible. Every same-Agent install is shown even if its build is
+missing. No remote resources are loaded; without JavaScript all records remain
+readable, with search/filter controls inactive.
+
+Use `--format html`, `--format json`, or `--format markdown` for one format.
+`--format both` still means JSON + Markdown. Only selected files are refreshed;
+previously generated formats may remain older. Run the default command to refresh
+all three together. Successful mutations also refresh all three default reports.
+The HTML view is a snapshot, not a live monitor. All outputs share the same private
+permissions, path protection, and rollback on replacement failure.
+
+### Synchronize all repository Skills to this machine
+
+Ask: "Synchronize all current repository Skills to my local Agent installations,
+and resolve incomplete build coverage." The workflow inventories current sources
+and declared Builders, builds missing or stale outputs for all supported Builders
+unless you limit the Agent scope, and installs only into the selected local targets.
+An inventory command alone does not build anything; building all adapters does
+not install into every discovered root.
+
+Completion reports distinguish build coverage, selected installation results, and
+machine-wide warnings. Zero version or content drift does not mean missing builds
+or identities have been resolved. Old machine paths need verified registration
+correction; removed or split Skills need a retirement decision with backup, not
+automatic restoration or reassignment of their identity. Other local Skills keep
+their metadata warnings until their own sources can be repaired. See the
+[repository-to-machine workflow](references/sync-model.md#repository-to-machine-synchronization)
+for the detailed procedure and recovery boundaries.
 
 ### Repair a registered Agent installation
 
