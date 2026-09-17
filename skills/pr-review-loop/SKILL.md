@@ -160,9 +160,9 @@ Stop and report as soon as any of these applies:
 - **Blocked** — the loop cannot comment or push: missing authentication, branch
   protection, a conflicting head, or an unavailable dependency. Report it; do not
   work around a protection rule.
-- **Already clean** — the head has no reviewed-and-open findings and no commits
-  since the last passing round. Post the passing comment, or report only when the
-  user declined comments, and stop.
+- **Already clean** — the current head has no confirmed findings and no commit
+  was added since the last passing round. Confirm the state, post the passing
+  comment for that head, and stop instead of re-reviewing an unchanged commit.
 
 ## Boundaries
 
