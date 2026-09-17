@@ -412,9 +412,20 @@ class ReviewRegressions(unittest.TestCase):
         paths = {r.get("path") for r in codex["local_skill_roots"]}
         self.assertIn(str(self.root / "home/.agents/skills"), paths)
         self.assertIn(str(self.root / "home/.codex/skills"), paths)
-        roots = rel.deduplicate_roots(adapters)
-        shared = next(r for r in roots if r.get("path") == str(self.root / "home/.agents/skills"))
-        self.assertEqual(shared["agent_ids"], ["codex", "workbuddy"])
+        workbuddy = next(a for a in adapters if a["id"] == "workbuddy")
+        wb_paths = {r.get("path") for r in workbuddy["local_skill_roots"]}
+        self.assertIn(str(self.root / "home/.workbuddy-ai/skills"), wb_paths)
+        self.assertIn(str(self.root / "home/.workbuddy/skills"), wb_paths)
+        self.assertNotIn(str(self.root / "home/.agents/skills"), wb_paths)
+        # A root claimed by two Builders is attributed to both, independent of adapter config.
+        shared = str(self.root / "home/.shared/skills")
+        adapters_shared, _ = rel.load_adapters(
+            ROOT, [f"codex={shared}", f"workbuddy={shared}"], {"HOME": str(self.root / "home")}
+        )
+        shared_roots = [r for r in rel.deduplicate_roots(adapters_shared)
+                        if set(r.get("agent_ids", [])) == {"codex", "workbuddy"}]
+        self.assertEqual(len(shared_roots), 1)
+        self.assertEqual(shared_roots[0]["agent_ids"], ["codex", "workbuddy"])
 
 
     def test_cross_group_nested_install_preserved(self):
