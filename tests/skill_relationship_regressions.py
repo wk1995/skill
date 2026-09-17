@@ -414,9 +414,15 @@ class ReviewRegressions(unittest.TestCase):
         self.assertIn(str(self.root / "home/.codex/skills"), paths)
         workbuddy = next(a for a in adapters if a["id"] == "workbuddy")
         wb_paths = {r.get("path") for r in workbuddy["local_skill_roots"]}
-        self.assertIn(str(self.root / "home/.workbuddy-ai/skills"), wb_paths)
-        self.assertIn(str(self.root / "home/.workbuddy/skills"), wb_paths)
+        self.assertEqual(wb_paths, {str(self.root / "home/.workbuddy/skills")})
+        workbuddy_ai = next(a for a in adapters if a["id"] == "workbuddy-ai")
+        wb_ai_paths = {r.get("path") for r in workbuddy_ai["local_skill_roots"]}
+        self.assertEqual(wb_ai_paths, {str(self.root / "home/.workbuddy-ai/skills")})
         self.assertNotIn(str(self.root / "home/.agents/skills"), wb_paths)
+        self.assertNotIn(str(self.root / "home/.workbuddy-ai/skills"), wb_paths)
+        self.assertNotIn(str(self.root / "home/.workbuddy/skills"), wb_ai_paths)
+        env_names = {root["resolver"] for root in workbuddy["local_skill_roots"] + workbuddy_ai["local_skill_roots"]}
+        self.assertTrue(all(not name.startswith("env:WORKBUDDY_CONFIG_DIR") for name in env_names))
         # A root claimed by two Builders is attributed to both, independent of adapter config.
         shared = str(self.root / "home/.shared/skills")
         adapters_shared, _ = rel.load_adapters(
@@ -427,6 +433,69 @@ class ReviewRegressions(unittest.TestCase):
         self.assertEqual(len(shared_roots), 1)
         self.assertEqual(shared_roots[0]["agent_ids"], ["codex", "workbuddy"])
 
+    def test_workbuddy_editions_select_distinct_repair_targets(self):
+        china = self.root / "home/.workbuddy/skills/alpha"
+        intl = self.root / "home/.workbuddy-ai/skills/alpha"
+        china.mkdir(parents=True)
+        intl.mkdir(parents=True)
+        group = {
+            "locations": {
+                "local:workbuddy": {"kind": "local", "agent_id": "workbuddy", "path": str(china)},
+                "local:workbuddy-ai": {"kind": "local", "agent_id": "workbuddy-ai", "path": str(intl)},
+            }
+        }
+        adapters, _ = rel.load_adapters(ROOT, [], {"HOME": str(self.root / "home")})
+        roots = rel.deduplicate_roots(adapters)
+        china_id, china_path = sync.registered_agent_install(group, "workbuddy", roots)
+        intl_id, intl_path = sync.registered_agent_install(group, "workbuddy-ai", roots)
+        self.assertEqual(china_id, "local:workbuddy")
+        self.assertEqual(intl_id, "local:workbuddy-ai")
+        self.assertEqual(china_path, china.expanduser().absolute())
+        self.assertEqual(intl_path, intl.expanduser().absolute())
+        merged = {
+            "locations": {
+                "local:workbuddy-a": {"kind": "local", "agent_id": "workbuddy", "path": str(china)},
+                "local:workbuddy-b": {"kind": "local", "agent_id": "workbuddy", "path": str(intl)},
+            }
+        }
+        with self.assertRaisesRegex(SystemExit, "multiple registered local installs for Agent 'workbuddy'"):
+            sync.registered_agent_install(merged, "workbuddy", roots)
+        report = {
+            "generated_at": "2026-09-17T00:00:00Z",
+            "project": {"id": "skill", "root": "/projects/skill"},
+            "summary": {"skill_count": 1},
+            "skills": [{
+                "sync_id": "alpha",
+                "portable": {"path": "/projects/skill/skills/alpha", "core_version": "1.0.0"},
+                "local_installs": [
+                    {"agent_id": "workbuddy", "path": str(china), "statuses": ["synced"]},
+                    {"agent_id": "workbuddy-ai", "path": str(intl), "statuses": ["stale"]},
+                ],
+                "locations": [],
+                "agent_builds": {
+                    "workbuddy": {
+                        "present": True, "core_version": "1.0.0",
+                        "adapter_version": "1.1.1", "artifact_version": "0.1.0",
+                    },
+                    "workbuddy-ai": {
+                        "present": True, "core_version": "1.0.0",
+                        "adapter_version": "1.0.0", "artifact_version": "0.1.0",
+                    },
+                },
+                "statuses": ["synced", "stale"],
+            }],
+            "unlinked_local_skills": [],
+            "issues": [],
+            "scan_sources": [],
+            "agent_builders": [
+                {"id": "workbuddy", "adapter_version": "1.1.1", "artifact_version": "0.1.0"},
+                {"id": "workbuddy-ai", "adapter_version": "1.0.0", "artifact_version": "0.1.0"},
+            ],
+        }
+        markdown = rel.markdown_report(report)
+        self.assertIn("| workbuddy | workbuddy-ai |", markdown)
+        self.assertIn("local `synced`", markdown)
+        self.assertIn("local `stale`", markdown)
 
     def test_cross_group_nested_install_preserved(self):
         nested = self.target / "nested/gamma"

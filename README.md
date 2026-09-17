@@ -52,7 +52,10 @@ skill/
 |   |   |-- adapter.json          # Adapter and artifact versions, output layout
 |   |   |-- SKILL.append.md       # Codex-wide generated instructions
 |   |   `-- root/.codex-plugin/plugin.json
-|   `-- workbuddy/
+|   |-- workbuddy/
+|   |   |-- adapter.json
+|   |   `-- SKILL.append.md
+|   `-- workbuddy-ai/
 |       |-- adapter.json
 |       `-- SKILL.append.md
 |-- scripts/
@@ -256,6 +259,7 @@ python3 scripts/agent_build.py --list
 python3 scripts/agent_build.py --check
 python3 scripts/agent_build.py codex
 python3 scripts/agent_build.py workbuddy
+python3 scripts/agent_build.py workbuddy-ai
 ```
 
 The builder scans `platforms/` instead of using a hard-coded Agent list. A new Agent with repository-wide defaults therefore adds one `platforms/<agent>/` directory. Existing Skills need a matching `agent-builds/<agent>/` only when they require an exception.
