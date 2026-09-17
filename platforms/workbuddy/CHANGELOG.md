@@ -4,6 +4,14 @@
 
 - No unreleased changes.
 
+## [1.1.1] - 2026-09-17
+
+- Change-Type: fix
+- Summary: Declare both WorkBuddy editions' machine-local Skill roots so relationship inventory and Agent-install repair can locate either install.
+- Compatibility: Portable Skills and generated artifacts are unchanged; only adapter `local_skill_roots` metadata changed.
+
+- Replaced the non-existent `.agents/skills` root with the international (`~/.workbuddy-ai/skills`, workbuddy.ai) and China (`~/.workbuddy/skills`, workbuddy.cn) WorkBuddy roots.
+
 ## [1.1.0] - 2026-09-07
 
 - Declared the machine-local WorkBuddy-compatible Skill root for adapter-driven relationship inventory.
