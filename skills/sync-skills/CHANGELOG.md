@@ -6,9 +6,18 @@ version, date, and a change summary.
 
 ## [Unreleased]
 
-- Correct both README guides to distinguish role synchronization from named-location inventory and Agent repair, and explain that conversion resolves symbolic links rather than rejecting them. No runtime behavior, triggers, or versions change.
+- No unreleased changes.
 
-- Expand the English and Chinese README coverage for every supported command, location role, source-selection rule, report workflow, installation repair path, state migration, and recovery behavior. This is a documentation-only change with no version or trigger-metadata change.
+## [0.3.0] - 2026-09-17
+
+- Change-Type: feature
+- Summary: Add optional `link-location --replace` so a mislabeled local Agent install can be retargeted after the requested Agent root is validated.
+- Compatibility: Existing `link-location` usage remains valid and still refuses to overwrite a different location record unless `--replace` is explicit. Repair still selects builds by `--agent`. Skill files are not modified during retargeting.
+
+- Add `link-location --replace` to rewrite registry identity for an existing location ID or same-path registration after Agent-root validation. Duplicate same-path location IDs in the same group are retired.
+- Keep Skill files unchanged during retargeting; repair afterwards with `--agent` matching the new identity.
+- Document the China WorkBuddy (`workbuddy`) and international WorkBuddy AI (`workbuddy-ai`) retag-then-repair workflow.
+- Add a stateful regression covering rejection, successful retag, same-path retirement, outside-root rejection, and idempotency.
 
 ## [0.2.3] - 2026-09-08
 

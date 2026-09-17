@@ -50,6 +50,19 @@ python3 skills/sync-skills/scripts/skill_sync.py link-location my-skill-id \
 
 `link` and `link-location` register relationships; they do not make divergent copies equal. Use `status` to inspect roles registered by `link` or `convert` before selecting a synchronization source. Use `relationships` to inspect named locations registered by `link-location`: they are not included in ordinary `status`, `versions`, `sync`, role snapshots, current-role `diff`, or role rollback. Agent repair snapshots have their own local-install rollback path, described below.
 
+If a local Agent install is registered under the wrong `agent_id`—for example a China WorkBuddy path marked `workbuddy-ai`, or an international WorkBuddy AI path marked `workbuddy`—do not repair it under the old label. Re-register the same path with `--replace` after the requested Agent root is validated, then repair with the corrected Agent. `--replace` rewrites registry identity only; Skill files are not modified. Same-path duplicate location IDs in the same group are retired:
+
+```bash
+python3 skills/sync-skills/scripts/skill_sync.py link-location my-skill-id \
+  --location-id local:workbuddy-ai \
+  --kind local \
+  --agent-id workbuddy-ai \
+  --path ~/.workbuddy-ai/skills/my-skill \
+  --replace
+python3 skills/sync-skills/scripts/skill_sync.py repair-agent-install my-skill-id \
+  --agent workbuddy-ai
+```
+
 ### Convert an existing copy
 
 Use `convert` to materialize a validated source at a new location and register both locations:
@@ -163,7 +176,8 @@ Use this Skill when the request:
 - involves repository, project, machine-wide, Agent-build, or explicit external copies of the same Skill;
 - needs stable identity, provenance URLs, version history, digests, snapshots, audit times, or file differences;
 - inventories local Skills, supported Builders, generated builds, Agent installations, or related projects;
-- repairs an incomplete or diverged registered Agent installation; or
+- repairs an incomplete or diverged registered Agent installation;
+- retargets a registered local Agent install whose `agent_id` no longer matches the product directory; or
 - migrates legacy repository-local Skill synchronization state.
 
 ## When It Does Not Trigger

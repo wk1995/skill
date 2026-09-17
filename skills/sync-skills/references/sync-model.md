@@ -45,6 +45,8 @@ If a registered Agent install lacks `metadata.sync_id`, keep it visible as `regi
 
 Ordinary `sync --source repo` must stop before its first mutation when a target is an Agent installation. Portable sources are not installable Agent outputs.
 
+`link-location` refuses to change an existing location ID or a same-path registration unless `--replace` is explicit. Replacement revalidates the requested Agent root, rewrites only registry identity, retires duplicate same-path location IDs in the same group, and does not modify Skill files. After retargeting, repair with `--agent` matching the new identity. A China WorkBuddy path must use `workbuddy`; an international WorkBuddy AI path must use `workbuddy-ai`.
+
 Role registration and overwrite commands check their paths against all registry roles and locations, including other groups. An incomplete adapter discovery blocks installation-protection decisions; read-only inventory can still report the adapter error and continue with valid Builders. Explicitly registered local locations are inventoried even below direct-child scan depth, with the same identity checks and physical-path deduplication.
 
 Install equivalence includes file execute bits, checked separately from the unchanged manifest-v2 content digest. A permission mismatch is `agent-install-diverged` and requires authorized snapshot/replacement. Repair and rollback verify staged and installed execute bits; Agent snapshot rollback also checks the current target's non-empty sync ID before modifying it.
@@ -87,7 +89,7 @@ For this skill, use:
 
 ```yaml
 metadata:
-  version: "0.2.3"
+  version: "0.3.0"
 ```
 
 When a group is synchronized, copy the selected source version to all targets. If target versions differ before sync, record them in the pre-sync snapshot and report the difference.

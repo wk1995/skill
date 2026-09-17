@@ -1442,9 +1442,27 @@ def command_link_location(args: argparse.Namespace) -> int:
 
     locations = group.setdefault("locations", {})
     existing = locations.get(args.location_id)
-    if existing and existing != location:
-        raise SystemExit(f"location ID already exists with different data: {args.location_id}")
+    replace = bool(getattr(args, "replace", False))
+    if existing and existing != location and not replace:
+        raise SystemExit(
+            f"location ID already exists with different data: {args.location_id}; "
+            "rerun with --replace to update the registered Agent identity"
+        )
+    retired: list[str] = []
+    for location_id, recorded in list(locations.items()):
+        if location_id == args.location_id or not isinstance(recorded, dict) or not recorded.get("path"):
+            continue
+        if not paths_refer_to_same_location(path, Path(str(recorded["path"]))):
+            continue
+        if not replace:
+            raise SystemExit(
+                f"path is already registered as {location_id!r}; "
+                "rerun with --replace to retarget that location to the requested Agent"
+            )
+        retired.append(location_id)
     locations[args.location_id] = location
+    for location_id in retired:
+        locations.pop(location_id, None)
     registry["schema_version"] = max(2, int(registry.get("schema_version", 1)))
     operation_at = now_iso()
     group["updated_at"] = operation_at
@@ -1454,6 +1472,8 @@ def command_link_location(args: argparse.Namespace) -> int:
         "sync_id": sync_id,
         "location_id": args.location_id,
         "location": location,
+        "retired_location_ids": retired,
+        "replaced": bool((existing and existing != location) or retired),
         "updated_at": operation_at,
     })
 
@@ -1807,6 +1827,11 @@ def build_parser() -> argparse.ArgumentParser:
     link_location.add_argument("--derived-from")
     link_location.add_argument("--source-id")
     link_location.add_argument("--adapter-root")
+    link_location.add_argument(
+        "--replace",
+        action="store_true",
+        help="Replace an existing location ID or same-path registration after validation. Skill files are not modified.",
+    )
     link_location.set_defaults(func=command_link_location)
 
     repair_install = subparsers.add_parser(

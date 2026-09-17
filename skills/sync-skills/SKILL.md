@@ -3,7 +3,7 @@ name: sync-skills
 description: Use when linking, converting, synchronizing, inventorying, reporting, repairing Agent installs, versioning, auditing, or rolling back Skill copies across repository, project, machine-wide, or explicit external locations.
 metadata:
   sync_id: "sync-skills"
-  version: "0.2.3"
+  version: "0.3.0"
   urls:
     - type: repository
       value: https://github.com/wk1995/skill.git
@@ -16,6 +16,7 @@ metadata:
       - The task needs Skill provenance URLs, version history, content digests, snapshots, or difference reports.
       - The user needs to migrate legacy repository-local Skill synchronization state.
       - The user needs a machine-local relationship report across supported AI Agent Builders or needs to repair an incomplete Agent installation.
+      - The user needs to retarget a registered local Agent install whose agent_id no longer matches the product directory.
     exclude:
       - The user is only asking to use a Skill for its domain workflow rather than manage Skill copies.
       - The task is ordinary code editing and does not involve Skill synchronization, conversion, auditing, or rollback.
@@ -132,6 +133,16 @@ python skills/sync-skills/scripts/skill_sync.py link-location my-skill-id \
   --path /projects/app-a/skills/my-skill
 ```
 
+Retarget a registered local Agent install whose `agent_id` no longer matches the product directory. This rewrites registry identity only after the requested Agent root is validated; Skill files are not modified. Same-path duplicate location IDs in the same group are retired. Then repair with the corrected Agent:
+
+```bash
+python skills/sync-skills/scripts/skill_sync.py link-location my-skill-id \
+  --location-id local:workbuddy-ai --kind local --agent-id workbuddy-ai \
+  --path ~/.workbuddy-ai/skills/my-skill --replace
+python skills/sync-skills/scripts/skill_sync.py repair-agent-install my-skill-id \
+  --agent workbuddy-ai
+```
+
 Repair an already registered Agent installation from a trusted manifest-v2 build. Diverged local content is preserved unless replacement is explicitly authorized; authorized replacement is still snapshotted first:
 
 ```bash
@@ -153,13 +164,14 @@ python skills/sync-skills/scripts/skill_sync.py repair-agent-install my-skill-id
 - Treat missing adapter root information as a blocking error for installation protection; a read-only inventory may continue with diagnostics for other valid adapters.
 - Compare installed file execute bits as well as manifest-v2 content digests. Permission-only differences need the same snapshot, authorized replacement, verification, and idempotency as content differences.
 - Refuse ordinary portable repo sync into a registered or adapter-discovered Agent install directory. Use the Agent build/install flow instead.
+- `link-location` refuses to change an existing location ID or a same-path registration unless `--replace` is explicit. Replacement revalidates the requested Agent root, rewrites only registry identity, retires duplicate same-path location IDs in the same group, and does not modify Skill files. After retargeting, repair with `--agent` matching the new identity.
 - Exclude transient directories and files such as `.git`, `node_modules`, `dist`, `.DS_Store`, `__pycache__`, and Python bytecode.
 - When the skill-management repository is on `master` or its configured default branch, compare linked copies by `metadata.version`; if versions differ, synchronize and let the higher version replace the lower version.
 - When the repository is on any other branch, do not synchronize only because versions differ unless the user explicitly requests synchronization or the branch work requires updating the target copy.
 - If versions are equal but digests differ, use normal conflict handling and require an explicit source unless only one linked role changed since the previous snapshot.
 - If two or more copies changed since the previous snapshot and no source was specified, stop and report the conflict instead of choosing silently.
 - Keep the immutable sync-group identity in `metadata.sync_id` and the logical Skill version in `metadata.version` in `SKILL.md`. New Skills must define a stable sync ID that does not change with `metadata.name`; `rename --to` is reserved for migrating legacy name-keyed registry entries and cannot change an existing stable ID.
-- Use this Skill's own sync ID as `sync-skills` and its version as `0.2.3`.
+- Use this Skill's own sync ID as `sync-skills` and its version as `0.3.0`.
 - Store registry and snapshot runtime state outside the repository. By default, use `$XDG_STATE_HOME/sync-skills/<checkout-id>/`, or `$HOME/.local/state/sync-skills/<checkout-id>/` when `XDG_STATE_HOME` is unset. Treat repository-local `.skill-sync/` as legacy migration input only.
 - Legacy registries keyed by a Skill name remain readable; run `rename <old-reference> --to <sync-id> --name <new-name>` to migrate the group and its snapshots before linking a renamed Skill.
 - Record Skill addresses in the registry: `skill_urls` for canonical repository/documentation/registry/source URLs, and `role_urls` for role-specific remote/source URLs.
