@@ -1,0 +1,4 @@
+interface:
+  display_name: "PR Review Loop"
+  short_description: "Review a PR, comment, fix, repeat."
+  default_prompt: "Use $pr-review-loop to review this pull request, comment the confirmed findings on it, fix and push them, and keep reviewing until a round is clean."
