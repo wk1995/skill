@@ -12,7 +12,6 @@ Point at one pull request and say what you want:
 Review PR #25 and fix what you find until it is clean.
 Review https://github.com/<owner>/<repo>/pull/42, post the problems to the PR, then fix them.
 Continue the review loop on this PR after the last fix.
-Review my PR but only comment the blockers, do not change code.   # read-only variant
 ```
 
 Provide the pull request by number or link, and the repository if it is not the
