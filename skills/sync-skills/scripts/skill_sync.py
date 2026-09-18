@@ -1438,7 +1438,7 @@ def rewrite_agent_install_snapshots(
         return []
     old_original = normalized_absolute(old_path)
     new_original = normalized_absolute(new_path)
-    rewritten: list[str] = []
+    matches: list[tuple[Path, Path, dict[str, Any], Path, Path, bytes]] = []
     for snapshot_dir in sorted(path for path in snapshots_dir.iterdir() if path.is_dir()):
         if snapshot_dir.is_symlink():
             continue
@@ -1464,17 +1464,48 @@ def rewrite_agent_install_snapshots(
                 raise SystemExit(
                     f"cannot rewrite snapshot {snapshot_dir.name}: payload local-{new_agent} already exists"
                 )
-            if not paths_refer_to_same_location(old_payload, new_payload):
+        matches.append((
+            snapshot_dir,
+            manifest_path,
+            manifest,
+            old_payload,
+            new_payload,
+            manifest_path.read_bytes(),
+        ))
+
+    # Preflight every matching snapshot before changing any one of them. The
+    # registry is still unchanged at this point, so a malformed later snapshot
+    # must not leave earlier snapshots half-retagged.
+    rewritten: list[str] = []
+    moved: list[tuple[Path, Path]] = []
+    written: list[tuple[Path, bytes]] = []
+    try:
+        for snapshot_dir, manifest_path, manifest, old_payload, new_payload, original_bytes in matches:
+            if old_agent != new_agent and not paths_refer_to_same_location(old_payload, new_payload):
                 old_payload.rename(new_payload)
-        if (
-            manifest.get("agent_id") == new_agent
-            and manifest.get("original_path") == new_original
-        ):
-            continue
-        manifest["agent_id"] = new_agent
-        manifest["original_path"] = new_original
-        manifest_path.write_text(json.dumps(manifest, indent=2, sort_keys=True) + "\n", encoding="utf-8")
-        rewritten.append(snapshot_dir.name)
+                moved.append((old_payload, new_payload))
+            if manifest.get("agent_id") == new_agent and manifest.get("original_path") == new_original:
+                continue
+            written.append((manifest_path, original_bytes))
+            manifest["agent_id"] = new_agent
+            manifest["original_path"] = new_original
+            manifest_path.write_text(
+                json.dumps(manifest, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+            )
+            rewritten.append(snapshot_dir.name)
+    except BaseException:
+        for manifest_path, original_bytes in reversed(written):
+            try:
+                manifest_path.write_bytes(original_bytes)
+            except OSError:
+                pass
+        for old_payload, new_payload in reversed(moved):
+            try:
+                if new_payload.exists() and not old_payload.exists():
+                    new_payload.rename(old_payload)
+            except OSError:
+                pass
+        raise
     return rewritten
 
 

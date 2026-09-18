@@ -658,6 +658,29 @@ class ReviewRegressions(unittest.TestCase):
         self.assertEqual((product / "LOCAL.txt").read_text(), "legacy-restore")
         self.assertEqual(rolled["rolled_back_to"], snapshot_id)
 
+    def test_snapshot_retag_preflights_all_matches_before_mutation(self):
+        snapshots_dir = self.state / "snapshots/alpha"
+        first = snapshots_dir / "20260101T000000Z"
+        second = snapshots_dir / "20260101T000001Z"
+        for snapshot_dir in (first, second):
+            snapshot_dir.mkdir(parents=True)
+            (snapshot_dir / "manifest.json").write_text(json.dumps({
+                "operation": "repair-agent-install",
+                "group": "alpha",
+                "agent_id": "workbuddy",
+                "original_path": sync.normalized_absolute(self.target),
+            }))
+        (first / "local-workbuddy").mkdir()
+        before_manifest = (first / "manifest.json").read_bytes()
+        with self.assertRaisesRegex(SystemExit, "missing payload local-workbuddy"):
+            sync.rewrite_agent_install_snapshots(
+                self.state, "alpha", old_agent="workbuddy", new_agent="workbuddy-ai",
+                old_path=self.target, new_path=self.target,
+            )
+        self.assertEqual((first / "manifest.json").read_bytes(), before_manifest)
+        self.assertTrue((first / "local-workbuddy").is_dir())
+        self.assertFalse((first / "local-workbuddy-ai").exists())
+
     def test_cross_group_nested_install_preserved(self):
         nested = self.target / "nested/gamma"
         shutil.copytree(self.project / "dist/codex/skills/gamma", nested)
