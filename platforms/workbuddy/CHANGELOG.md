@@ -4,6 +4,16 @@
 
 - No unreleased changes.
 
+## [1.1.1] - 2026-09-17
+
+- Change-Type: fix
+- Summary: Add the China WorkBuddy product Skill root and keep the 1.1.0 `.agents/skills` root as a legacy install location.
+- Compatibility: Existing 1.1.0 `workbuddy` installs under `~/.agents/skills` remain valid for inventory, repair, and rollback. `~/.workbuddy/skills` is an additional supported root. Portable Skills and generated artifacts are unchanged.
+
+- Inventory `~/.workbuddy/skills` for China WorkBuddy.app (`dataFolderName` `.workbuddy`) and retain `~/.agents/skills` so 1.1.0 registrations stay on Agent `workbuddy`.
+- Optional migration: copy or convert a Skill into `~/.workbuddy/skills/<skill>`, then register that product path with `link-location --agent-id workbuddy`. Do not retarget a 1.1.0 `workbuddy` install to `codex`; `.agents/skills` was the documented WorkBuddy root in 1.1.0, even though Codex also inventories that directory.
+- International WorkBuddy AI is a separate adapter (`workbuddy-ai`) and is not claimed by this Agent ID.
+
 ## [1.1.0] - 2026-09-07
 
 - Declared the machine-local WorkBuddy-compatible Skill root for adapter-driven relationship inventory.

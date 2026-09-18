@@ -6,7 +6,7 @@ Personal Skills is a monorepo for managing personal Agent Skills. Each Skill own
 
 ## Current State
 
-- Done: repository purpose, portable Skill conventions, declarative Codex and WorkBuddy adapters, deterministic Agent builds, and PR validation.
+- Done: repository purpose, portable Skill conventions, declarative Codex, WorkBuddy, and WorkBuddy AI adapters, deterministic Agent builds, and PR validation.
 - Planned: shared management packages, CLI, MCP server, installation, registry publishing, and release automation.
 - Not yet available: project-level executable commands. Commands shown in this README describe the target interface.
 
@@ -52,7 +52,10 @@ skill/
 |   |   |-- adapter.json          # Adapter and artifact versions, output layout
 |   |   |-- SKILL.append.md       # Codex-wide generated instructions
 |   |   `-- root/.codex-plugin/plugin.json
-|   `-- workbuddy/
+|   |-- workbuddy/
+|   |   |-- adapter.json
+|   |   `-- SKILL.append.md
+|   `-- workbuddy-ai/
 |       |-- adapter.json
 |       `-- SKILL.append.md
 |-- scripts/
@@ -256,6 +259,7 @@ python3 scripts/agent_build.py --list
 python3 scripts/agent_build.py --check
 python3 scripts/agent_build.py codex
 python3 scripts/agent_build.py workbuddy
+python3 scripts/agent_build.py workbuddy-ai
 ```
 
 The builder scans `platforms/` instead of using a hard-coded Agent list. A new Agent with repository-wide defaults therefore adds one `platforms/<agent>/` directory. Existing Skills need a matching `agent-builds/<agent>/` only when they require an exception.
