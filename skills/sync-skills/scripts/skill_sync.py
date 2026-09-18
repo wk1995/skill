@@ -1392,6 +1392,92 @@ def validate_group_role_locations(registry: dict[str, Any], sync_id: str, group:
         validate_location_identity(registry, sync_id, Path(path))
 
 
+def compatible_derived_from(agent_id: str, value: object) -> bool:
+    if not isinstance(value, str):
+        return False
+    exact = f"build:{agent_id}"
+    return value == exact or value.startswith(f"{exact}:")
+
+
+def same_path_location_ids(locations: dict[str, Any], path: Path, skip_id: str) -> list[str]:
+    matches: list[str] = []
+    for location_id, recorded in locations.items():
+        if location_id == skip_id or not isinstance(recorded, dict) or not recorded.get("path"):
+            continue
+        if paths_refer_to_same_location(path, Path(str(recorded["path"]))):
+            matches.append(location_id)
+    return matches
+
+
+def preserved_derived_from(recorded: dict[str, Any] | None, agent_id: str) -> str:
+    if (
+        isinstance(recorded, dict)
+        and recorded.get("kind") == "local"
+        and recorded.get("agent_id") == agent_id
+        and compatible_derived_from(agent_id, recorded.get("derived_from"))
+    ):
+        return str(recorded["derived_from"])
+    return f"build:{agent_id}"
+
+
+def rewrite_agent_install_snapshots(
+    state_dir: Path,
+    group_key: str,
+    *,
+    old_agent: str,
+    new_agent: str,
+    old_path: Path,
+    new_path: Path,
+) -> list[str]:
+    if not isinstance(old_agent, str) or not SYNC_ID.fullmatch(old_agent):
+        return []
+    if not isinstance(new_agent, str) or not SYNC_ID.fullmatch(new_agent):
+        raise SystemExit("invalid Agent ID for snapshot rewrite")
+    snapshots_dir = state_dir / "snapshots" / group_key
+    if not snapshots_dir.is_dir():
+        return []
+    old_original = normalized_absolute(old_path)
+    new_original = normalized_absolute(new_path)
+    rewritten: list[str] = []
+    for snapshot_dir in sorted(path for path in snapshots_dir.iterdir() if path.is_dir()):
+        if snapshot_dir.is_symlink():
+            continue
+        manifest_path = snapshot_dir / "manifest.json"
+        try:
+            manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            continue
+        if not isinstance(manifest, dict) or manifest.get("operation") != "repair-agent-install":
+            continue
+        if manifest.get("group") != group_key or manifest.get("agent_id") != old_agent:
+            continue
+        if manifest.get("original_path") != old_original:
+            continue
+        old_payload = snapshot_dir / f"local-{old_agent}"
+        new_payload = snapshot_dir / f"local-{new_agent}"
+        if old_agent != new_agent:
+            if not old_payload.is_dir():
+                raise SystemExit(
+                    f"cannot rewrite snapshot {snapshot_dir.name}: missing payload local-{old_agent}"
+                )
+            if new_payload.exists() and not paths_refer_to_same_location(old_payload, new_payload):
+                raise SystemExit(
+                    f"cannot rewrite snapshot {snapshot_dir.name}: payload local-{new_agent} already exists"
+                )
+            if not paths_refer_to_same_location(old_payload, new_payload):
+                old_payload.rename(new_payload)
+        if (
+            manifest.get("agent_id") == new_agent
+            and manifest.get("original_path") == new_original
+        ):
+            continue
+        manifest["agent_id"] = new_agent
+        manifest["original_path"] = new_original
+        manifest_path.write_text(json.dumps(manifest, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+        rewritten.append(snapshot_dir.name)
+    return rewritten
+
+
 def command_link_location(args: argparse.Namespace) -> int:
     state_dir = Path(args.state_dir).expanduser().resolve()
     registry = load_registry(state_dir)
@@ -1433,7 +1519,7 @@ def command_link_location(args: argparse.Namespace) -> int:
     elif args.kind == "local":
         adapters, roots = adapter_roots_for_project(args)
         validate_agent_target(args.agent_id, path, adapters, roots)
-        if args.derived_from and args.derived_from != f"build:{args.agent_id}":
+        if args.derived_from and not compatible_derived_from(args.agent_id, args.derived_from):
             raise SystemExit("derived_from must reference the same Agent build")
         location["agent_id"] = args.agent_id
         location["derived_from"] = args.derived_from or f"build:{args.agent_id}"
@@ -1441,25 +1527,68 @@ def command_link_location(args: argparse.Namespace) -> int:
         location["source_id"] = args.source_id
 
     locations = group.setdefault("locations", {})
-    existing = locations.get(args.location_id)
+    existing = locations.get(args.location_id) if isinstance(locations.get(args.location_id), dict) else None
     replace = bool(getattr(args, "replace", False))
+    same_path_ids = same_path_location_ids(locations, path, args.location_id)
+    if args.kind == "local" and not args.derived_from:
+        location["derived_from"] = preserved_derived_from(existing, args.agent_id)
     if existing and existing != location and not replace:
         raise SystemExit(
             f"location ID already exists with different data: {args.location_id}; "
             "rerun with --replace to update the registered Agent identity"
         )
+    if same_path_ids and not replace:
+        raise SystemExit(
+            f"path is already registered as {same_path_ids[0]!r}; "
+            "rerun with --replace to retarget that location to the requested Agent"
+        )
+
+    sources: list[tuple[str, dict[str, Any]]] = []
+    if existing:
+        sources.append((args.location_id, existing))
+    for location_id in same_path_ids:
+        recorded = locations.get(location_id)
+        if isinstance(recorded, dict):
+            sources.append((location_id, recorded))
+
+    rewritten_snapshot_ids: list[str] = []
     retired: list[str] = []
-    for location_id, recorded in list(locations.items()):
-        if location_id == args.location_id or not isinstance(recorded, dict) or not recorded.get("path"):
-            continue
-        if not paths_refer_to_same_location(path, Path(str(recorded["path"]))):
-            continue
-        if not replace:
-            raise SystemExit(
-                f"path is already registered as {location_id!r}; "
-                "rerun with --replace to retarget that location to the requested Agent"
-            )
-        retired.append(location_id)
+    if replace:
+        for _, recorded in sources:
+            if recorded.get("kind") != args.kind:
+                raise SystemExit("--replace cannot change location kind")
+            recorded_path = Path(str(recorded["path"])) if recorded.get("path") else None
+            same_path = bool(recorded_path and paths_refer_to_same_location(path, recorded_path))
+            if args.kind == "local":
+                if not same_path and recorded.get("agent_id") != args.agent_id:
+                    raise SystemExit("--replace cannot change path and agent_id in the same operation")
+            else:
+                if not same_path:
+                    raise SystemExit("--replace cannot change the registered path")
+                if args.kind == "project" and recorded.get("project_id") != args.project_id:
+                    raise SystemExit("--replace cannot change project_id")
+                if args.kind == "external" and recorded.get("source_id") != args.source_id:
+                    raise SystemExit("--replace cannot change source_id")
+        if args.kind == "local" and not args.derived_from:
+            for _, recorded in sources:
+                if (
+                    recorded.get("agent_id") == args.agent_id
+                    and compatible_derived_from(args.agent_id, recorded.get("derived_from"))
+                ):
+                    location["derived_from"] = str(recorded["derived_from"])
+                    break
+        for location_id, recorded in sources:
+            if recorded.get("kind") == "local" and recorded.get("agent_id") and recorded.get("path"):
+                rewritten_snapshot_ids.extend(rewrite_agent_install_snapshots(
+                    state_dir, key,
+                    old_agent=str(recorded["agent_id"]),
+                    new_agent=str(args.agent_id),
+                    old_path=Path(str(recorded["path"])),
+                    new_path=path,
+                ))
+            if location_id != args.location_id:
+                retired.append(location_id)
+
     locations[args.location_id] = location
     for location_id in retired:
         locations.pop(location_id, None)
@@ -1473,6 +1602,7 @@ def command_link_location(args: argparse.Namespace) -> int:
         "location_id": args.location_id,
         "location": location,
         "retired_location_ids": retired,
+        "rewritten_snapshot_ids": sorted(set(rewritten_snapshot_ids)),
         "replaced": bool((existing and existing != location) or retired),
         "updated_at": operation_at,
     })

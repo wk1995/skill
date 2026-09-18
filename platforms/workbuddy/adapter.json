@@ -9,6 +9,10 @@
     {
       "type": "home-relative",
       "path": ".workbuddy/skills"
+    },
+    {
+      "type": "home-relative",
+      "path": ".agents/skills"
     }
   ]
 }

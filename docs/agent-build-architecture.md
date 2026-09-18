@@ -120,7 +120,7 @@ As checked on 2026-09-08, the [official Skills documentation](https://learn.chat
 
 ### WorkBuddy local roots (adapter 1.1.1)
 
-As checked on 2026-09-17, China `WorkBuddy.app` (`com.tencent.workbuddy.mac`) uses `dataFolderName` `.workbuddy`. Adapter 1.1.1 inventories `~/.workbuddy/skills` for that product. International WorkBuddy AI is a different Agent (`workbuddy-ai`) and is not claimed by this adapter. Do not attach the process-injected `WORKBUDDY_CONFIG_DIR` variable to this adapter; a custom directory must be registered with `link-location`.
+As checked on 2026-09-17, China `WorkBuddy.app` (`com.tencent.workbuddy.mac`) uses `dataFolderName` `.workbuddy`. Adapter 1.1.1 inventories `~/.workbuddy/skills` for that product and retains `~/.agents/skills` so 1.1.0 `workbuddy` installs remain valid. A physical root shared with Codex keeps both Agent IDs; do not retarget those 1.1.0 installs to `codex`. International WorkBuddy AI is a different Agent (`workbuddy-ai`) and is not claimed by this adapter. Do not attach the process-injected `WORKBUDDY_CONFIG_DIR` variable to this adapter; a custom directory must be registered with `link-location`.
 
 ### WorkBuddy AI local roots (adapter 1.0.0)
 

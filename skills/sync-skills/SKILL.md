@@ -16,7 +16,7 @@ metadata:
       - The task needs Skill provenance URLs, version history, content digests, snapshots, or difference reports.
       - The user needs to migrate legacy repository-local Skill synchronization state.
       - The user needs a machine-local relationship report across supported AI Agent Builders or needs to repair an incomplete Agent installation.
-      - The user needs to retarget a registered local Agent install whose agent_id no longer matches the product directory.
+      - The user needs to retarget a registered local Agent install to another supported root for the same Agent, or rewrite a same-path Agent identity.
     exclude:
       - The user is only asking to use a Skill for its domain workflow rather than manage Skill copies.
       - The task is ordinary code editing and does not involve Skill synchronization, conversion, auditing, or rollback.
@@ -133,14 +133,14 @@ python skills/sync-skills/scripts/skill_sync.py link-location my-skill-id \
   --path /projects/app-a/skills/my-skill
 ```
 
-Retarget a registered local Agent install whose `agent_id` no longer matches the product directory. This rewrites registry identity only after the requested Agent root is validated; Skill files are not modified. Same-path duplicate location IDs in the same group are retired. Then repair with the corrected Agent:
+A 1.1.0 China WorkBuddy install at `~/.agents/skills/<skill>` remains a valid `workbuddy` location; do not retarget it to `codex`. After the Skill already exists at the product root, optionally migrate the registered path without changing Agent identity. `--replace` rewrites registry identity only after the requested Agent root is validated, preserves a precise `derived_from` when the Agent stays the same, and rewrites matching repair snapshots so rollback still works. Skill files are not copied. Same-path duplicate location IDs in the same group are retired:
 
 ```bash
 python skills/sync-skills/scripts/skill_sync.py link-location my-skill-id \
-  --location-id local:workbuddy-ai --kind local --agent-id workbuddy-ai \
-  --path ~/.workbuddy-ai/skills/my-skill --replace
+  --location-id local:workbuddy --kind local --agent-id workbuddy \
+  --path ~/.workbuddy/skills/my-skill --replace
 python skills/sync-skills/scripts/skill_sync.py repair-agent-install my-skill-id \
-  --agent workbuddy-ai
+  --agent workbuddy
 ```
 
 Repair an already registered Agent installation from a trusted manifest-v2 build. Diverged local content is preserved unless replacement is explicitly authorized; authorized replacement is still snapshotted first:
@@ -164,7 +164,7 @@ python skills/sync-skills/scripts/skill_sync.py repair-agent-install my-skill-id
 - Treat missing adapter root information as a blocking error for installation protection; a read-only inventory may continue with diagnostics for other valid adapters.
 - Compare installed file execute bits as well as manifest-v2 content digests. Permission-only differences need the same snapshot, authorized replacement, verification, and idempotency as content differences.
 - Refuse ordinary portable repo sync into a registered or adapter-discovered Agent install directory. Use the Agent build/install flow instead.
-- `link-location` refuses to change an existing location ID or a same-path registration unless `--replace` is explicit. Replacement revalidates the requested Agent root, rewrites only registry identity, retires duplicate same-path location IDs in the same group, and does not modify Skill files. After retargeting, repair with `--agent` matching the new identity.
+- `link-location` refuses to change an existing location ID or to register a second same-path location ID unless `--replace` is explicit. Replacement revalidates the requested Agent root, rewrites registry identity, retires duplicate same-path location IDs in the same group, preserves a precise `derived_from` when the Agent stays the same, rewrites matching Agent-install snapshots so rollback still works, and does not modify Skill files. It cannot change `kind`, `project_id`, or `source_id`, and cannot change `path` and `agent_id` together. After a path or identity change, repair with `--agent` matching the registered identity. Do not retarget a 1.1.0 `workbuddy` install under `~/.agents/skills` to `codex`.
 - Exclude transient directories and files such as `.git`, `node_modules`, `dist`, `.DS_Store`, `__pycache__`, and Python bytecode.
 - When the skill-management repository is on `master` or its configured default branch, compare linked copies by `metadata.version`; if versions differ, synchronize and let the higher version replace the lower version.
 - When the repository is on any other branch, do not synchronize only because versions differ unless the user explicitly requests synchronization or the branch work requires updating the target copy.

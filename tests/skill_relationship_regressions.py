@@ -414,13 +414,19 @@ class ReviewRegressions(unittest.TestCase):
         self.assertIn(str(self.root / "home/.codex/skills"), paths)
         workbuddy = next(a for a in adapters if a["id"] == "workbuddy")
         wb_paths = {r.get("path") for r in workbuddy["local_skill_roots"]}
-        self.assertEqual(wb_paths, {str(self.root / "home/.workbuddy/skills")})
+        self.assertEqual(wb_paths, {
+            str(self.root / "home/.workbuddy/skills"),
+            str(self.root / "home/.agents/skills"),
+        })
         workbuddy_ai = next(a for a in adapters if a["id"] == "workbuddy-ai")
         wb_ai_paths = {r.get("path") for r in workbuddy_ai["local_skill_roots"]}
         self.assertEqual(wb_ai_paths, {str(self.root / "home/.workbuddy-ai/skills")})
-        self.assertNotIn(str(self.root / "home/.agents/skills"), wb_paths)
         self.assertNotIn(str(self.root / "home/.workbuddy-ai/skills"), wb_paths)
         self.assertNotIn(str(self.root / "home/.workbuddy/skills"), wb_ai_paths)
+        shared_legacy = [r for r in rel.deduplicate_roots(adapters)
+                         if r.get("path") == str(self.root / "home/.agents/skills")]
+        self.assertEqual(len(shared_legacy), 1)
+        self.assertEqual(shared_legacy[0]["agent_ids"], ["codex", "workbuddy"])
         env_names = {root["resolver"] for root in workbuddy["local_skill_roots"] + workbuddy_ai["local_skill_roots"]}
         self.assertTrue(all(not name.startswith("env:WORKBUDDY_CONFIG_DIR") for name in env_names))
         # A root claimed by two Builders is attributed to both, independent of adapter config.
@@ -430,8 +436,9 @@ class ReviewRegressions(unittest.TestCase):
         )
         shared_roots = [r for r in rel.deduplicate_roots(adapters_shared)
                         if set(r.get("agent_ids", [])) == {"codex", "workbuddy"}]
-        self.assertEqual(len(shared_roots), 1)
-        self.assertEqual(shared_roots[0]["agent_ids"], ["codex", "workbuddy"])
+        self.assertGreaterEqual(len(shared_roots), 1)
+        self.assertIn(shared, {root.get("path") for root in shared_roots})
+        self.assertTrue(all(root["agent_ids"] == ["codex", "workbuddy"] for root in shared_roots))
 
     def test_workbuddy_editions_select_distinct_repair_targets(self):
         china = self.root / "home/.workbuddy/skills/alpha"
@@ -498,16 +505,16 @@ class ReviewRegressions(unittest.TestCase):
         self.assertIn("local `stale`", markdown)
 
     def _write_workbuddy_edition_adapters(self):
-        for agent_id, relative in (
-            ("workbuddy", ".workbuddy/skills"),
-            ("workbuddy-ai", ".workbuddy-ai/skills"),
+        for agent_id, relatives in (
+            ("workbuddy", (".workbuddy/skills", ".agents/skills")),
+            ("workbuddy-ai", (".workbuddy-ai/skills",)),
         ):
             adapter = self.project / "platforms" / agent_id
             adapter.mkdir(parents=True, exist_ok=True)
             (adapter / "adapter.json").write_text(json.dumps({
                 "id": agent_id, "schema_version": 1, "version": "1.0.0", "artifact_version": "1.0.0",
                 "skills_path": ".",
-                "local_skill_roots": [{"type": "home-relative", "path": relative}],
+                "local_skill_roots": [{"type": "home-relative", "path": relative} for relative in relatives],
             }))
 
     def test_link_location_replace_retargets_mislabeled_workbuddy_install(self):
@@ -578,6 +585,78 @@ class ReviewRegressions(unittest.TestCase):
         self.assertEqual(china_result["retired_location_ids"], ["local:workbuddy-ai"])
         self.assertEqual((china / "LOCAL.txt").read_text(), "china-preserve")
         self.assertEqual((intl / "LOCAL.txt").read_text(), "preserve")
+
+    def test_link_location_replace_preserves_identity_and_rollback(self):
+        self._write_workbuddy_edition_adapters()
+        legacy = self.root / "home/.agents/skills/alpha"
+        product = self.root / "home/.workbuddy/skills/alpha"
+        shutil.copytree(self.project / "dist/codex/skills/alpha", legacy)
+        shutil.copytree(self.project / "dist/codex/skills/alpha", product)
+        (legacy / "LOCAL.txt").write_text("legacy-restore")
+        self.registry["groups"]["alpha"]["locations"] = {
+            "local:workbuddy": {
+                "kind": "local", "agent_id": "workbuddy",
+                "derived_from": "build:workbuddy:abc123", "path": str(legacy),
+            }
+        }
+        self.save()
+        adapters, issues = rel.load_adapters(self.project, [])
+        self.assertFalse(issues)
+        roots = [{"path": root["path"], "agent_id": adapter["id"]}
+                 for adapter in adapters for root in adapter["local_skill_roots"] if root.get("path")]
+        location_id, target = sync.registered_agent_install(
+            self.registry["groups"]["alpha"], "workbuddy", roots)
+        self.assertEqual(location_id, "local:workbuddy")
+        self.assertEqual(target, legacy.expanduser().absolute())
+        snapshot_id = sync.create_agent_install_snapshot(
+            self.state, "alpha", "workbuddy", legacy,
+            {"build_id": "build:workbuddy:abc123", "output_digest": rel.digest_tree(legacy)})
+        self.registry["groups"]["alpha"].setdefault("snapshots", []).append(snapshot_id)
+        self.save()
+        (legacy / "LOCAL.txt").write_text("changed-after-snapshot")
+
+        duplicate = ("link-location", "alpha", "--location-id", "local:workbuddy-legacy",
+                     "--kind", "local", "--agent-id", "workbuddy", "--path", str(legacy))
+        self.assert_rejected_preserving_state(duplicate, "path is already registered as 'local:workbuddy'", legacy)
+        self.assert_rejected_preserving_state(
+            ("link-location", "alpha", "--location-id", "local:workbuddy", "--kind", "project",
+             "--project-id", "app", "--path", str(legacy), "--replace"),
+            "cannot change location kind", legacy)
+        intl = self.root / "home/.workbuddy-ai/skills/alpha"
+        shutil.copytree(self.project / "dist/codex/skills/alpha", intl)
+        self.assert_rejected_preserving_state(
+            ("link-location", "alpha", "--location-id", "local:workbuddy", "--kind", "local",
+             "--agent-id", "workbuddy-ai", "--path", str(intl), "--replace"),
+            "cannot change path and agent_id", legacy, product, intl)
+
+        code, keep = self.run_cli(
+            "link-location", "alpha", "--location-id", "local:workbuddy", "--kind", "local",
+            "--agent-id", "workbuddy", "--path", str(legacy), "--replace")
+        self.assertEqual(code, 0)
+        self.assertEqual(keep["location"]["derived_from"], "build:workbuddy:abc123")
+        self.assertFalse(keep["replaced"])
+        self.assertEqual(keep["rewritten_snapshot_ids"], [])
+
+        code, migrated = self.run_cli(
+            "link-location", "alpha", "--location-id", "local:workbuddy", "--kind", "local",
+            "--agent-id", "workbuddy", "--path", str(product), "--replace")
+        self.assertEqual(code, 0)
+        self.assertTrue(migrated["replaced"])
+        self.assertEqual(migrated["location"]["agent_id"], "workbuddy")
+        self.assertEqual(migrated["location"]["path"], sync.normalized_absolute(product))
+        self.assertEqual(migrated["location"]["derived_from"], "build:workbuddy:abc123")
+        self.assertEqual(migrated["rewritten_snapshot_ids"], [snapshot_id])
+        self.assertEqual((legacy / "LOCAL.txt").read_text(), "changed-after-snapshot")
+        manifest = json.loads((self.state / "snapshots/alpha" / snapshot_id / "manifest.json").read_text())
+        self.assertEqual(manifest["agent_id"], "workbuddy")
+        self.assertEqual(manifest["original_path"], sync.normalized_absolute(product))
+        self.assertTrue((self.state / "snapshots/alpha" / snapshot_id / "local-workbuddy").is_dir())
+
+        (product / "LOCAL.txt").write_text("product-current")
+        code, rolled = self.run_cli("rollback", "alpha", "--snapshot", snapshot_id, "--roles", "local")
+        self.assertEqual(code, 0)
+        self.assertEqual((product / "LOCAL.txt").read_text(), "legacy-restore")
+        self.assertEqual(rolled["rolled_back_to"], snapshot_id)
 
     def test_cross_group_nested_install_preserved(self):
         nested = self.target / "nested/gamma"

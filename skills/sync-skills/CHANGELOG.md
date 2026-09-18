@@ -11,13 +11,15 @@ version, date, and a change summary.
 ## [0.3.0] - 2026-09-17
 
 - Change-Type: feature
-- Summary: Add optional `link-location --replace` so a mislabeled local Agent install can be retargeted after the requested Agent root is validated.
-- Compatibility: Existing `link-location` usage remains valid and still refuses to overwrite a different location record unless `--replace` is explicit. Repair still selects builds by `--agent`. Skill files are not modified during retargeting.
+- Summary: Add optional `link-location --replace` to rewrite a local Agent identity or migrate a same-Agent install path after the requested Agent root is validated.
+- Compatibility: Existing first-time `link-location` usage remains valid. Registering a second location ID for the same group and filesystem path without `--replace` is now rejected; `--replace` retires the earlier same-path ID. `--replace` does not change `kind`, `project_id`, or `source_id`, and cannot change `path` and `agent_id` in one operation. Precise `derived_from` build IDs are preserved when the Agent stays the same. Matching Agent-install snapshots are rewritten so rollback remains possible. Skill files are not modified.
 
-- Add `link-location --replace` to rewrite registry identity for an existing location ID or same-path registration after Agent-root validation. Duplicate same-path location IDs in the same group are retired.
-- Keep Skill files unchanged during retargeting; repair afterwards with `--agent` matching the new identity.
-- Document the China WorkBuddy (`workbuddy`) and international WorkBuddy AI (`workbuddy-ai`) retag-then-repair workflow.
-- Add a stateful regression covering rejection, successful retag, same-path retirement, outside-root rejection, and idempotency.
+- Add `link-location --replace` to rewrite registry identity for an existing location ID or same-path registration after Agent-root validation.
+- Reject a second same-group same-path location ID unless `--replace` is explicit; `--replace` retires the earlier ID instead of keeping both.
+- Keep `kind`/`project_id`/`source_id` unchanged; keep Skill files unchanged; preserve a precise `derived_from` when retargeting the same Agent.
+- Rewrite matching `repair-agent-install` snapshot manifests (and payload directory names) so later `rollback` still resolves the registered install.
+- Document the optional WorkBuddy 1.1.0 → product-root migration that stays on Agent `workbuddy`; do not retarget those installs to `codex`.
+- Add stateful regressions covering rejection, successful retag, same-path retirement, derived-from preservation, snapshot rewrite, and post-replace rollback.
 
 ## [0.2.3] - 2026-09-08
 

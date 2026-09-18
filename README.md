@@ -6,7 +6,7 @@ Personal Skills is a monorepo for managing personal Agent Skills. Each Skill own
 
 ## Current State
 
-- Done: repository purpose, portable Skill conventions, declarative Codex and WorkBuddy adapters, deterministic Agent builds, and PR validation.
+- Done: repository purpose, portable Skill conventions, declarative Codex, WorkBuddy, and WorkBuddy AI adapters, deterministic Agent builds, and PR validation.
 - Planned: shared management packages, CLI, MCP server, installation, registry publishing, and release automation.
 - Not yet available: project-level executable commands. Commands shown in this README describe the target interface.
 
