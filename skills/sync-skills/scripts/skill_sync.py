@@ -1588,7 +1588,19 @@ def command_link_location(args: argparse.Namespace) -> int:
         location["source_id"] = args.source_id
 
     locations = group.setdefault("locations", {})
-    existing = locations.get(args.location_id) if isinstance(locations.get(args.location_id), dict) else None
+    if not isinstance(locations, dict):
+        raise SystemExit("malformed locations registry; refusing mutation")
+    malformed_location_ids = sorted(
+        str(location_id)
+        for location_id, recorded in locations.items()
+        if not isinstance(recorded, dict)
+    )
+    if malformed_location_ids:
+        raise SystemExit(
+            "malformed location record(s); refusing mutation: "
+            + ", ".join(malformed_location_ids)
+        )
+    existing = locations.get(args.location_id)
     replace = bool(getattr(args, "replace", False))
     same_path_ids = same_path_location_ids(locations, path, args.location_id)
     if args.kind == "local" and not args.derived_from:
@@ -1622,6 +1634,18 @@ def command_link_location(args: argparse.Namespace) -> int:
             recorded_path = Path(str(recorded["path"])) if recorded.get("path") else None
             same_path = bool(recorded_path and paths_refer_to_same_location(path, recorded_path))
             if args.kind == "local":
+                if (
+                    same_path
+                    and recorded.get("agent_id") != args.agent_id
+                    and isinstance(recorded.get("derived_from"), str)
+                    and recorded["derived_from"].startswith(
+                        f"build:{recorded.get('agent_id')}:"
+                    )
+                ):
+                    raise SystemExit(
+                        "cannot retarget a local install with precise build provenance "
+                        "to another Agent"
+                    )
                 if not same_path and recorded.get("agent_id") != args.agent_id:
                     raise SystemExit("--replace cannot change path and agent_id in the same operation")
             else:

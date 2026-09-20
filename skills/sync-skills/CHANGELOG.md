@@ -6,7 +6,8 @@ version, date, and a change summary.
 
 ## [Unreleased]
 
-- No unreleased changes.
+- Reject cross-Agent retagging when a local install has precise build provenance,
+  and fail closed on malformed persisted location records before mutation.
 
 ## [0.3.0] - 2026-09-17
 

@@ -145,6 +145,46 @@ class ReviewRegressions(unittest.TestCase):
         self.assertEqual(self.run_cli(*argv)[0], 0)
         self.assertEqual(len(sync.load_registry(self.state)["groups"]["alpha"]["locations"]), 1)
 
+    def test_precise_build_provenance_cannot_cross_agent_on_same_path(self):
+        legacy = self.root / "home/.agents/skills/alpha"
+        legacy.parent.mkdir(parents=True)
+        shutil.copytree(self.project / "dist/codex/skills/alpha", legacy)
+        codex_adapter = self.project / "platforms/codex/adapter.json"
+        adapter_data = json.loads(codex_adapter.read_text())
+        adapter_data["local_skill_roots"].append(
+            {"type": "home-relative", "path": ".agents/skills"}
+        )
+        codex_adapter.write_text(json.dumps(adapter_data))
+        self._write_workbuddy_edition_adapters()
+        self.registry["groups"]["alpha"]["locations"] = {
+            "local:workbuddy": {
+                "kind": "local",
+                "agent_id": "workbuddy",
+                "derived_from": "build:workbuddy:abc123",
+                "path": str(legacy),
+            }
+        }
+        self.save()
+        before = (self.state / "registry.json").read_bytes()
+        with self.assertRaisesRegex(SystemExit, "precise build provenance"):
+            self.run_cli(
+                "link-location", "alpha", "--location-id", "local:workbuddy",
+                "--kind", "local", "--agent-id", "codex", "--path", str(legacy),
+                "--replace",
+            )
+        self.assertEqual((self.state / "registry.json").read_bytes(), before)
+
+    def test_malformed_location_record_is_rejected_before_overwrite(self):
+        self.registry["groups"]["alpha"]["locations"] = {"local:codex": "CORRUPT"}
+        self.save()
+        before = (self.state / "registry.json").read_bytes()
+        with self.assertRaisesRegex(SystemExit, "malformed location record"):
+            self.run_cli(
+                "link-location", "alpha", "--location-id", "local:codex",
+                "--kind", "local", "--agent-id", "codex", "--path", str(self.target),
+            )
+        self.assertEqual((self.state / "registry.json").read_bytes(), before)
+
     def test_identical_symlink_install_rejected_without_state(self):
         store = self.local / ".alpha-store"
         self.target.rename(store)
