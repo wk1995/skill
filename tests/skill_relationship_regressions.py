@@ -681,6 +681,57 @@ class ReviewRegressions(unittest.TestCase):
         self.assertTrue((first / "local-workbuddy").is_dir())
         self.assertFalse((first / "local-workbuddy-ai").exists())
 
+    def test_link_location_replace_rolls_back_snapshots_when_registry_save_fails(self):
+        self._write_workbuddy_edition_adapters()
+        legacy = self.root / "home/.agents/skills/alpha"
+        product = self.root / "home/.workbuddy/skills/alpha"
+        shutil.copytree(self.project / "dist/codex/skills/alpha", legacy)
+        shutil.copytree(self.project / "dist/codex/skills/alpha", product)
+        (legacy / "LOCAL.txt").write_text("restore-after-save-failure")
+        self.registry["groups"]["alpha"]["locations"] = {
+            "local:workbuddy": {
+                "kind": "local", "agent_id": "workbuddy",
+                "derived_from": "build:workbuddy:abc123", "path": str(legacy),
+            }
+        }
+        self.save()
+        snapshot_id = sync.create_agent_install_snapshot(
+            self.state, "alpha", "workbuddy", legacy,
+            {"build_id": "build:workbuddy:abc123", "output_digest": rel.digest_tree(legacy)},
+        )
+        self.registry = sync.load_registry(self.state)
+        self.registry["groups"]["alpha"].setdefault("snapshots", []).append(snapshot_id)
+        self.save()
+        registry_before = (self.state / "registry.json").read_bytes()
+        snapshot_dir = self.state / "snapshots/alpha" / snapshot_id
+        manifest_before = (snapshot_dir / "manifest.json").read_bytes()
+
+        with patch.object(sync, "save_registry", side_effect=OSError("disk full")):
+            with self.assertRaisesRegex(OSError, "disk full"):
+                self.run_cli(
+                    "link-location", "alpha", "--location-id", "local:workbuddy",
+                    "--kind", "local", "--agent-id", "workbuddy", "--path", str(product),
+                    "--replace",
+                )
+
+        self.assertEqual((self.state / "registry.json").read_bytes(), registry_before)
+        self.assertEqual((snapshot_dir / "manifest.json").read_bytes(), manifest_before)
+        self.assertTrue((snapshot_dir / "local-workbuddy").is_dir())
+        self.assertFalse((snapshot_dir / "local-workbuddy-ai").exists())
+
+        code, migrated = self.run_cli(
+            "link-location", "alpha", "--location-id", "local:workbuddy", "--kind", "local",
+            "--agent-id", "workbuddy", "--path", str(product), "--replace",
+        )
+        self.assertEqual(code, 0)
+        self.assertEqual(migrated["rewritten_snapshot_ids"], [snapshot_id])
+        (product / "LOCAL.txt").write_text("current")
+        self.assertEqual(
+            self.run_cli("rollback", "alpha", "--snapshot", snapshot_id, "--roles", "local")[0],
+            0,
+        )
+        self.assertEqual((product / "LOCAL.txt").read_text(), "restore-after-save-failure")
+
     def test_cross_group_nested_install_preserved(self):
         nested = self.target / "nested/gamma"
         shutil.copytree(self.project / "dist/codex/skills/gamma", nested)

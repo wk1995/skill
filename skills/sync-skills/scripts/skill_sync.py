@@ -1428,6 +1428,7 @@ def rewrite_agent_install_snapshots(
     new_agent: str,
     old_path: Path,
     new_path: Path,
+    changes: list[tuple[Path, bytes, Path, Path, bool]] | None = None,
 ) -> list[str]:
     if not isinstance(old_agent, str) or not SYNC_ID.fullmatch(old_agent):
         return []
@@ -1479,11 +1480,14 @@ def rewrite_agent_install_snapshots(
     rewritten: list[str] = []
     moved: list[tuple[Path, Path]] = []
     written: list[tuple[Path, bytes]] = []
+    changes_start = len(changes) if changes is not None else 0
     try:
         for snapshot_dir, manifest_path, manifest, old_payload, new_payload, original_bytes in matches:
+            moved_here = False
             if old_agent != new_agent and not paths_refer_to_same_location(old_payload, new_payload):
                 old_payload.rename(new_payload)
                 moved.append((old_payload, new_payload))
+                moved_here = True
             if manifest.get("agent_id") == new_agent and manifest.get("original_path") == new_original:
                 continue
             written.append((manifest_path, original_bytes))
@@ -1492,6 +1496,8 @@ def rewrite_agent_install_snapshots(
             manifest_path.write_text(
                 json.dumps(manifest, indent=2, sort_keys=True) + "\n", encoding="utf-8"
             )
+            if changes is not None:
+                changes.append((manifest_path, original_bytes, old_payload, new_payload, moved_here))
             rewritten.append(snapshot_dir.name)
     except BaseException:
         for manifest_path, original_bytes in reversed(written):
@@ -1505,12 +1511,36 @@ def rewrite_agent_install_snapshots(
                     new_payload.rename(old_payload)
             except OSError:
                 pass
+        if changes is not None:
+            del changes[changes_start:]
         raise
     return rewritten
 
 
+def restore_agent_install_snapshot_rewrites(
+    changes: list[tuple[Path, bytes, Path, Path, bool]],
+) -> None:
+    """Undo snapshot retagging when the accompanying registry commit fails."""
+    failures: list[str] = []
+    for manifest_path, original_bytes, old_payload, new_payload, moved in reversed(changes):
+        try:
+            manifest_path.write_bytes(original_bytes)
+        except OSError as error:
+            failures.append(f"restore {manifest_path}: {error}")
+        if moved:
+            try:
+                if new_payload.exists() and not old_payload.exists():
+                    new_payload.rename(old_payload)
+            except OSError as error:
+                failures.append(f"restore {new_payload}: {error}")
+    if failures:
+        raise OSError("; ".join(failures))
+
+
 def command_link_location(args: argparse.Namespace) -> int:
     state_dir = Path(args.state_dir).expanduser().resolve()
+    registry_path = state_dir / "registry.json"
+    registry_before = registry_path.read_bytes() if registry_path.exists() else None
     registry = load_registry(state_dir)
     key, group = get_group(registry, args.group)
     sync_id = group_id(key, group)
@@ -1583,6 +1613,7 @@ def command_link_location(args: argparse.Namespace) -> int:
             sources.append((location_id, recorded))
 
     rewritten_snapshot_ids: list[str] = []
+    snapshot_changes: list[tuple[Path, bytes, Path, Path, bool]] = []
     retired: list[str] = []
     if replace:
         for _, recorded in sources:
@@ -1616,6 +1647,7 @@ def command_link_location(args: argparse.Namespace) -> int:
                     new_agent=str(args.agent_id),
                     old_path=Path(str(recorded["path"])),
                     new_path=path,
+                    changes=snapshot_changes,
                 ))
             if location_id != args.location_id:
                 retired.append(location_id)
@@ -1626,7 +1658,28 @@ def command_link_location(args: argparse.Namespace) -> int:
     registry["schema_version"] = max(2, int(registry.get("schema_version", 1)))
     operation_at = now_iso()
     group["updated_at"] = operation_at
-    save_registry(state_dir, registry)
+    try:
+        save_registry(state_dir, registry)
+    except BaseException as error:
+        rollback_failures: list[str] = []
+        if snapshot_changes:
+            try:
+                restore_agent_install_snapshot_rewrites(snapshot_changes)
+            except OSError as restore_error:
+                rollback_failures.append(str(restore_error))
+        try:
+            if registry_before is None:
+                if registry_path.exists():
+                    registry_path.unlink()
+            else:
+                registry_path.write_bytes(registry_before)
+        except OSError as restore_error:
+            rollback_failures.append(f"restore {registry_path}: {restore_error}")
+        if rollback_failures:
+            raise SystemExit(
+                f"{error}; mutation rollback failed: {'; '.join(rollback_failures)}"
+            ) from error
+        raise
     return finish_mutation(args, registry, {
         "group": key,
         "sync_id": sync_id,
