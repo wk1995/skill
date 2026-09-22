@@ -50,7 +50,7 @@ python3 skills/sync-skills/scripts/skill_sync.py link-location my-skill-id \
 
 `link` 和 `link-location` 只登记关系，不会让存在差异的副本自动变成一致。选择同步来源前，使用 `status` 检查通过 `link` 或 `convert` 登记的角色。通过 `link-location` 登记的命名位置请用 `relationships` 检查：普通 `status`、`versions`、`sync`、角色快照、当前角色 `diff` 和角色回滚都不包含这些位置。Agent 修复快照使用独立的本机安装回滚路径，见下文。
 
-1.1.0 登记在 `~/.agents/skills/<skill>` 的中国版 WorkBuddy 安装仍然是合法的 `workbuddy` 位置，不要把它重标成 `codex`。Skill 已经出现在 `~/.workbuddy/skills/<skill>` 之后，可以用 `--replace` 把登记路径迁到产品根，同时保持 `agent_id` 为 `workbuddy`。`--replace` 只在校验目标 Agent 根之后改 registry 身份：不复制 Skill 文件，不改 `kind`/`project_id`/`source_id`，也不能在同一次操作里同时改 `path` 和 `agent_id`。同组同路径再登记第二个 location ID 现在会被拒绝，除非显式使用 `--replace`（它会退役先前的 ID）。匹配的 Agent 安装快照会一并改写，因此之后仍可 rollback：
+1.1.0 登记在 `~/.agents/skills/<skill>` 的中国版 WorkBuddy 安装仍然是合法的 `workbuddy` 位置，不要把它重标成 `codex`。Skill 已经出现在 `~/.workbuddy/skills/<skill>` 之后，可以用 `--replace` 把登记路径迁到产品根，同时保持 `agent_id` 为 `workbuddy`。`--replace` 不能改 `agent_id`；另一个 Agent 必须单独登记。它只在校验该 Agent 根之后改同 Agent 路径，并在旧的 legacy `roles.local` 指向被迁移路径时一并改到新路径。它不复制 Skill 文件，也不改 `kind`/`project_id`/`source_id`。同组同路径再登记第二个 location ID 现在会被拒绝，除非显式使用 `--replace`（它会退役先前的 ID）。匹配的 Agent 安装快照会一并改写，因此之后仍可 rollback：
 
 ```bash
 python3 skills/sync-skills/scripts/skill_sync.py link-location my-skill-id \

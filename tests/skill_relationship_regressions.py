@@ -160,19 +160,24 @@ class ReviewRegressions(unittest.TestCase):
             "local:workbuddy": {
                 "kind": "local",
                 "agent_id": "workbuddy",
-                "derived_from": "build:workbuddy:abc123",
+                "derived_from": "build:workbuddy",
                 "path": str(legacy),
             }
         }
         self.save()
         before = (self.state / "registry.json").read_bytes()
-        with self.assertRaisesRegex(SystemExit, "precise build provenance"):
-            self.run_cli(
-                "link-location", "alpha", "--location-id", "local:workbuddy",
-                "--kind", "local", "--agent-id", "codex", "--path", str(legacy),
-                "--replace",
-            )
-        self.assertEqual((self.state / "registry.json").read_bytes(), before)
+        for extra in ((), ("--derived-from", "build:codex")):
+            with self.subTest(extra=extra):
+                with self.assertRaisesRegex(SystemExit, "cannot change agent_id"):
+                    self.run_cli(
+                        "link-location", "alpha", "--location-id", "local:workbuddy",
+                        "--kind", "local", "--agent-id", "codex", "--path", str(legacy),
+                        "--replace", *extra,
+                    )
+                self.assertEqual((self.state / "registry.json").read_bytes(), before)
+                recorded = sync.load_registry(self.state)["groups"]["alpha"]["locations"]["local:workbuddy"]
+                self.assertEqual(recorded["agent_id"], "workbuddy")
+                self.assertEqual(recorded["derived_from"], "build:workbuddy")
 
     def test_malformed_location_record_is_rejected_before_overwrite(self):
         self.registry["groups"]["alpha"]["locations"] = {"local:codex": "CORRUPT"}
@@ -581,13 +586,19 @@ class ReviewRegressions(unittest.TestCase):
             ("link-location", "alpha", "--location-id", "local:workbuddy-ai", "--kind", "local",
              "--agent-id", "workbuddy-ai", "--path", str(china), "--replace"),
             "outside the workbuddy-ai adapter roots", china, intl)
+        self.assert_rejected_preserving_state((*retag, "--replace"), "cannot change agent_id", intl)
+        self.assert_rejected_preserving_state((*same_id, "--replace"), "cannot change agent_id", intl)
+        self.assert_rejected_preserving_state(retag, "path is already registered as 'local:workbuddy'", intl)
         snapshots = self.snapshot_names()
-        code, result = self.run_cli(*retag, "--replace")
+        retired = sync.load_registry(self.state)
+        retired["groups"]["alpha"]["locations"].pop("local:workbuddy")
+        sync.save_registry(self.state, retired)
+        code, registered = self.run_cli(*retag)
         self.assertEqual(code, 0)
-        self.assertEqual(result["location"]["agent_id"], "workbuddy-ai")
-        self.assertEqual(result["location"]["derived_from"], "build:workbuddy-ai")
-        self.assertEqual(result["retired_location_ids"], ["local:workbuddy"])
-        self.assertTrue(result["replaced"])
+        self.assertEqual(registered["location"]["agent_id"], "workbuddy-ai")
+        self.assertEqual(registered["location"]["derived_from"], "build:workbuddy-ai")
+        self.assertEqual(registered["retired_location_ids"], [])
+        self.assertFalse(registered["replaced"])
         self.assertEqual((intl / "LOCAL.txt").read_text(), "preserve")
         self.assertEqual(self.snapshot_names(), snapshots)
         locations = sync.load_registry(self.state)["groups"]["alpha"]["locations"]
@@ -603,7 +614,7 @@ class ReviewRegressions(unittest.TestCase):
         self.assertEqual(target, intl.expanduser().absolute())
         with self.assertRaisesRegex(SystemExit, "no registered local install for Agent 'workbuddy'"):
             sync.registered_agent_install(sync.load_registry(self.state)["groups"]["alpha"], "workbuddy", roots)
-        code, again = self.run_cli(*retag, "--replace")
+        code, again = self.run_cli(*retag)
         self.assertEqual(code, 0)
         self.assertFalse(again["replaced"])
         self.assertEqual(again["retired_location_ids"], [])
@@ -611,20 +622,16 @@ class ReviewRegressions(unittest.TestCase):
         self.assertEqual(self.snapshot_names(), snapshots)
 
         (china / "LOCAL.txt").write_text("china-preserve")
-        self.registry = sync.load_registry(self.state)
-        self.registry["groups"]["alpha"]["locations"]["local:workbuddy-ai"] = {
-            "kind": "local", "agent_id": "workbuddy-ai",
-            "derived_from": "build:workbuddy-ai", "path": str(china),
-        }
-        self.save()
         code, china_result = self.run_cli(
             "link-location", "alpha", "--location-id", "local:workbuddy", "--kind", "local",
             "--agent-id", "workbuddy", "--path", str(china), "--replace")
         self.assertEqual(code, 0)
         self.assertEqual(china_result["location"]["agent_id"], "workbuddy")
-        self.assertEqual(china_result["retired_location_ids"], ["local:workbuddy-ai"])
+        self.assertEqual(china_result["retired_location_ids"], [])
         self.assertEqual((china / "LOCAL.txt").read_text(), "china-preserve")
         self.assertEqual((intl / "LOCAL.txt").read_text(), "preserve")
+        locations = sync.load_registry(self.state)["groups"]["alpha"]["locations"]
+        self.assertEqual(locations["local:workbuddy-ai"]["path"], sync.normalized_absolute(intl))
 
     def test_link_location_replace_preserves_identity_and_rollback(self):
         self._write_workbuddy_edition_adapters()
@@ -667,7 +674,7 @@ class ReviewRegressions(unittest.TestCase):
         self.assert_rejected_preserving_state(
             ("link-location", "alpha", "--location-id", "local:workbuddy", "--kind", "local",
              "--agent-id", "workbuddy-ai", "--path", str(intl), "--replace"),
-            "cannot change path and agent_id", legacy, product, intl)
+            "cannot change agent_id", legacy, product, intl)
 
         code, keep = self.run_cli(
             "link-location", "alpha", "--location-id", "local:workbuddy", "--kind", "local",
@@ -771,6 +778,95 @@ class ReviewRegressions(unittest.TestCase):
             0,
         )
         self.assertEqual((product / "LOCAL.txt").read_text(), "restore-after-save-failure")
+
+    def test_multi_source_snapshot_preflight_failure_restores_earlier_source(self):
+        self._write_workbuddy_edition_adapters()
+        codex_adapter = self.project / "platforms/codex/adapter.json"
+        adapter_data = json.loads(codex_adapter.read_text())
+        adapter_data["local_skill_roots"] = [
+            {"type": "home-relative", "path": ".agents/skills"},
+            {"type": "home-relative", "path": ".codex/skills"},
+        ]
+        codex_adapter.write_text(json.dumps(adapter_data))
+        legacy = self.root / "home/.agents/skills/alpha"
+        official = self.root / "home/.codex/skills/alpha"
+        legacy.parent.mkdir(parents=True)
+        shutil.copytree(self.project / "dist/codex/skills/alpha", legacy)
+        shutil.copytree(self.project / "dist/codex/skills/alpha", official)
+        (official / "LOCAL.txt").write_text("codex-snapshot")
+        self.registry["groups"]["alpha"]["locations"] = {
+            "local:codex": {
+                "kind": "local", "agent_id": "codex",
+                "derived_from": "build:codex", "path": str(official),
+            },
+            "local:codex-legacy": {
+                "kind": "local", "agent_id": "codex",
+                "derived_from": "build:codex", "path": str(legacy),
+            },
+        }
+        self.save()
+        snapshot_id = sync.create_agent_install_snapshot(
+            self.state, "alpha", "codex", official,
+            {"build_id": "build:codex", "output_digest": rel.digest_tree(official)},
+        )
+        broken = self.state / "snapshots/alpha/20200101T000000Z"
+        broken.mkdir()
+        (broken / "manifest.json").write_text(json.dumps({
+            "operation": "repair-agent-install",
+            "group": "alpha",
+            "agent_id": "codex",
+            "original_path": sync.normalized_absolute(legacy),
+        }) + "\n")
+        self.registry = sync.load_registry(self.state)
+        self.registry["groups"]["alpha"].setdefault("snapshots", []).append(snapshot_id)
+        self.save()
+        registry_before = (self.state / "registry.json").read_bytes()
+        manifest_path = self.state / "snapshots/alpha" / snapshot_id / "manifest.json"
+        manifest_before = manifest_path.read_bytes()
+        with self.assertRaisesRegex(SystemExit, "missing payload local-codex"):
+            self.run_cli(
+                "link-location", "alpha", "--location-id", "local:codex-legacy", "--kind", "local",
+                "--agent-id", "codex", "--path", str(official), "--replace",
+            )
+        self.assertEqual((self.state / "registry.json").read_bytes(), registry_before)
+        self.assertEqual(manifest_path.read_bytes(), manifest_before)
+        self.assertTrue((self.state / "snapshots/alpha" / snapshot_id / "local-codex").is_dir())
+        kept = sync.load_registry(self.state)
+        kept["groups"]["alpha"]["locations"].pop("local:codex-legacy")
+        sync.save_registry(self.state, kept)
+        (official / "LOCAL.txt").write_text("changed")
+        self.assertEqual(
+            self.run_cli("rollback", "alpha", "--snapshot", snapshot_id, "--roles", "local")[0], 0)
+        self.assertEqual((official / "LOCAL.txt").read_text(), "codex-snapshot")
+
+    def test_same_agent_path_replace_moves_matching_legacy_role(self):
+        self._write_workbuddy_edition_adapters()
+        legacy = self.root / "home/.agents/skills/alpha"
+        product = self.root / "home/.workbuddy/skills/alpha"
+        shutil.copytree(self.project / "dist/codex/skills/alpha", legacy)
+        shutil.copytree(self.project / "dist/codex/skills/alpha", product)
+        self.registry["groups"]["alpha"]["roles"]["local"] = str(legacy)
+        self.registry["groups"]["alpha"]["locations"] = {
+            "local:workbuddy": {
+                "kind": "local", "agent_id": "workbuddy",
+                "derived_from": "build:workbuddy", "path": str(legacy),
+            }
+        }
+        self.save()
+        code, migrated = self.run_cli(
+            "link-location", "alpha", "--location-id", "local:workbuddy", "--kind", "local",
+            "--agent-id", "workbuddy", "--path", str(product), "--replace")
+        self.assertEqual(code, 0)
+        group = sync.load_registry(self.state)["groups"]["alpha"]
+        self.assertEqual(group["roles"]["local"], sync.normalized_absolute(product))
+        self.assertEqual(group["locations"]["local:workbuddy"]["path"], sync.normalized_absolute(product))
+        adapters, issues = rel.load_adapters(self.project, [])
+        self.assertFalse(issues)
+        roots = [{"path": root["path"], "agent_id": adapter["id"]}
+                 for adapter in adapters for root in adapter["local_skill_roots"] if root.get("path")]
+        location_id, target = sync.registered_agent_install(group, "workbuddy", roots)
+        self.assertEqual(location_id, "local:workbuddy")
+        self.assertEqual(target, product.expanduser().absolute())
 
     def test_cross_group_nested_install_preserved(self):
         nested = self.target / "nested/gamma"

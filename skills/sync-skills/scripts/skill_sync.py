@@ -1456,15 +1456,14 @@ def rewrite_agent_install_snapshots(
             continue
         old_payload = snapshot_dir / f"local-{old_agent}"
         new_payload = snapshot_dir / f"local-{new_agent}"
-        if old_agent != new_agent:
-            if not old_payload.is_dir():
-                raise SystemExit(
-                    f"cannot rewrite snapshot {snapshot_dir.name}: missing payload local-{old_agent}"
-                )
-            if new_payload.exists() and not paths_refer_to_same_location(old_payload, new_payload):
-                raise SystemExit(
-                    f"cannot rewrite snapshot {snapshot_dir.name}: payload local-{new_agent} already exists"
-                )
+        if not old_payload.is_dir():
+            raise SystemExit(
+                f"cannot rewrite snapshot {snapshot_dir.name}: missing payload local-{old_agent}"
+            )
+        if old_agent != new_agent and new_payload.exists() and not paths_refer_to_same_location(old_payload, new_payload):
+            raise SystemExit(
+                f"cannot rewrite snapshot {snapshot_dir.name}: payload local-{new_agent} already exists"
+            )
         matches.append((
             snapshot_dir,
             manifest_path,
@@ -1613,7 +1612,8 @@ def command_link_location(args: argparse.Namespace) -> int:
     if same_path_ids and not replace:
         raise SystemExit(
             f"path is already registered as {same_path_ids[0]!r}; "
-            "rerun with --replace to retarget that location to the requested Agent"
+            "retire that location before registering another Agent, or rerun with "
+            "--replace to migrate the same Agent to this path"
         )
 
     sources: list[tuple[str, dict[str, Any]]] = []
@@ -1634,20 +1634,11 @@ def command_link_location(args: argparse.Namespace) -> int:
             recorded_path = Path(str(recorded["path"])) if recorded.get("path") else None
             same_path = bool(recorded_path and paths_refer_to_same_location(path, recorded_path))
             if args.kind == "local":
-                if (
-                    same_path
-                    and recorded.get("agent_id") != args.agent_id
-                    and isinstance(recorded.get("derived_from"), str)
-                    and recorded["derived_from"].startswith(
-                        f"build:{recorded.get('agent_id')}:"
-                    )
-                ):
+                if recorded.get("agent_id") != args.agent_id:
                     raise SystemExit(
-                        "cannot retarget a local install with precise build provenance "
-                        "to another Agent"
+                        "--replace cannot change agent_id; register the other Agent "
+                        "as its own location"
                     )
-                if not same_path and recorded.get("agent_id") != args.agent_id:
-                    raise SystemExit("--replace cannot change path and agent_id in the same operation")
             else:
                 if not same_path:
                     raise SystemExit("--replace cannot change the registered path")
@@ -1663,18 +1654,35 @@ def command_link_location(args: argparse.Namespace) -> int:
                 ):
                     location["derived_from"] = str(recorded["derived_from"])
                     break
-        for location_id, recorded in sources:
-            if recorded.get("kind") == "local" and recorded.get("agent_id") and recorded.get("path"):
-                rewritten_snapshot_ids.extend(rewrite_agent_install_snapshots(
-                    state_dir, key,
-                    old_agent=str(recorded["agent_id"]),
-                    new_agent=str(args.agent_id),
-                    old_path=Path(str(recorded["path"])),
-                    new_path=path,
-                    changes=snapshot_changes,
-                ))
-            if location_id != args.location_id:
-                retired.append(location_id)
+        try:
+            for location_id, recorded in sources:
+                if recorded.get("kind") == "local" and recorded.get("agent_id") and recorded.get("path"):
+                    rewritten_snapshot_ids.extend(rewrite_agent_install_snapshots(
+                        state_dir, key,
+                        old_agent=str(recorded["agent_id"]),
+                        new_agent=str(args.agent_id),
+                        old_path=Path(str(recorded["path"])),
+                        new_path=path,
+                        changes=snapshot_changes,
+                    ))
+                if location_id != args.location_id:
+                    retired.append(location_id)
+        except BaseException:
+            if snapshot_changes:
+                restore_agent_install_snapshot_rewrites(snapshot_changes)
+            raise
+        roles = group.get("roles")
+        if args.kind == "local" and isinstance(roles, dict) and roles.get("local"):
+            legacy_local = Path(str(roles["local"]))
+            moved_from_legacy = any(
+                recorded.get("path")
+                and paths_refer_to_same_location(legacy_local, Path(str(recorded["path"])))
+                and not paths_refer_to_same_location(legacy_local, path)
+                for _, recorded in sources
+                if recorded.get("kind") == "local" and recorded.get("agent_id") == args.agent_id
+            )
+            if moved_from_legacy:
+                roles["local"] = normalized_absolute(path)
 
     locations[args.location_id] = location
     for location_id in retired:
