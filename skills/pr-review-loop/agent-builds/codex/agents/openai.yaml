@@ -1,4 +1,4 @@
 interface:
   display_name: "PR Review Loop"
-  short_description: "Review a PR, comment, fix, repeat."
-  default_prompt: "Use $pr-review-loop to review this pull request, comment the confirmed findings on it, fix and push them, and keep reviewing until a round is clean."
+  short_description: "Review a PR, fix, repeat."
+  default_prompt: "Use $pr-review-loop to review this pull request, fix and push the confirmed findings, and keep reviewing until a round is clean. Comment on the pull request only when its comment policy enables comments."
