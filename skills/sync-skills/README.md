@@ -50,7 +50,7 @@ python3 skills/sync-skills/scripts/skill_sync.py link-location my-skill-id \
 
 `link` and `link-location` register relationships; they do not make divergent copies equal. Use `status` to inspect roles registered by `link` or `convert` before selecting a synchronization source. Use `relationships` to inspect named locations registered by `link-location`: they are not included in ordinary `status`, `versions`, `sync`, role snapshots, current-role `diff`, or role rollback. Agent repair snapshots have their own local-install rollback path, described below.
 
-A 1.1.0 China WorkBuddy install at `~/.agents/skills/<skill>` remains a valid `workbuddy` location. Do not retarget it to `codex`. After the Skill already exists at `~/.workbuddy/skills/<skill>`, optionally migrate the registered path with `--replace` while keeping `agent_id` as `workbuddy`. `--replace` cannot change `agent_id`; register the other Agent as its own location. It rewrites the same-Agent path only after that Agent root is validated, moves a matching legacy `roles.local` entry with the path, and does not copy Skill files or change `kind`/`project_id`/`source_id`. Registering a second location ID for the same group and filesystem path now requires `--replace`, which retires the earlier ID. Matching Agent-install snapshots are rewritten so rollback still works:
+A 1.1.0 China WorkBuddy install at `~/.agents/skills/<skill>` remains a valid `workbuddy` location. Do not retarget it to `codex`. After the Skill already exists at `~/.workbuddy/skills/<skill>`, optionally migrate the registered path with `--replace` while keeping `agent_id` as `workbuddy`. `--replace` cannot change `agent_id`. Keep the other Agent on its own registration; the same path cannot gain a second location ID for a different Agent. It rewrites the same-Agent path only after that Agent root is validated. A matching legacy `roles.local` entry moves only when no other Agent still resolves the old path, so a shared `~/.agents/skills` role stays in place and role rollback does not write into the new directory. An Agent that already has an explicit local location is not also selected from `roles.local`. Skill files and `kind`/`project_id`/`source_id` stay unchanged. Registering a second location ID for the same group and filesystem path now requires `--replace`, which retires the earlier ID when the Agent stays the same. Matching Agent-install snapshots are rewritten so rollback still works:
 
 ```bash
 python3 skills/sync-skills/scripts/skill_sync.py link-location my-skill-id \
@@ -177,7 +177,7 @@ Use this Skill when the request:
 - needs stable identity, provenance URLs, version history, digests, snapshots, audit times, or file differences;
 - inventories local Skills, supported Builders, generated builds, Agent installations, or related projects;
 - repairs an incomplete or diverged registered Agent installation;
-- retargets a registered local Agent install whose `agent_id` or path should move to another supported root for the same Agent; or
+- retargets a registered local Agent install to another supported root for the same Agent; or
 - migrates legacy repository-local Skill synchronization state.
 
 ## When It Does Not Trigger
@@ -186,7 +186,8 @@ Do not use this Skill when the request:
 
 - only uses a Skill for its domain workflow and does not manage its copies or installation;
 - creates or updates the behavior of one Skill without any copy-management work; or
-- is ordinary application or repository work unrelated to Skill synchronization, conversion, inventory, repair, or rollback.
+- is ordinary application or repository work unrelated to Skill synchronization, conversion, inventory, repair, or rollback; or
+- retargets a registered install onto a different Agent. `link-location --replace` cannot change `agent_id`.
 
 ## Exit Codes And Recovery
 

@@ -50,7 +50,7 @@ python3 skills/sync-skills/scripts/skill_sync.py link-location my-skill-id \
 
 `link` 和 `link-location` 只登记关系，不会让存在差异的副本自动变成一致。选择同步来源前，使用 `status` 检查通过 `link` 或 `convert` 登记的角色。通过 `link-location` 登记的命名位置请用 `relationships` 检查：普通 `status`、`versions`、`sync`、角色快照、当前角色 `diff` 和角色回滚都不包含这些位置。Agent 修复快照使用独立的本机安装回滚路径，见下文。
 
-1.1.0 登记在 `~/.agents/skills/<skill>` 的中国版 WorkBuddy 安装仍然是合法的 `workbuddy` 位置，不要把它重标成 `codex`。Skill 已经出现在 `~/.workbuddy/skills/<skill>` 之后，可以用 `--replace` 把登记路径迁到产品根，同时保持 `agent_id` 为 `workbuddy`。`--replace` 不能改 `agent_id`；另一个 Agent 必须单独登记。它只在校验该 Agent 根之后改同 Agent 路径，并在旧的 legacy `roles.local` 指向被迁移路径时一并改到新路径。它不复制 Skill 文件，也不改 `kind`/`project_id`/`source_id`。同组同路径再登记第二个 location ID 现在会被拒绝，除非显式使用 `--replace`（它会退役先前的 ID）。匹配的 Agent 安装快照会一并改写，因此之后仍可 rollback：
+1.1.0 登记在 `~/.agents/skills/<skill>` 的中国版 WorkBuddy 安装仍然是合法的 `workbuddy` 位置，不要把它重标成 `codex`。Skill 已经出现在 `~/.workbuddy/skills/<skill>` 之后，可以用 `--replace` 把登记路径迁到产品根，同时保持 `agent_id` 为 `workbuddy`。`--replace` 不能改 `agent_id`。另一个 Agent 保持自己的登记；同一路径不能再为另一个 Agent 增加第二个 location ID。它只在校验该 Agent 根之后改同 Agent 路径。匹配的 legacy `roles.local` 只有在没有其他 Agent 仍解析旧路径时才跟着迁移，因此共享的 `~/.agents/skills` 角色会留在原地，角色回滚也不会写进新目录。已经有显式 local location 的 Agent 不会再把 `roles.local` 当成第二个候选。它不复制 Skill 文件，也不改 `kind`/`project_id`/`source_id`。同组同路径再登记第二个 location ID 现在会被拒绝，除非显式使用 `--replace`（Agent 不变时会退役先前的 ID）。匹配的 Agent 安装快照会一并改写，因此之后仍可 rollback：
 
 ```bash
 python3 skills/sync-skills/scripts/skill_sync.py link-location my-skill-id \
@@ -177,7 +177,7 @@ python3 skills/sync-skills/scripts/skill_sync.py migrate-state
 - 需要稳定身份、来源 URL、版本历史、摘要、快照、审计时间或文件差异；
 - 盘点本机 Skills、支持的 Builders、生成构建、Agent 安装或关联项目；
 - 修复不完整或存在分歧的已登记 Agent 安装；
-- 将已登记本机安装的 `agent_id` 或路径迁到同一 Agent 的另一个受支持根；
+- 将已登记本机安装的路径迁到同一 Agent 的另一个受支持根；
 - 将旧版仓库内 Skill 同步状态迁移到仓库外。
 
 ## 何时不触发
@@ -186,7 +186,8 @@ python3 skills/sync-skills/scripts/skill_sync.py migrate-state
 
 - 只是使用某个 Skill 的业务工作流，并不管理它的副本或安装；
 - 只创建或修改一个 Skill 的行为，不涉及副本管理；
-- 普通应用或仓库工作，与 Skill 同步、转换、盘点、修复或回滚无关。
+- 普通应用或仓库工作，与 Skill 同步、转换、盘点、修复或回滚无关；
+- 把已登记安装重标到另一个 Agent。`link-location --replace` 不能修改 `agent_id`。
 
 ## 退出码与恢复
 

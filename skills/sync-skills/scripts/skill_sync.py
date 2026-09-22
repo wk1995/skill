@@ -1492,24 +1492,29 @@ def rewrite_agent_install_snapshots(
             written.append((manifest_path, original_bytes))
             manifest["agent_id"] = new_agent
             manifest["original_path"] = new_original
+            if changes is not None:
+                changes.append((manifest_path, original_bytes, old_payload, new_payload, moved_here))
             manifest_path.write_text(
                 json.dumps(manifest, indent=2, sort_keys=True) + "\n", encoding="utf-8"
             )
-            if changes is not None:
-                changes.append((manifest_path, original_bytes, old_payload, new_payload, moved_here))
             rewritten.append(snapshot_dir.name)
-    except BaseException:
+    except BaseException as error:
+        restore_failures: list[str] = []
         for manifest_path, original_bytes in reversed(written):
             try:
                 manifest_path.write_bytes(original_bytes)
-            except OSError:
-                pass
+            except OSError as restore_error:
+                restore_failures.append(f"restore {manifest_path}: {restore_error}")
         for old_payload, new_payload in reversed(moved):
             try:
                 if new_payload.exists() and not old_payload.exists():
                     new_payload.rename(old_payload)
-            except OSError:
-                pass
+            except OSError as restore_error:
+                restore_failures.append(f"restore {new_payload}: {restore_error}")
+        if restore_failures:
+            # The caller retries this same undo log. Dropping it here would
+            # leave an already rewritten snapshot after the failed replace.
+            raise OSError(str(error)) from OSError("; ".join(restore_failures))
         if changes is not None:
             del changes[changes_start:]
         raise
@@ -1636,8 +1641,8 @@ def command_link_location(args: argparse.Namespace) -> int:
             if args.kind == "local":
                 if recorded.get("agent_id") != args.agent_id:
                     raise SystemExit(
-                        "--replace cannot change agent_id; register the other Agent "
-                        "as its own location"
+                        "--replace cannot change agent_id; keep this location on its "
+                        "current Agent and register the other Agent at its own path"
                     )
             else:
                 if not same_path:
@@ -1667,9 +1672,14 @@ def command_link_location(args: argparse.Namespace) -> int:
                     ))
                 if location_id != args.location_id:
                     retired.append(location_id)
-        except BaseException:
+        except BaseException as error:
             if snapshot_changes:
-                restore_agent_install_snapshot_rewrites(snapshot_changes)
+                try:
+                    restore_agent_install_snapshot_rewrites(snapshot_changes)
+                except OSError as restore_error:
+                    raise SystemExit(
+                        f"{error}; mutation rollback failed: {restore_error}"
+                    ) from error
             raise
         roles = group.get("roles")
         if args.kind == "local" and isinstance(roles, dict) and roles.get("local"):
@@ -1681,7 +1691,9 @@ def command_link_location(args: argparse.Namespace) -> int:
                 for _, recorded in sources
                 if recorded.get("kind") == "local" and recorded.get("agent_id") == args.agent_id
             )
-            if moved_from_legacy:
+            # roles.local is one shared pointer. Moving it drops any other Agent
+            # that still resolves the old path, and role rollback follows the pointer.
+            if moved_from_legacy and not other_agent_resolves_path(group, legacy_local, roots, args.agent_id):
                 roles["local"] = normalized_absolute(path)
 
     locations[args.location_id] = location
@@ -1771,26 +1783,55 @@ def refuse_portable_sync_to_agent_install(
             )
 
 
-def registered_agent_install(
+def agent_install_candidates(
     group: dict[str, Any],
     agent_id: str,
     roots: list[dict[str, Any]],
-) -> tuple[str, Path]:
+) -> list[tuple[str, Path]]:
     matches: list[tuple[str, Path]] = []
     for location_id, location in group.get("locations", {}).items():
         if not isinstance(location, dict) or location.get("kind") != "local":
             continue
         if location.get("agent_id") == agent_id and location.get("path"):
-            matches.append((location_id, Path(str(location["path"])).expanduser().absolute()))
+            matches.append((str(location_id), Path(str(location["path"])).expanduser().absolute()))
+    # An explicit location already selects this Agent. The shared legacy role
+    # must not become a second candidate after that location moves.
     legacy_local = group.get("roles", {}).get("local")
-    if legacy_local:
+    if legacy_local and not matches:
         path = Path(str(legacy_local)).expanduser().absolute()
         belongs = any(
             root["agent_id"] == agent_id and path_is_within(path, Path(root["path"]))
             for root in roots
         )
-        if belongs and not any(paths_refer_to_same_location(path, match[1]) for match in matches):
+        if belongs:
             matches.append((f"local:{agent_id}", path))
+    return matches
+
+
+def other_agent_resolves_path(
+    group: dict[str, Any],
+    path: Path,
+    roots: list[dict[str, Any]],
+    agent_id: str,
+) -> bool:
+    others = sorted({
+        root["agent_id"]
+        for root in roots
+        if root.get("agent_id") and root["agent_id"] != agent_id
+    })
+    for other in others:
+        for _, resolved in agent_install_candidates(group, other, roots):
+            if paths_refer_to_same_location(resolved, path):
+                return True
+    return False
+
+
+def registered_agent_install(
+    group: dict[str, Any],
+    agent_id: str,
+    roots: list[dict[str, Any]],
+) -> tuple[str, Path]:
+    matches = agent_install_candidates(group, agent_id, roots)
     if not matches:
         raise SystemExit(f"no registered local install for Agent {agent_id!r}")
     if len(matches) > 1 and not all(paths_refer_to_same_location(matches[0][1], match[1]) for match in matches[1:]):

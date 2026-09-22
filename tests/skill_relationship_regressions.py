@@ -868,6 +868,154 @@ class ReviewRegressions(unittest.TestCase):
         self.assertEqual(location_id, "local:workbuddy")
         self.assertEqual(target, product.expanduser().absolute())
 
+    def _adapter_roots(self):
+        adapters, issues = rel.load_adapters(self.project, [])
+        self.assertFalse(issues)
+        return [
+            {"path": root["path"], "agent_id": adapter["id"]}
+            for adapter in adapters
+            for root in adapter["local_skill_roots"]
+            if root.get("path")
+        ]
+
+    def test_shared_legacy_role_stays_when_another_agent_resolves_it(self):
+        self._write_workbuddy_edition_adapters()
+        codex_adapter = self.project / "platforms/codex/adapter.json"
+        codex_data = json.loads(codex_adapter.read_text())
+        codex_data["local_skill_roots"].append({"type": "home-relative", "path": ".agents/skills"})
+        codex_adapter.write_text(json.dumps(codex_data))
+        workbuddy_adapter = self.project / "platforms/workbuddy/adapter.json"
+        workbuddy_data = json.loads(workbuddy_adapter.read_text())
+        workbuddy_data["skills_path"] = "skills"
+        workbuddy_adapter.write_text(json.dumps(workbuddy_data))
+        (self.project / "platforms/workbuddy/CHANGELOG.md").write_text("## [1.0.0] - 2026-09-08\n")
+        (self.project / "platforms/workbuddy-ai/CHANGELOG.md").write_text("## [1.0.0] - 2026-09-08\n")
+        builder.build("workbuddy", [], None, False)
+        legacy = self.root / "home/.agents/skills/alpha"
+        product = self.root / "home/.workbuddy/skills/alpha"
+        shutil.copytree(self.project / "dist/codex/skills/alpha", legacy)
+        shutil.copytree(self.project / "dist/workbuddy/skills/alpha", product)
+        self.registry["groups"]["alpha"]["roles"]["local"] = str(legacy)
+        self.registry["groups"]["alpha"]["locations"] = {
+            "local:workbuddy": {
+                "kind": "local", "agent_id": "workbuddy",
+                "derived_from": "build:workbuddy", "path": str(legacy),
+            }
+        }
+        self.save()
+        roots = self._adapter_roots()
+        group = self.registry["groups"]["alpha"]
+        self.assertEqual(sync.registered_agent_install(group, "codex", roots)[1], legacy.expanduser().absolute())
+        self.assertEqual(sync.registered_agent_install(group, "workbuddy", roots)[1], legacy.expanduser().absolute())
+        code, repaired = self.run_cli("repair-agent-install", "alpha", "--agent", "codex")
+        self.assertEqual(code, 0)
+        self.assertEqual(repaired["status"], "already-current")
+        self.assertEqual(Path(repaired["target_path"]), legacy.expanduser().absolute())
+
+        (legacy / "LOCAL.txt").write_text("legacy-snap")
+        (product / "LOCAL.txt").write_text("product-live")
+        role_snapshot = sync.create_snapshot(self.state, "alpha", sync.load_registry(self.state)["groups"]["alpha"], "pre-migration", None)
+        codex_snapshot = sync.create_agent_install_snapshot(
+            self.state, "alpha", "codex", legacy,
+            {"build_id": "build:codex", "output_digest": rel.digest_tree(legacy)},
+        )
+        (legacy / "LOCAL.txt").write_text("legacy-live")
+        code, migrated = self.run_cli(
+            "link-location", "alpha", "--location-id", "local:workbuddy", "--kind", "local",
+            "--agent-id", "workbuddy", "--path", str(product), "--replace")
+        self.assertEqual(code, 0)
+        self.assertTrue(migrated["replaced"])
+        group = sync.load_registry(self.state)["groups"]["alpha"]
+        self.assertEqual(group["roles"]["local"], sync.normalized_absolute(legacy))
+        self.assertEqual(group["locations"]["local:workbuddy"]["path"], sync.normalized_absolute(product))
+        self.assertEqual(group["locations"]["local:codex"]["path"], sync.normalized_absolute(legacy))
+        roots = self._adapter_roots()
+        self.assertEqual(sync.registered_agent_install(group, "codex", roots)[1], legacy.expanduser().absolute())
+        self.assertEqual(sync.registered_agent_install(group, "workbuddy", roots)[1], product.expanduser().absolute())
+        code, codex_again = self.run_cli(
+            "repair-agent-install", "alpha", "--agent", "codex", "--discard-local-changes")
+        self.assertEqual(code, 0)
+        self.assertEqual(Path(codex_again["target_path"]), legacy.expanduser().absolute())
+        code, workbuddy_repair = self.run_cli(
+            "repair-agent-install", "alpha", "--agent", "workbuddy", "--discard-local-changes")
+        self.assertEqual(code, 0)
+        self.assertEqual(workbuddy_repair["status"], "reinstalled")
+        self.assertEqual(Path(workbuddy_repair["target_path"]), product.expanduser().absolute())
+
+        (legacy / "LOCAL.txt").write_text("legacy-live")
+        (product / "LOCAL.txt").write_text("product-live")
+        code, rolled = self.run_cli("rollback", "alpha", "--snapshot", codex_snapshot, "--roles", "local")
+        self.assertEqual(code, 0)
+        self.assertEqual((legacy / "LOCAL.txt").read_text(), "legacy-snap")
+        self.assertEqual((product / "LOCAL.txt").read_text(), "product-live")
+        (legacy / "LOCAL.txt").write_text("legacy-after")
+        (product / "LOCAL.txt").write_text("product-after")
+        code, role_rolled = self.run_cli("rollback", "alpha", "--snapshot", role_snapshot, "--roles", "local")
+        self.assertEqual(code, 0)
+        self.assertEqual(role_rolled["restored_roles"], ["local"])
+        self.assertEqual((legacy / "LOCAL.txt").read_text(), "legacy-snap")
+        self.assertEqual((product / "LOCAL.txt").read_text(), "product-after")
+
+    def test_snapshot_rewrite_retries_undo_when_inner_restore_fails(self):
+        self._write_workbuddy_edition_adapters()
+        legacy = self.root / "home/.agents/skills/alpha"
+        product = self.root / "home/.workbuddy/skills/alpha"
+        shutil.copytree(self.project / "dist/codex/skills/alpha", legacy)
+        shutil.copytree(self.project / "dist/codex/skills/alpha", product)
+        self.registry["groups"]["alpha"]["locations"] = {
+            "local:workbuddy": {
+                "kind": "local", "agent_id": "workbuddy",
+                "derived_from": "build:workbuddy", "path": str(legacy),
+            }
+        }
+        self.save()
+        manifests = {}
+        for name in ("20200101T000000Z", "20200101T000001Z"):
+            snapshot_dir = self.state / "snapshots/alpha" / name
+            snapshot_dir.mkdir(parents=True)
+            (snapshot_dir / "local-workbuddy").mkdir()
+            (snapshot_dir / "manifest.json").write_text(json.dumps({
+                "operation": "repair-agent-install",
+                "group": "alpha",
+                "agent_id": "workbuddy",
+                "original_path": sync.normalized_absolute(legacy),
+            }, indent=2, sort_keys=True) + "\n")
+            manifests[name] = (snapshot_dir / "manifest.json").read_bytes()
+        registry_before = (self.state / "registry.json").read_bytes()
+        text_calls = {"n": 0}
+        byte_calls = {"n": 0}
+        real_text = Path.write_text
+        real_bytes = Path.write_bytes
+
+        def write_text(target, data, *args, **kwargs):
+            if target.name == "manifest.json" and "snapshots" in target.parts:
+                text_calls["n"] += 1
+                if text_calls["n"] == 2:
+                    raise OSError("injected manifest write failure")
+            return real_text(target, data, *args, **kwargs)
+
+        def write_bytes(target, data):
+            if target.name == "manifest.json" and "snapshots" in target.parts:
+                byte_calls["n"] += 1
+                if byte_calls["n"] == 1:
+                    raise OSError("injected manifest restore failure")
+            return real_bytes(target, data)
+
+        with patch.object(Path, "write_text", write_text), patch.object(Path, "write_bytes", write_bytes):
+            with self.assertRaisesRegex(OSError, "injected manifest write failure"):
+                self.run_cli(
+                    "link-location", "alpha", "--location-id", "local:workbuddy", "--kind", "local",
+                    "--agent-id", "workbuddy", "--path", str(product), "--replace")
+        self.assertGreaterEqual(byte_calls["n"], 2)
+        self.assertEqual((self.state / "registry.json").read_bytes(), registry_before)
+        for name, original in manifests.items():
+            self.assertEqual((self.state / "snapshots/alpha" / name / "manifest.json").read_bytes(), original)
+        code, migrated = self.run_cli(
+            "link-location", "alpha", "--location-id", "local:workbuddy", "--kind", "local",
+            "--agent-id", "workbuddy", "--path", str(product), "--replace")
+        self.assertEqual(code, 0)
+        self.assertEqual(migrated["location"]["path"], sync.normalized_absolute(product))
+
     def test_cross_group_nested_install_preserved(self):
         nested = self.target / "nested/gamma"
         shutil.copytree(self.project / "dist/codex/skills/gamma", nested)
