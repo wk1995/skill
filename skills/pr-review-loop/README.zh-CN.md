@@ -2,7 +2,7 @@
 
 语言：[English](README.md) | **中文**
 
-`pr-review-loop` 用于对 Pull Request 执行评审闭环：审查当前 head、修复确认的问题、提交推送，再重新审查，直到某一轮不再发现确认问题为止。它只定义闭环本身——身份标注、轮次顺序、评论决策、终止条件与汇报，刻意不定义「该怎么审查」；评论默认关闭，只有评论策略为该仓库开启时才会把问题写到 PR 上，且每条评论都标注触发这次评论的平台与模型。
+`pr-review-loop` 用于对 Pull Request 执行评审闭环：审查当前 head、修复确认的问题、提交推送，再重新审查，直到某一轮不再发现确认问题为止。它只定义闭环本身——身份标注、轮次顺序、评论决策、轮次与重试上限、终止条件与汇报，刻意不定义「该怎么审查」；评论默认关闭，只有评论策略为该仓库开启时才会把问题写到 PR 上，且每条评论都标注触发这次评论的平台与模型。轮次默认最多 10 轮，触顶时会说明为什么需要这么多轮；审查本身跑不起来时最多重试 3 次。
 
 ## 如何使用
 
@@ -23,23 +23,36 @@ review https://github.com/<owner>/<repo>/pull/42，把问题评论到 PR 再修�
 策略按以下顺序解析，第一个有决断的来源生效：
 
 1. **本次 review** —— 你针对这一次明确说明是否评论。
-2. **项目级配置** —— `<项目根>/.pr-review-loop/comment-targets.yml`。
-3. **安装级配置** —— 正在运行的 Skill 目录下的 `comment-targets.yml`；若该目录需要保持干净或只读，可用 `$XDG_STATE_HOME/skill/pr-review-loop/comment-targets.yml`（未设置 `XDG_STATE_HOME` 时为 `$HOME/.local/state/...`）。
+2. **项目级配置** —— `<项目根>/.pr-review-loop.yml`。
+3. **安装级配置** —— 正在运行的 Skill 目录下的 `pr-review-loop.yml`；若该目录需要保持干净或只读，可用 `$XDG_STATE_HOME/skill/pr-review-loop.yml`（未设置 `XDG_STATE_HOME` 时为 `$HOME/.local/state/...`）。
 4. **默认** —— 不评论。
 
-两个层级使用同一文件名与同一组键：
+两个层级使用同一文件名与同一组键，且这个文件同时承载[轮次上限与重试](#轮次上限与重试)：
 
 ```yaml
 comment: false
 comment_targets:
   - https://github.com/wk1995/skill.git
+max_rounds: 10
+review_retries: 3
 ```
 
-命中 `comment_targets` 的 remote 会收到评论；否则由 `comment` 决定该层级；再否则交给下一个来源。remote 一律归一化为 `host/owner/repo` 后按大小写不敏感比较，忽略协议、`user@`、结尾斜杠与结尾 `.git`。带注释的模板见 [assets/comment-targets.example.yml](assets/comment-targets.example.yml)。
+命中 `comment_targets` 的 remote 会收到评论；否则由 `comment` 决定该层级；再否则交给下一个来源。remote 一律归一化为 `host/owner/repo` 后按大小写不敏感比较，忽略协议、`user@`、结尾斜杠与结尾 `.git`。带注释的模板见 [assets/pr-review-loop.example.yml](assets/pr-review-loop.example.yml)。
 
 只想让某个仓库收到评论，就把它的 remote 写进安装级配置；想为某个项目开关评论，就把项目级配置连同 `comment: true` 或 `comment: false` 提交进仓库。
 
 闭环发出的每条评论首行都带 `[<平台>][<模型>]`——即运行本闭环的智能体平台与当前实际使用的模型详细名；提交信息则遵循仓库自身的提交约定并携带同一身份。完整闭环契约、终止条件与边界见 [SKILL.md](SKILL.md)。
+
+## 轮次上限与重试
+
+闭环会在轮次上限处停下，不会无限循环；审查跑不起来时也会重试：
+
+| 限制 | 配置键 | 默认 | 计数口径 |
+| --- | --- | --- | --- |
+| 轮次 | `max_rounds` | 10 | 产生了确认问题的轮 |
+| 重试 | `review_retries` | 3 | 审查尝试失败后的追加尝试 |
+
+只有「产生了确认问题」的轮才计入 `max_rounds`；通过的轮、失败的尝试都不计入。触顶时闭环会停止改动，给出轮次总结——轮数与上限的对比、每轮问题数、复发的根因、以及现在需要做的决策——并升级为人工决策，而不是继续空转。完全无法执行的审查（head 解析不了、文件或 diff 读不了、命令或宿主报错）最多重试 `review_retries` 次，每次重试都要改变做法并记录失败；重试不计轮次、不发评论，也绝不会把没跑成的审查变成通过的一轮。两个上限可以写在与评论决策同一个策略文件里，也可以只针对某一次 review 指定。完整规则见 [SKILL.md](SKILL.md)。
 
 ## 何时触发
 

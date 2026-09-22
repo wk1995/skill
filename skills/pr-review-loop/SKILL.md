@@ -1,6 +1,6 @@
 ---
 name: pr-review-loop
-description: Drive a pull-request review loop that reviews the current head, fixes and pushes the confirmed findings, and reviews again until one round produces no confirmed findings. Commenting on the pull request is off by default and happens only when the comment policy enables it for that repository, and every posted comment is labelled with the platform and model that produced it. Use when a request names a pull request and asks to review it, to review and fix it, or to keep reviewing until it is clean. Do not use when no pull request is identified, when the user asks for a read-only review or a local report, or for pull-request administration such as creating, retitling, approving, or merging.
+description: Drive a pull-request review loop that reviews the current head, fixes and pushes the confirmed findings, and reviews again until one round produces no confirmed findings. Commenting on the pull request is off by default and happens only when the comment policy enables it for that repository, and every posted comment is labelled with the platform and model that produced it. The loop runs at most ten rounds by default, retries a review that fails to run up to three times, and explains why so many rounds were needed when it stops at the round cap. Use when a request names a pull request and asks to review it, to review and fix it, or to keep reviewing until it is clean. Do not use when no pull request is identified, when the user asks for a read-only review or a local report, or for pull-request administration such as creating, retitling, approving, or merging.
 metadata:
   sync_id: "pr-review-loop"
   version: "0.1.0"
@@ -66,19 +66,19 @@ Resolve from the first decisive source:
 1. **This review** — the user states, for this review, whether to comment. This
    is the only source that can enable commenting for a repository that no
    configuration lists.
-2. **Project scope** — `<project-root>/.pr-review-loop/comment-targets.yml` in
-   the repository under review.
-3. **Install scope** — the same file name in the running Skill's own directory:
-   the machine-wide allowlist when the machine-wide Skill is running, the
-   project's own setting when a project-level Skill is running. When both
+2. **Project scope** — `<project-root>/.pr-review-loop.yml` in the repository
+   under review.
+3. **Install scope** — `pr-review-loop.yml` in the running Skill's own
+   directory: the machine-wide allowlist when the machine-wide Skill is running,
+   the project's own setting when a project-level Skill is running. When both
    installs exist, the project-level one governs its project. Say which install
    was read. When that directory must stay clean or read-only, the same file may
-   instead live at `$XDG_STATE_HOME/skill/pr-review-loop/comment-targets.yml`, or
-   `$HOME/.local/state/skill/pr-review-loop/comment-targets.yml` when
-   `XDG_STATE_HOME` is unset.
+   instead live at `$XDG_STATE_HOME/skill/pr-review-loop.yml`, or
+   `$HOME/.local/state/skill/pr-review-loop.yml` when `XDG_STATE_HOME` is unset.
 4. **Default** — no comment.
 
-Both scopes use the same file name and the same two keys:
+Both scopes use the same file name, and that one file also carries the limits in
+[Loop Limits](#loop-limits):
 
 ```yaml
 # This scope's decision when no target below matches. Omit the key to leave the
@@ -88,6 +88,9 @@ comment: false
 comment_targets:
   - https://github.com/wk1995/skill.git
   - git@github.com:wk1995/other-repo.git
+# Round and retry limits; see Loop Limits.
+max_rounds: 10
+review_retries: 3
 ```
 
 Within one file, decide in this order:
@@ -115,6 +118,32 @@ reviews, fixes, commits, and pushes: findings stay in the round ledger and the
 round report, and nothing is written to the pull request. If the request asked
 for comments while the policy is off, say so plainly and name the file that
 would enable them for this repository instead of commenting anyway.
+
+## Loop Limits
+
+Both limits resolve from the first decisive source — the user's statement for
+this review, then the configuration file — and fall back to the defaults.
+
+| Limit | Config key | Default | Counts |
+| --- | --- | --- | --- |
+| Rounds | `max_rounds` | 10 | Rounds that produced confirmed findings |
+| Retries | `review_retries` | 3 | Further attempts after a review attempt fails |
+
+The round limit counts rounds that produced findings. It does not count attempts
+and does not count a round that passed. When it is reached, stop editing and
+deliver the round-count summary required by [Stop Conditions](#stop-conditions)
+instead of continuing, truncating the work silently, or reporting a clean result.
+
+A **failed review attempt** is one that could not be performed at all: the head
+could not be resolved, a file or diff could not be read, or a command or the host
+returned an error. It is not a red check, not a confirmed finding, and not a
+result that merely looked large. Retry it up to `review_retries` times. On each
+retry, record the failure and change something instead of repeating the identical
+failed action — re-resolve the head, read through another path, check the tool
+and the credentials, or narrow the attempt to what can be read. Retries consume
+no round, post no comment, and must never turn a review that did not run into a
+passing round. A failure the loop cannot influence — missing authentication, a
+protected branch, an absent tool — is blocked immediately rather than retried.
 
 ## Trigger Gate
 
@@ -175,10 +204,11 @@ prefix, that convention governs commits while the comment marker keeps the
 
 ## The Loop
 
-Start at round 1 and keep a round ledger — round number, head commit, findings,
-whether the round commented or withheld, action taken, result. Every round ends
-in exactly one of three ways: findings → another round; no findings → stop as
-passed; cap reached → stop and escalate.
+Start at round 1 and keep a round ledger — round number, head commit, review
+attempts and why any failed, findings, whether the round commented or withheld,
+action taken, result. Every round ends in exactly one of three ways: findings →
+another round; no findings → stop as passed; cap reached → stop, explain the
+round count, and escalate.
 
 ### Step 1 — Review the current head
 
@@ -187,6 +217,9 @@ passed; cap reached → stop and escalate.
 - Apply the review method from the sources below.
 - Separate confirmed findings from open questions. Only confirmed findings may
   reach the pull request; open questions stay in the round report.
+- If the attempt fails to run, retry it per [Loop Limits](#loop-limits) before
+  treating the round as blocked, and never carry a finding — or a clean result —
+  out of an attempt that did not complete.
 
 ### Step 2 — Round with findings
 
@@ -226,9 +259,11 @@ stop. Do not start another round to look thorough.
 Stop and report as soon as any of these applies:
 
 - **Passed** — a round produces no confirmed findings.
-- **Cap** — a round limit was reached (default 5) with findings still open. Stop
-  editing, keep the unresolved findings on the record, and escalate for a
-  decision instead of looping.
+- **Cap** — the round limit was reached (default 10, `max_rounds`) with findings
+  still open. Stop editing, keep the unresolved findings on the record, deliver
+  the round-count summary below, and escalate for a decision instead of looping.
+- **Exhausted** — every attempt in a round failed, retries included. Report the
+  attempts and their failures; never report such a round as clean or passed.
 - **Stalled** — two consecutive rounds produce the same findings that were
   reported as not-fixed. This is a decision point, not a retry point.
 - **Blocked** — the loop cannot push, or cannot comment while the policy enables
@@ -238,6 +273,26 @@ Stop and report as soon as any of these applies:
   was added since the last passing round. Confirm the state, post the passing
   comment only when the policy enables it, and stop instead of re-reviewing an
   unchanged commit.
+
+### Round-Count Summary
+
+Reaching the cap requires an explanation, not just a stop. Report why the loop
+needed that many rounds, from evidence already in the ledger:
+
+- the round count against the limit, and the findings per round;
+- the recurring root causes — which findings came back, and which categories
+  kept producing new ones;
+- churn — fixes that introduced new findings, or findings reported fixed that
+  returned, which means verification failed rather than the review being
+  thorough;
+- what drove the count: a growing diff, an ambiguous review standard, a standard
+  applied inconsistently, or genuinely independent defects;
+- the decision needed now — split the pull request, change the standard, fix the
+  upstream cause, or raise `max_rounds` deliberately.
+
+Do not claim convergence the ledger cannot show, and do not pad the summary with
+restated findings. When the policy enables commenting, post this summary to the
+pull request under the marker; otherwise keep it in the round report.
 
 ## Boundaries
 
@@ -275,7 +330,10 @@ source was found instead of silently reviewing with no standard.
 ## Round Report
 
 Close with one message: the pull request and its title, the comment decision and
-the source that made it, how many rounds ran, per round the findings by severity
-and how each was resolved, the open questions that were deliberately not posted,
-the current head commit and check status, and the conclusion — passed, stopped at
-the cap, stalled, or blocked. Deliver the result, not the process log.
+the source that made it, how many rounds ran, every review attempt that failed
+with its retries, per round the findings by severity and how each was resolved,
+the open questions that were deliberately not posted, the current head commit and
+check status, and the conclusion — passed, stopped at the cap, stalled, or
+blocked. When the cap was reached, include the round-count summary from
+[Stop Conditions](#stop-conditions) in the same message. Deliver the result, not
+the process log.
