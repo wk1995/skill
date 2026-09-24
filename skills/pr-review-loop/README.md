@@ -19,6 +19,12 @@ current checkout. The Skill resolves the exact head commit and the review mode.
 The full loop repeats after each pushed fix until a round is clean or a stop
 condition applies; comment-only mode reviews one head and stops.
 
+If you name a specific review concern, the Skill checks it first. It then uses
+the repository's required review standard and relevant project guidance for
+other applicable checks, explaining any conflict instead of dropping your
+request. For example, “Review PR #25 for leaked tokens” puts that check first
+even when the repository has a general review playbook.
+
 ## Comment Policy
 
 **Commenting is off by default.** The loop writes findings to the pull request

@@ -396,27 +396,33 @@ pull request under the marker; otherwise keep it in the round report.
 ## Where The Review Method Comes From
 
 This Skill deliberately defines no review criteria. At the start of each round,
-resolve the method from the first applicable source and use it as authoritative
-for what that round must check:
+combine applicable sources in this order:
 
-1. the repository's own review standard — a review playbook, contribution guide,
-   or repository instructions;
-2. the project's documentation for review, testing, and release expectations;
-3. criteria the user stated for this specific pull request;
-4. the host's general code-review capability.
+1. **This review's user request** — check every criterion the user stated for
+   this pull request first, and honor an explicit focus or scope limit. A general
+   repository standard must not hide a check the user specifically requested.
+2. **Repository review standard** — apply its required playbook, contribution
+   guide, or repository instructions to the remaining applicable coverage.
+3. **Project documentation** — apply relevant review, testing, and release
+   expectations not already covered.
+4. **Host code-review capability** — fill gaps when the preceding sources leave
+   a check unspecified.
 
-Record in the round report which source was used, and say so plainly when no
-source was found instead of silently reviewing with no standard.
+Use the instruction priority that governs the run when sources conflict. State
+the conflict, what was checked or skipped, and why; do not silently replace the
+user's requested check with a general checklist. Record every source used and
+the user-specific checks completed in the round report. If no source is found,
+say so plainly instead of silently reviewing with no standard.
 
 ## Round Report
 
 Close with one message: the pull request and its title, the selected mode and its
 account/address evidence, the comment decision and the source that made it, how
-many rounds ran, every review attempt that failed
-with its retries, per round the findings by severity and how each was resolved,
-the open questions that were deliberately not posted, the current head commit and
-check status, and the conclusion — passed, comment-only findings reported,
-stopped at the cap, stalled, exhausted, or blocked. When the cap was reached,
-include the round-count summary from
+many rounds ran, every review attempt that failed with its retries, per round
+the method sources, user-specific checks, findings by severity, and how each
+finding was resolved, the open questions that were deliberately not posted, the
+current head commit and check status, and the conclusion — passed, comment-only
+findings reported, stopped at the cap, stalled, exhausted, or blocked. When the
+cap was reached, include the round-count summary from
 [Stop Conditions](#stop-conditions) in the same message. Deliver the result, not
 the process log.
