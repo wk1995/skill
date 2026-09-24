@@ -978,6 +978,55 @@ class ReviewRegressions(unittest.TestCase):
         self.assertEqual(group["roles"]["local"], sync.normalized_absolute(legacy))
         self.assertEqual(group["locations"]["local:workbuddy"]["path"], sync.normalized_absolute(codex_root))
 
+    def test_distinct_explicit_and_legacy_local_paths_remain_ambiguous(self):
+        self._write_workbuddy_edition_adapters()
+        legacy = self.root / "home/.workbuddy/skills/alpha"
+        explicit = self.root / "home/.agents/skills/alpha"
+        for path in (legacy, explicit):
+            path.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copytree(self.project / "dist/codex/skills/alpha", path)
+        self.registry["groups"]["alpha"]["roles"]["local"] = str(legacy)
+        self.save()
+
+        code, registered = self.run_cli(
+            "link-location", "alpha", "--location-id", "local:workbuddy-explicit",
+            "--kind", "local", "--agent-id", "workbuddy", "--path", str(explicit),
+        )
+        self.assertEqual(code, 0)
+        self.assertFalse(registered["replaced"])
+        group = sync.load_registry(self.state)["groups"]["alpha"]
+        roots = self._adapter_roots()
+        with self.assertRaisesRegex(
+            SystemExit, "multiple registered local installs for Agent 'workbuddy'"
+        ):
+            sync.registered_agent_install(group, "workbuddy", roots)
+
+    def test_unlink_location_unblocks_different_kind_same_path_registration(self):
+        path = self.target
+        code, project = self.run_cli(
+            "link-location", "alpha", "--location-id", "project:app", "--kind", "project",
+            "--project-id", "app", "--path", str(path),
+        )
+        self.assertEqual(code, 0)
+        registry_before = (self.state / "registry.json").read_bytes()
+        with self.assertRaisesRegex(SystemExit, "path is already registered"):
+            self.run_cli(
+                "link-location", "alpha", "--location-id", "local:codex", "--kind", "local",
+                "--agent-id", "codex", "--path", str(path),
+            )
+        self.assertEqual((self.state / "registry.json").read_bytes(), registry_before)
+        code, removed = self.run_cli(
+            "unlink-location", "alpha", "--location-id", "project:app",
+        )
+        self.assertEqual(code, 0)
+        self.assertEqual(removed["location_id"], "project:app")
+        code, registered = self.run_cli(
+            "link-location", "alpha", "--location-id", "local:codex", "--kind", "local",
+            "--agent-id", "codex", "--path", str(path),
+        )
+        self.assertEqual(code, 0)
+        self.assertEqual(registered["location"]["agent_id"], "codex")
+
     def test_snapshot_rewrite_retries_undo_when_inner_restore_fails(self):
         self._write_workbuddy_edition_adapters()
         legacy = self.root / "home/.agents/skills/alpha"

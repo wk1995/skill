@@ -9,7 +9,7 @@
 - 测试策略：[Skill 关系报告测试计划](skill-relationship-report-test-plan.zh-CN.md)。
 - 范围：`sync-skills` 的只读盘点、报告生成、同步后刷新，以及 Agent 安装副本安全修复所需的数据链路。
 
-本文同时描述首版实现边界。当前 `skill_sync.py` 已提供 `relationships`、`link-location` 和 `repair-agent-install`；JSON Schema、独立契约校验器、扫描/渲染模块及端到端测试均已落地。
+本文同时描述首版实现边界。当前 `skill_sync.py` 已提供 `relationships`、`link-location`、`unlink-location` 和 `repair-agent-install`；JSON Schema、独立契约校验器、扫描/渲染模块及端到端测试均已落地。
 
 ## 2. 设计原则
 

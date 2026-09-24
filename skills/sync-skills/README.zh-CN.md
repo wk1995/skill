@@ -50,7 +50,7 @@ python3 skills/sync-skills/scripts/skill_sync.py link-location my-skill-id \
 
 `link` 和 `link-location` 只登记关系，不会让存在差异的副本自动变成一致。选择同步来源前，使用 `status` 检查通过 `link` 或 `convert` 登记的角色。通过 `link-location` 登记的命名位置请用 `relationships` 检查：普通 `status`、`versions`、`sync`、角色快照、当前角色 `diff` 和角色回滚都不包含这些位置。Agent 修复快照使用独立的本机安装回滚路径，见下文。
 
-1.1.0 登记在 `~/.agents/skills/<skill>` 的中国版 WorkBuddy 安装仍然是合法的 `workbuddy` 位置，不要把它重标成 `codex`。Skill 已经出现在 `~/.workbuddy/skills/<skill>` 之后，可以用 `--replace` 把登记路径迁到产品根，同时保持 `agent_id` 为 `workbuddy`。如果旧版把同一路径错误登记成另一个 Agent，且旧路径不属于共享根，也可以在校验新 Agent 根后迁移身份；共享根上的重标仍会被拒绝。另一个 Agent 保持自己的登记；同一路径不能再为另一个 Agent 增加第二个 location ID。匹配的 legacy `roles.local` 只有在没有其他 Agent 解析旧路径或新路径时才跟着迁移，因此共享的 `~/.agents/skills` 角色会留在原地。已经有显式 local location 的 Agent 不会再把 `roles.local` 当成第二个候选。它不复制 Skill 文件，也不改 `kind`/`project_id`/`source_id`。同组同路径再登记第二个 location ID 现在会被拒绝，除非显式使用 `--replace`（它会退役先前的 ID）。匹配的 Agent 安装快照会一并改写，因此之后仍可 rollback：
+1.1.0 登记在 `~/.agents/skills/<skill>` 的中国版 WorkBuddy 安装仍然是合法的 `workbuddy` 位置，不要把它重标成 `codex`。Skill 已经出现在 `~/.workbuddy/skills/<skill>` 之后，可以用 `--replace` 把登记路径迁到产品根，同时保持 `agent_id` 为 `workbuddy`。如果旧版把同一路径错误登记成另一个 Agent，且旧路径不属于共享根，也可以在校验新 Agent 根后迁移身份；共享根上的重标仍会被拒绝。另一个 Agent 保持自己的登记；同一路径不能再为另一个 Agent 增加第二个 location ID。匹配的 legacy `roles.local` 只有在没有其他 Agent 解析旧路径或新路径时才跟着迁移，因此共享的 `~/.agents/skills` 角色会留在原地。只有显式位置与 legacy 角色指向同一物理路径，或 legacy 角色由其他 Agent 共享时，显式位置才会抑制它；不同路径的候选会继续按歧义拒绝。它不复制 Skill 文件，也不改 `kind`/`project_id`/`source_id`。同组同路径再登记第二个 location ID 现在会被拒绝，除非显式使用 `--replace`（它会退役先前的 ID）。匹配的 Agent 安装快照会一并改写，因此之后仍可 rollback：
 
 ```bash
 python3 skills/sync-skills/scripts/skill_sync.py link-location my-skill-id \
@@ -61,6 +61,13 @@ python3 skills/sync-skills/scripts/skill_sync.py link-location my-skill-id \
   --replace
 python3 skills/sync-skills/scripts/skill_sync.py repair-agent-install my-skill-id \
   --agent workbuddy
+```
+
+当某个命名位置阻塞新的登记时，使用 `unlink-location` 从 registry 移除它。该命令只修改 registry 元数据，不会删除或修改位置中的文件：
+
+```bash
+python3 skills/sync-skills/scripts/skill_sync.py unlink-location my-skill-id \
+  --location-id project:app-a
 ```
 
 ### 转换现有副本
@@ -191,7 +198,7 @@ python3 skills/sync-skills/scripts/skill_sync.py migrate-state
 
 ## 退出码与恢复
 
-`link`、`link-location`、`convert`、`sync`、`rollback`、`rename` 和 `repair-agent-install` 返回退出码 **2** 时，表示变更已成功，但报告刷新失败（`report_status: stale`）。此时只运行返回的 `report_retry_command`，不要重复执行变更。退出码 0 表示请求的操作和报告刷新都已完成。
+`link`、`link-location`、`unlink-location`、`convert`、`sync`、`rollback`、`rename` 和 `repair-agent-install` 返回退出码 **2** 时，表示变更已成功，但报告刷新失败（`report_status: stale`）。此时只运行返回的 `report_retry_command`，不要重复执行变更。退出码 0 表示请求的操作和报告刷新都已完成。
 
 对于只读的 `relationships --strict`，退出码 **2** 表示新生成的报告中存在问题或未关联副本。不加 `--strict` 时，问题仍会保留在报告中，但不改变命令退出状态。
 

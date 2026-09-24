@@ -6,15 +6,16 @@ version, date, and a change summary.
 
 ## [Unreleased]
 
-- Allow explicit same-path migration of a stale Agent identity when the old root is not shared, and keep legacy role pointers away from other Agents' roots.
+- No unreleased changes.
 
 ## [0.3.0] - 2026-09-17
 
 - Change-Type: feature
 - Summary: Add optional `link-location --replace` to migrate a same-Agent install path after that Agent root is validated.
-- Compatibility: Existing first-time `link-location` usage remains valid. Registering a second location ID for the same group and filesystem path without `--replace` is now rejected; `--replace` retires the earlier same-path ID when the Agent stays the same. `--replace` does not change `kind`, `project_id`, `source_id`, or `agent_id`. `derived_from` is preserved for the same Agent. Matching Agent-install snapshots are rewritten so rollback remains possible. A rejected or failed rewrite leaves the registry and every snapshot unchanged, including when the first snapshot restore fails and the caller retries it. A matching legacy `roles.local` path moves with the install only when no other Agent still resolves that path. An Agent with an explicit local location is not also selected from `roles.local`. Skill files are not modified.
+- Compatibility: Existing first-time `link-location` usage remains valid. Registering a second location ID for the same group and filesystem path without `--replace` is now rejected; `--replace` retires the earlier same-path ID. Same-path Agent identity migration is allowed only from a non-shared old root; shared-root or moved-path retags remain rejected. `--replace` does not change `kind`, `project_id`, or `source_id`. `derived_from` is preserved for the same Agent. Matching Agent-install snapshots are rewritten so rollback remains possible. A rejected or failed rewrite leaves the registry and every snapshot unchanged, including when the first snapshot restore fails and the caller retries it. A matching legacy `roles.local` path moves with the install only when no other Agent still resolves that path. An explicit local location suppresses a legacy role only when it is the same physical path or the legacy role is shared by another Agent; distinct candidates fail closed as ambiguous. Skill files are not modified. Use `unlink-location` to remove a stale named location record without touching its files.
 
 - Add `link-location --replace` to rewrite registry identity for an existing location ID or same-path registration after Agent-root validation.
+- Add `unlink-location` to explicitly remove a stale named location record without deleting the referenced files.
 - Reject a second same-group same-path location ID unless `--replace` is explicit; `--replace` retires the earlier ID instead of keeping both.
 - Keep `kind`/`project_id`/`source_id` unchanged; keep Skill files unchanged; preserve a precise `derived_from` when retargeting the same Agent.
 - Rewrite matching `repair-agent-install` snapshot manifests (and payload directory names) so later `rollback` still resolves the registered install. If that restore fails, keep the undo log and retry it; report `mutation rollback failed` only when the retry also fails.

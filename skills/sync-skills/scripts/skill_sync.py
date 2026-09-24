@@ -1748,6 +1748,86 @@ def command_link_location(args: argparse.Namespace) -> int:
     })
 
 
+def command_unlink_location(args: argparse.Namespace) -> int:
+    state_dir = Path(args.state_dir).expanduser().resolve()
+    registry = load_registry(state_dir)
+    key, group = get_group(registry, args.group)
+    locations = group.get("locations", {})
+    if not isinstance(locations, dict):
+        raise SystemExit("malformed locations registry; refusing mutation")
+    if args.location_id not in locations:
+        raise SystemExit(f"location ID not found: {args.location_id}")
+    removed = locations.pop(args.location_id)
+    operation_at = now_iso()
+    group["updated_at"] = operation_at
+    registry["schema_version"] = max(2, int(registry.get("schema_version", 1)))
+    save_registry(state_dir, registry)
+    return finish_mutation(args, registry, {
+        "group": key,
+        "sync_id": group_id(key, group),
+        "location_id": args.location_id,
+        "removed_location": removed,
+        "updated_at": operation_at,
+    })
+
+
+def explicit_agent_install_paths(
+    group: dict[str, Any],
+    agent_id: str,
+) -> list[Path]:
+    paths: list[Path] = []
+    for location in group.get("locations", {}).values():
+        if (
+            isinstance(location, dict)
+            and location.get("kind") == "local"
+            and location.get("agent_id") == agent_id
+            and location.get("path")
+        ):
+            paths.append(Path(str(location["path"])).expanduser().absolute())
+    return paths
+
+
+def agent_resolves_path_without_legacy_role(
+    group: dict[str, Any],
+    agent_id: str,
+    path: Path,
+    roots: list[dict[str, Any]],
+) -> bool:
+    explicit = explicit_agent_install_paths(group, agent_id)
+    if explicit:
+        return any(paths_refer_to_same_location(path, candidate) for candidate in explicit)
+    return any(
+        root.get("agent_id") == agent_id
+        and root.get("path")
+        and path_is_within(path, Path(str(root["path"])))
+        for root in roots
+    )
+
+
+def agent_root_contains_path(
+    agent_id: str,
+    path: Path,
+    roots: list[dict[str, Any]],
+) -> bool:
+    return any(
+        root.get("agent_id") == agent_id
+        and root.get("path")
+        and path_is_within(path, Path(str(root["path"])))
+        for root in roots
+    )
+
+
+def agent_uses_legacy_role(
+    group: dict[str, Any],
+    agent_id: str,
+    path: Path,
+    roots: list[dict[str, Any]],
+) -> bool:
+    return not explicit_agent_install_paths(group, agent_id) and agent_root_contains_path(
+        agent_id, path, roots
+    )
+
+
 def adapter_roots_for_project(args: argparse.Namespace) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
     try:
         adapters, issues = load_adapters(relationship_project_root(args), [])
@@ -1800,22 +1880,39 @@ def agent_install_candidates(
     agent_id: str,
     roots: list[dict[str, Any]],
 ) -> list[tuple[str, Path]]:
-    matches: list[tuple[str, Path]] = []
-    for location_id, location in group.get("locations", {}).items():
-        if not isinstance(location, dict) or location.get("kind") != "local":
-            continue
-        if location.get("agent_id") == agent_id and location.get("path"):
-            matches.append((str(location_id), Path(str(location["path"])).expanduser().absolute()))
-    # An explicit location already selects this Agent. The shared legacy role
-    # must not become a second candidate after that location moves.
+    matches = [
+        (str(location_id), Path(str(location["path"])).expanduser().absolute())
+        for location_id, location in group.get("locations", {}).items()
+        if isinstance(location, dict)
+        and location.get("kind") == "local"
+        and location.get("agent_id") == agent_id
+        and location.get("path")
+    ]
     legacy_local = group.get("roles", {}).get("local")
-    if legacy_local and not matches:
+    if legacy_local:
         path = Path(str(legacy_local)).expanduser().absolute()
-        belongs = any(
-            root["agent_id"] == agent_id and path_is_within(path, Path(root["path"]))
-            for root in roots
+        belongs = agent_root_contains_path(agent_id, path, roots)
+        same_as_explicit = any(
+            paths_refer_to_same_location(path, candidate) for _, candidate in matches
         )
-        if belongs:
+        current_has_explicit = bool(matches)
+        shared_by_other_agent = False
+        for other_agent in {
+            str(root.get("agent_id"))
+            for root in roots
+            if root.get("agent_id") and root.get("agent_id") != agent_id
+        }:
+            other_explicit = explicit_agent_install_paths(group, other_agent)
+            if agent_uses_legacy_role(group, other_agent, path, roots):
+                shared_by_other_agent = True
+                break
+            if current_has_explicit and any(
+                paths_refer_to_same_location(path, candidate)
+                for candidate in other_explicit
+            ):
+                shared_by_other_agent = True
+                break
+        if belongs and not same_as_explicit and not shared_by_other_agent:
             matches.append((f"local:{agent_id}", path))
     return matches
 
@@ -1832,9 +1929,8 @@ def other_agent_resolves_path(
         if root.get("agent_id") and root["agent_id"] != agent_id
     })
     for other in others:
-        for _, resolved in agent_install_candidates(group, other, roots):
-            if paths_refer_to_same_location(resolved, path):
-                return True
+        if agent_resolves_path_without_legacy_role(group, other, path, roots):
+            return True
     return False
 
 
@@ -2145,6 +2241,14 @@ def build_parser() -> argparse.ArgumentParser:
         help="Replace an existing location ID or same-path registration after validation. Same-path Agent identity migration is allowed only from a non-shared old root. Skill files are not modified.",
     )
     link_location.set_defaults(func=command_link_location)
+
+    unlink_location = subparsers.add_parser(
+        "unlink-location",
+        help="Remove a named project, local Agent, or external location from the registry without touching its files.",
+    )
+    unlink_location.add_argument("group", help="Existing sync ID, Skill name, or alias.")
+    unlink_location.add_argument("--location-id", required=True)
+    unlink_location.set_defaults(func=command_unlink_location)
 
     repair_install = subparsers.add_parser(
         "repair-agent-install",

@@ -7,7 +7,7 @@
 - 已落地的契约测试：固定 report v1 的 JSON 结构、动态 Builder、身份派生链、状态语义、绝对路径、canonical 顺序和派生 summary。
 - 已落地的行为测试：adapter resolver、只读扫描、registry 兼容、Markdown 渲染、安全写入、命令接入、stale 语义和 Agent 安装修复；矩阵中标为“部分落地”或“实现阶段”的扩展对抗组合继续作为回归建设项。
 
-仓库现已实现 `relationships`、`link-location` 和 `repair-agent-install`。契约测试与端到端行为测试都进入 CI；没有 skip、expected-failure 或永远失败的占位用例。
+仓库现已实现 `relationships`、`link-location`、`unlink-location` 和 `repair-agent-install`。契约测试与端到端行为测试都进入 CI；没有 skip、expected-failure 或永远失败的占位用例。
 
 当前可直接运行：
 

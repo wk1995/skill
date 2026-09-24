@@ -134,7 +134,7 @@ python skills/sync-skills/scripts/skill_sync.py link-location my-skill-id \
   --path /projects/app-a/skills/my-skill
 ```
 
-A 1.1.0 China WorkBuddy install at `~/.agents/skills/<skill>` remains a valid `workbuddy` location; do not retarget it to `codex`. After the Skill already exists at the product root, optionally migrate the registered path while keeping the Agent identity. A stale same-path identity from a non-shared old root (for example an old `workbuddy` record under `~/.workbuddy-ai`) may be migrated with `--replace` after the new Agent root is validated; shared-root retags remain rejected. It preserves `derived_from`, rewrites matching repair snapshots so rollback still works, and moves a legacy `roles.local` entry only when no other Agent resolves either path. An Agent with an explicit local location is not also selected from `roles.local`. Skill files are not copied. Same-path duplicate location IDs in the same group are retired:
+A 1.1.0 China WorkBuddy install at `~/.agents/skills/<skill>` remains a valid `workbuddy` location; do not retarget it to `codex`. After the Skill already exists at the product root, optionally migrate the registered path while keeping the Agent identity. A stale same-path identity from a non-shared old root (for example an old `workbuddy` record under `~/.workbuddy-ai`) may be migrated with `--replace` after the new Agent root is validated; shared-root retags remain rejected. It preserves `derived_from`, rewrites matching repair snapshots so rollback still works, and moves a legacy `roles.local` entry only when no other Agent resolves either path. An explicit local location suppresses a legacy role only when it is the same physical path or the legacy role is shared by another Agent; distinct candidates remain ambiguous and fail closed. Skill files are not copied. Same-path duplicate location IDs in the same group are retired:
 
 ```bash
 python skills/sync-skills/scripts/skill_sync.py link-location my-skill-id \
@@ -142,6 +142,13 @@ python skills/sync-skills/scripts/skill_sync.py link-location my-skill-id \
   --path ~/.workbuddy/skills/my-skill --replace
 python skills/sync-skills/scripts/skill_sync.py repair-agent-install my-skill-id \
   --agent workbuddy
+```
+
+Remove a named registry location without touching its files:
+
+```bash
+python skills/sync-skills/scripts/skill_sync.py unlink-location my-skill-id \
+  --location-id project:app-a
 ```
 
 Repair an already registered Agent installation from a trusted manifest-v2 build. Diverged local content is preserved unless replacement is explicitly authorized; authorized replacement is still snapshotted first:
@@ -165,7 +172,7 @@ python skills/sync-skills/scripts/skill_sync.py repair-agent-install my-skill-id
 - Treat missing adapter root information as a blocking error for installation protection; a read-only inventory may continue with diagnostics for other valid adapters.
 - Compare installed file execute bits as well as manifest-v2 content digests. Permission-only differences need the same snapshot, authorized replacement, verification, and idempotency as content differences.
 - Refuse ordinary portable repo sync into a registered or adapter-discovered Agent install directory. Use the Agent build/install flow instead.
-- `link-location` refuses to change an existing location ID or to register a second same-path location ID unless `--replace` is explicit. Replacement revalidates the requested Agent root, rewrites same-Agent paths, and permits a same-path Agent identity migration only when the old path is not in a shared old Agent root. It retires duplicate same-path location IDs in the same group, preserves `derived_from`, and rewrites matching Agent-install snapshots so rollback still works. It moves a legacy `roles.local` entry only when no other Agent resolves the old or new path. An Agent with an explicit local location is not also selected from `roles.local`. It does not modify Skill files or change `kind`, `project_id`, or `source_id`. Do not retarget a 1.1.0 `workbuddy` install under `~/.agents/skills` to `codex`; keep shared-root registrations separate. After a path or identity change, repair with `--agent` matching the registered identity. A failed snapshot rewrite restores every manifest it changed, and retries that restore when the first attempt fails.
+- `link-location` refuses to change an existing location ID or to register a second same-path location ID unless `--replace` is explicit. Replacement revalidates the requested Agent root, rewrites same-Agent paths, and permits a same-path Agent identity migration only when the old path is not in a shared old Agent root. It retires duplicate same-path location IDs in the same group, preserves `derived_from`, and rewrites matching Agent-install snapshots so rollback still works. It moves a legacy `roles.local` entry only when no other Agent resolves the old or new path. An explicit local location suppresses a legacy role only when it is the same physical path or the legacy role is shared by another Agent; distinct candidates remain ambiguous and fail closed. It does not modify Skill files or change `kind`, `project_id`, or `source_id`. Do not retarget a 1.1.0 `workbuddy` install under `~/.agents/skills` to `codex`; keep shared-root registrations separate. After a path or identity change, repair with `--agent` matching the registered identity. A failed snapshot rewrite restores every manifest it changed, and retries that restore when the first attempt fails.
 - Exclude transient directories and files such as `.git`, `node_modules`, `dist`, `.DS_Store`, `__pycache__`, and Python bytecode.
 - When the skill-management repository is on `master` or its configured default branch, compare linked copies by `metadata.version`; if versions differ, synchronize and let the higher version replace the lower version.
 - When the repository is on any other branch, do not synchronize only because versions differ unless the user explicitly requests synchronization or the branch work requires updating the target copy.
@@ -217,7 +224,7 @@ Inventory explicit local locations even when they are below the automatically sc
 
 ## Exit Codes And Recovery
 
-`link`, `link-location`, `convert`, `sync`, `rollback`, `rename`, and `repair-agent-install` return exit code **2** when the mutation succeeded but report refresh failed (`report_status: stale`). Run only the returned `report_retry_command`; do not repeat the mutation just because a shell reports nonzero. Exit code 0 means the command and refresh completed.
+`link`, `link-location`, `unlink-location`, `convert`, `sync`, `rollback`, `rename`, and `repair-agent-install` return exit code **2** when the mutation succeeded but report refresh failed (`report_status: stale`). Run only the returned `report_retry_command`; do not repeat the mutation just because a shell reports nonzero. Exit code 0 means the command and refresh completed.
 
 For the read-only `relationships --strict` command, exit code **2** instead means the freshly generated report contains findings or unlinked copies. Healthy `project-only` Skills pass, as do `synced` Skills. Without `--strict`, findings are reported in JSON without a nonzero exit code. Validation or execution errors fail separately with an error message.
 
