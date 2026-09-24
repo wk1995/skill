@@ -5,3 +5,4 @@
 dist/
 __pycache__/
 *.py[cod]
+/skills/pr-review-loop/pr-review-loop.yml

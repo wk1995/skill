@@ -19,20 +19,19 @@
 
 ## 配置与评审模式
 
-项目配置为 PR base 中的 `<项目根>/.pr-review-loop.yml`。当前 Agent 平台按 `metadata.sync_id: pr-review-loop` 发现的项目级 Skill 也默认适用于本项目；两者都不需要 `comment_targets`。项目 Skill 即使没有相邻的 `pr-review-loop.yml`，也不会继承整机配置。没有项目 Skill 时才选整机 Skill；整机配置必须在 `comment_targets` 中列出 PR 仓库，才能进入修复闭环。
+项目级 Skill 生成的配置放在其 `SKILL.md` 旁的 `pr-review-loop.yml`，默认把实际路径写入项目 `.gitignore`。在本仓库中，该路径是 `<项目根>/skills/pr-review-loop/pr-review-loop.yml`。用户可移除忽略规则并提交文件，使其成为项目共享配置。已跟踪配置只从 PR base 读取；未跟踪的本地配置须在审查开始前存在。两者都不会进入通用 Agent 构建产物或同步到其他 Skill 副本。兼容旧项目：Skill 旁的文件不存在时，仍可读取 PR base 中已提交的 `<项目根>/.pr-review-loop.yml`。当前 Agent 平台按 `metadata.sync_id: pr-review-loop` 发现的项目级 Skill 也默认适用于本项目；这些项目级来源都不需要 `comment_targets`。项目 Skill 即使没有相邻的 `pr-review-loop.yml`，也不会继承整机配置。没有项目 Skill 时才选整机 Skill；整机配置必须通过 `projects` 或旧版 `comment_targets` 命中 PR 仓库，才能进入修复闭环。
 
-配置先取项目根文件，再取选中 Skill 旁的 `pr-review-loop.yml`。只有整机 Skill 在相邻文件不存在时才使用 `$XDG_STATE_HOME/skill/pr-review-loop.yml`（未设置时为 `$HOME/.local/state/skill/pr-review-loop.yml`）；两者都存在时相邻文件优先。PR 不能靠自身新增 Skill 或配置来改变本次评审；只认 base 或预先存在的安装。
+通用 Skill 生成的配置放在该 Skill 的本机安装目录旁。选择配置时，先取项目 Skill 旁的文件；若不存在，再取 PR base 中的旧项目根文件，之后才取选中通用 Skill 安装目录旁的 `pr-review-loop.yml`。只有整机 Skill 在相邻文件不存在时才使用 `$XDG_STATE_HOME/skill/pr-review-loop.yml`（未设置时为 `$HOME/.local/state/skill/pr-review-loop.yml`）；两者都存在时相邻文件优先。PR 不能靠自身新增 Skill 或配置来改变本次评审；未跟踪文件须预先存在，已跟踪文件只认 base。
 
 ```yaml
 comment: false
 max_rounds: 10
 review_retries: 3
-# 仅整机配置需要：
-comment_targets:
-  - https://github.com/<owner>/<repo>.git
 ```
 
-`comment: true` 开启 PR 评论，`false` 或省略则关闭；`max_rounds` 不影响评论。本次用户明确提出的评论偏好优先。只要项目根配置存在，它就独立决定本项目是否评论；没写 `comment` 也不会继承安装级授权。整机 Skill 的 `comment: true` 只对 `comment_targets` 命中的仓库生效；用户本次明确要求评论可允许未列出仓库的评论，但不能让它进入修复闭环。仅命中目标列表不会自动开启评论。带注释的模板见[示例配置](assets/pr-review-loop.example.yml)。
+整机 Skill 建议使用[按项目配置示例](assets/pr-review-loop.machine.example.yml)：`projects` 用 `host/owner/repo` 标识仓库，每个项目独立设置 `comment`、`max_rounds`、`review_retries`；未设置的键依次取 `defaults`、旧版顶层键、内置默认值。项目条目即使设置 `comment: false` 也允许修复闭环。旧版 `comment_targets` 仍可作为目标列表使用。归一化后重复的项目键或无效值不能授权评论或修复。
+
+`comment: true` 开启 PR 评论，`false` 或省略则关闭；`max_rounds` 不影响评论。本次用户明确提出的评论偏好优先。只要项目配置存在，它就独立决定本项目是否评论；没写 `comment` 也不会继承安装级授权。整机 Skill 的有效 `comment: true` 只对 `projects` 或 `comment_targets` 命中的仓库生效；用户本次明确要求评论可允许未列出仓库的评论，但不能让它进入修复闭环。仅命中项目条目或目标列表不会自动开启评论。项目级模板见[示例配置](assets/pr-review-loop.example.yml)。
 
 整机目标归一化为 `host/owner/repo` 后比较，忽略协议、`user@`、大小写、结尾斜杠和 `.git`。只有指向 PR 自身仓库的 remote 才算命中，fork remote 不算；无法核实则视为不匹配。
 

@@ -90,6 +90,8 @@ def normalized_absolute(path: Path) -> str:
 
 def should_ignore(path: Path, root: Path, portable: bool) -> bool:
     relative = path.relative_to(root)
+    if root.name == "pr-review-loop" and relative.parts == ("pr-review-loop.yml",):
+        return True
     if any(part in IGNORED_DIRECTORY_NAMES for part in relative.parts[:-1]):
         return True
     if portable and relative.parts and relative.parts[0] == "agent-builds":

@@ -2,6 +2,18 @@
 
 ## [Unreleased]
 
+## [artifact 0.2.0] - 2026-09-24
+
+- Change-Type: feature
+- Summary: Bundle the updated PR review workflow and Skill sync rules while excluding local review policy files.
+- Compatibility: Existing installed Skills retain their supported usage; the optional private project policy is an additional input.
+
+## [1.1.2] - 2026-09-24
+
+- Change-Type: fix
+- Summary: Keep ignored PR review project policy files out of Codex build inputs and digests.
+- Compatibility: Existing adapter discovery and generated file layout remain unchanged.
+
 ## [1.1.1] - 2026-09-08
 
 - Discover the current user Skill root `.agents/skills` alongside the legacy `.codex/skills` root; preserve shared-root Agent attribution.

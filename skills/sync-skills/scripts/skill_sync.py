@@ -122,6 +122,8 @@ def default_state_dir(
 
 
 def should_ignore(path: Path) -> bool:
+    if path.name == "pr-review-loop.yml" and path.parent.name == "pr-review-loop":
+        return True
     if path.name in IGNORE_FILES:
         return True
     if path.suffix in BYTECODE_SUFFIXES:
@@ -154,7 +156,7 @@ def copy_skill_tree(source: Path, target: Path) -> None:
     target.mkdir(parents=True, exist_ok=True)
 
     for child in target.iterdir():
-        if child.name in IGNORE_DIRS:
+        if should_ignore(child) or child.name in IGNORE_DIRS:
             continue
         if child.is_dir():
             shutil.rmtree(child)
@@ -2036,6 +2038,10 @@ def atomic_install_build(build_path: Path, target: Path, sync_id: str | None, ex
     require_skill_dir(str(build_path), "Agent install source")
     if path_is_within(target, build_path) or path_is_within(build_path, target) or paths_refer_to_same_location(target, build_path):
         raise SystemExit("Agent install source and target must be separate, non-nested directories")
+    local_policy = target / "pr-review-loop.yml" if sync_id == "pr-review-loop" and target.name == "pr-review-loop" else None
+    if local_policy is not None and (local_policy.exists() or local_policy.is_symlink()):
+        if local_policy.is_symlink() or not local_policy.is_file():
+            raise SystemExit(f"local review policy must be a regular file: {local_policy}")
     target.parent.mkdir(parents=True, exist_ok=True)
     staging_root = Path(tempfile.mkdtemp(prefix=f".{target.name}-install-", dir=target.parent))
     staged = staging_root / "new"
@@ -2044,6 +2050,12 @@ def atomic_install_build(build_path: Path, target: Path, sync_id: str | None, ex
     preserve_staging = False
     try:
         shutil.copytree(build_path, staged)
+        if local_policy is not None:
+            staged_policy = staged / local_policy.name
+            if staged_policy.exists() or staged_policy.is_symlink():
+                if staged_policy.is_dir() and not staged_policy.is_symlink():
+                    raise SystemExit(f"build review policy path must not be a directory: {staged_policy}")
+                staged_policy.unlink()
         metadata = read_skill_metadata(staged)
         if metadata.get("sync_id") != sync_id:
             raise SystemExit("staged Agent install does not contain the expected metadata.sync_id")
@@ -2052,6 +2064,8 @@ def atomic_install_build(build_path: Path, target: Path, sync_id: str | None, ex
         expected_modes = execution_modes(build_path)
         if execution_modes(staged) != expected_modes:
             raise SystemExit("staged Agent install failed executable permission verification")
+        if local_policy is not None and local_policy.is_file():
+            shutil.copy2(local_policy, staged / local_policy.name)
         had_target = target.exists()
         if had_target:
             os.replace(target, previous)
