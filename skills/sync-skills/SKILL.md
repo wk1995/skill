@@ -3,7 +3,7 @@ name: sync-skills
 description: Use when linking, converting, synchronizing, inventorying, reporting, repairing Agent installs, versioning, auditing, or rolling back Skill copies across repository, project, machine-wide, or explicit external locations.
 metadata:
   sync_id: "sync-skills"
-  version: "0.2.3"
+  version: "0.3.0"
   urls:
     - type: repository
       value: https://github.com/wk1995/skill.git
@@ -16,9 +16,11 @@ metadata:
       - The task needs Skill provenance URLs, version history, content digests, snapshots, or difference reports.
       - The user needs to migrate legacy repository-local Skill synchronization state.
       - The user needs a machine-local relationship report across supported AI Agent Builders or needs to repair an incomplete Agent installation.
+      - The user needs to retarget a registered local Agent install to another supported root, or migrate a stale Agent identity from a non-shared root.
     exclude:
       - The user is only asking to use a Skill for its domain workflow rather than manage Skill copies.
       - The task is ordinary code editing and does not involve Skill synchronization, conversion, auditing, or rollback.
+      - The user wants to change a registered install's agent_id without an explicit same-path migration from a non-shared old root.
 ---
 
 # Sync Skills
@@ -132,6 +134,23 @@ python skills/sync-skills/scripts/skill_sync.py link-location my-skill-id \
   --path /projects/app-a/skills/my-skill
 ```
 
+A 1.1.0 China WorkBuddy install at `~/.agents/skills/<skill>` remains a valid `workbuddy` location; do not retarget it to `codex`. After the Skill already exists at the product root, optionally migrate the registered path while keeping the Agent identity. A stale same-path identity from a non-shared old root (for example an old `workbuddy` record under `~/.workbuddy-ai`) may be migrated with `--replace` after the new Agent root is validated; shared-root retags remain rejected. It preserves `derived_from`, rewrites matching repair snapshots so rollback still works, and moves a legacy `roles.local` entry only when no other Agent resolves either path. An explicit local location suppresses a legacy role only when it is the same physical path or the legacy role is shared by another Agent; distinct candidates remain ambiguous and fail closed. Skill files are not copied. Same-path duplicate location IDs in the same group are retired:
+
+```bash
+python skills/sync-skills/scripts/skill_sync.py link-location my-skill-id \
+  --location-id local:workbuddy --kind local --agent-id workbuddy \
+  --path ~/.workbuddy/skills/my-skill --replace
+python skills/sync-skills/scripts/skill_sync.py repair-agent-install my-skill-id \
+  --agent workbuddy
+```
+
+Remove a named registry location without touching its files:
+
+```bash
+python skills/sync-skills/scripts/skill_sync.py unlink-location my-skill-id \
+  --location-id project:app-a
+```
+
 Repair an already registered Agent installation from a trusted manifest-v2 build. Diverged local content is preserved unless replacement is explicitly authorized; authorized replacement is still snapshotted first:
 
 ```bash
@@ -153,13 +172,14 @@ python skills/sync-skills/scripts/skill_sync.py repair-agent-install my-skill-id
 - Treat missing adapter root information as a blocking error for installation protection; a read-only inventory may continue with diagnostics for other valid adapters.
 - Compare installed file execute bits as well as manifest-v2 content digests. Permission-only differences need the same snapshot, authorized replacement, verification, and idempotency as content differences.
 - Refuse ordinary portable repo sync into a registered or adapter-discovered Agent install directory. Use the Agent build/install flow instead.
+- `link-location` refuses to change an existing location ID or to register a second same-path location ID unless `--replace` is explicit. Replacement revalidates the requested Agent root, rewrites same-Agent paths, and permits a same-path Agent identity migration only when the old path is not in a shared old Agent root. It retires duplicate same-path location IDs in the same group, preserves `derived_from`, and rewrites matching Agent-install snapshots so rollback still works. It moves a legacy `roles.local` entry only when no other Agent resolves the old or new path. An explicit local location suppresses a legacy role only when it is the same physical path or the legacy role is shared by another Agent; distinct candidates remain ambiguous and fail closed. It does not modify Skill files or change `kind`, `project_id`, or `source_id`. Do not retarget a 1.1.0 `workbuddy` install under `~/.agents/skills` to `codex`; keep shared-root registrations separate. After a path or identity change, repair with `--agent` matching the registered identity. A failed snapshot rewrite restores every manifest it changed, and retries that restore when the first attempt fails.
 - Exclude transient directories and files such as `.git`, `node_modules`, `dist`, `.DS_Store`, `__pycache__`, and Python bytecode.
 - When the skill-management repository is on `master` or its configured default branch, compare linked copies by `metadata.version`; if versions differ, synchronize and let the higher version replace the lower version.
 - When the repository is on any other branch, do not synchronize only because versions differ unless the user explicitly requests synchronization or the branch work requires updating the target copy.
 - If versions are equal but digests differ, use normal conflict handling and require an explicit source unless only one linked role changed since the previous snapshot.
 - If two or more copies changed since the previous snapshot and no source was specified, stop and report the conflict instead of choosing silently.
 - Keep the immutable sync-group identity in `metadata.sync_id` and the logical Skill version in `metadata.version` in `SKILL.md`. New Skills must define a stable sync ID that does not change with `metadata.name`; `rename --to` is reserved for migrating legacy name-keyed registry entries and cannot change an existing stable ID.
-- Use this Skill's own sync ID as `sync-skills` and its version as `0.2.3`.
+- Use this Skill's own sync ID as `sync-skills` and its version as `0.3.0`.
 - Store registry and snapshot runtime state outside the repository. By default, use `$XDG_STATE_HOME/sync-skills/<checkout-id>/`, or `$HOME/.local/state/sync-skills/<checkout-id>/` when `XDG_STATE_HOME` is unset. Treat repository-local `.skill-sync/` as legacy migration input only.
 - Legacy registries keyed by a Skill name remain readable; run `rename <old-reference> --to <sync-id> --name <new-name>` to migrate the group and its snapshots before linking a renamed Skill.
 - Record Skill addresses in the registry: `skill_urls` for canonical repository/documentation/registry/source URLs, and `role_urls` for role-specific remote/source URLs.
@@ -204,7 +224,7 @@ Inventory explicit local locations even when they are below the automatically sc
 
 ## Exit Codes And Recovery
 
-`link`, `link-location`, `convert`, `sync`, `rollback`, `rename`, and `repair-agent-install` return exit code **2** when the mutation succeeded but report refresh failed (`report_status: stale`). Run only the returned `report_retry_command`; do not repeat the mutation just because a shell reports nonzero. Exit code 0 means the command and refresh completed.
+`link`, `link-location`, `unlink-location`, `convert`, `sync`, `rollback`, `rename`, and `repair-agent-install` return exit code **2** when the mutation succeeded but report refresh failed (`report_status: stale`). Run only the returned `report_retry_command`; do not repeat the mutation just because a shell reports nonzero. Exit code 0 means the command and refresh completed.
 
 For the read-only `relationships --strict` command, exit code **2** instead means the freshly generated report contains findings or unlinked copies. Healthy `project-only` Skills pass, as do `synced` Skills. Without `--strict`, findings are reported in JSON without a nonzero exit code. Validation or execution errors fail separately with an error message.
 

@@ -1392,8 +1392,159 @@ def validate_group_role_locations(registry: dict[str, Any], sync_id: str, group:
         validate_location_identity(registry, sync_id, Path(path))
 
 
+def compatible_derived_from(agent_id: str, value: object) -> bool:
+    if not isinstance(value, str):
+        return False
+    exact = f"build:{agent_id}"
+    return value == exact or value.startswith(f"{exact}:")
+
+
+def same_path_location_ids(locations: dict[str, Any], path: Path, skip_id: str) -> list[str]:
+    matches: list[str] = []
+    for location_id, recorded in locations.items():
+        if location_id == skip_id or not isinstance(recorded, dict) or not recorded.get("path"):
+            continue
+        if paths_refer_to_same_location(path, Path(str(recorded["path"]))):
+            matches.append(location_id)
+    return matches
+
+
+def preserved_derived_from(recorded: dict[str, Any] | None, agent_id: str) -> str:
+    if (
+        isinstance(recorded, dict)
+        and recorded.get("kind") == "local"
+        and recorded.get("agent_id") == agent_id
+        and compatible_derived_from(agent_id, recorded.get("derived_from"))
+    ):
+        return str(recorded["derived_from"])
+    return f"build:{agent_id}"
+
+
+def rewrite_agent_install_snapshots(
+    state_dir: Path,
+    group_key: str,
+    *,
+    old_agent: str,
+    new_agent: str,
+    old_path: Path,
+    new_path: Path,
+    changes: list[tuple[Path, bytes, Path, Path, bool]] | None = None,
+) -> list[str]:
+    if not isinstance(old_agent, str) or not SYNC_ID.fullmatch(old_agent):
+        return []
+    if not isinstance(new_agent, str) or not SYNC_ID.fullmatch(new_agent):
+        raise SystemExit("invalid Agent ID for snapshot rewrite")
+    snapshots_dir = state_dir / "snapshots" / group_key
+    if not snapshots_dir.is_dir():
+        return []
+    old_original = normalized_absolute(old_path)
+    new_original = normalized_absolute(new_path)
+    matches: list[tuple[Path, Path, dict[str, Any], Path, Path, bytes]] = []
+    for snapshot_dir in sorted(path for path in snapshots_dir.iterdir() if path.is_dir()):
+        if snapshot_dir.is_symlink():
+            continue
+        manifest_path = snapshot_dir / "manifest.json"
+        try:
+            manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            continue
+        if not isinstance(manifest, dict) or manifest.get("operation") != "repair-agent-install":
+            continue
+        if manifest.get("group") != group_key or manifest.get("agent_id") != old_agent:
+            continue
+        if manifest.get("original_path") != old_original:
+            continue
+        old_payload = snapshot_dir / f"local-{old_agent}"
+        new_payload = snapshot_dir / f"local-{new_agent}"
+        if not old_payload.is_dir():
+            raise SystemExit(
+                f"cannot rewrite snapshot {snapshot_dir.name}: missing payload local-{old_agent}"
+            )
+        if old_agent != new_agent and new_payload.exists() and not paths_refer_to_same_location(old_payload, new_payload):
+            raise SystemExit(
+                f"cannot rewrite snapshot {snapshot_dir.name}: payload local-{new_agent} already exists"
+            )
+        matches.append((
+            snapshot_dir,
+            manifest_path,
+            manifest,
+            old_payload,
+            new_payload,
+            manifest_path.read_bytes(),
+        ))
+
+    # Preflight every matching snapshot before changing any one of them. The
+    # registry is still unchanged at this point, so a malformed later snapshot
+    # must not leave earlier snapshots half-retagged.
+    rewritten: list[str] = []
+    moved: list[tuple[Path, Path]] = []
+    written: list[tuple[Path, bytes]] = []
+    changes_start = len(changes) if changes is not None else 0
+    try:
+        for snapshot_dir, manifest_path, manifest, old_payload, new_payload, original_bytes in matches:
+            moved_here = False
+            if old_agent != new_agent and not paths_refer_to_same_location(old_payload, new_payload):
+                old_payload.rename(new_payload)
+                moved.append((old_payload, new_payload))
+                moved_here = True
+            if manifest.get("agent_id") == new_agent and manifest.get("original_path") == new_original:
+                continue
+            written.append((manifest_path, original_bytes))
+            manifest["agent_id"] = new_agent
+            manifest["original_path"] = new_original
+            if changes is not None:
+                changes.append((manifest_path, original_bytes, old_payload, new_payload, moved_here))
+            manifest_path.write_text(
+                json.dumps(manifest, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+            )
+            rewritten.append(snapshot_dir.name)
+    except BaseException as error:
+        restore_failures: list[str] = []
+        for manifest_path, original_bytes in reversed(written):
+            try:
+                manifest_path.write_bytes(original_bytes)
+            except OSError as restore_error:
+                restore_failures.append(f"restore {manifest_path}: {restore_error}")
+        for old_payload, new_payload in reversed(moved):
+            try:
+                if new_payload.exists() and not old_payload.exists():
+                    new_payload.rename(old_payload)
+            except OSError as restore_error:
+                restore_failures.append(f"restore {new_payload}: {restore_error}")
+        if restore_failures:
+            # The caller retries this same undo log. Dropping it here would
+            # leave an already rewritten snapshot after the failed replace.
+            raise OSError(str(error)) from OSError("; ".join(restore_failures))
+        if changes is not None:
+            del changes[changes_start:]
+        raise
+    return rewritten
+
+
+def restore_agent_install_snapshot_rewrites(
+    changes: list[tuple[Path, bytes, Path, Path, bool]],
+) -> None:
+    """Undo snapshot retagging when the accompanying registry commit fails."""
+    failures: list[str] = []
+    for manifest_path, original_bytes, old_payload, new_payload, moved in reversed(changes):
+        try:
+            manifest_path.write_bytes(original_bytes)
+        except OSError as error:
+            failures.append(f"restore {manifest_path}: {error}")
+        if moved:
+            try:
+                if new_payload.exists() and not old_payload.exists():
+                    new_payload.rename(old_payload)
+            except OSError as error:
+                failures.append(f"restore {new_payload}: {error}")
+    if failures:
+        raise OSError("; ".join(failures))
+
+
 def command_link_location(args: argparse.Namespace) -> int:
     state_dir = Path(args.state_dir).expanduser().resolve()
+    registry_path = state_dir / "registry.json"
+    registry_before = registry_path.read_bytes() if registry_path.exists() else None
     registry = load_registry(state_dir)
     key, group = get_group(registry, args.group)
     sync_id = group_id(key, group)
@@ -1433,7 +1584,7 @@ def command_link_location(args: argparse.Namespace) -> int:
     elif args.kind == "local":
         adapters, roots = adapter_roots_for_project(args)
         validate_agent_target(args.agent_id, path, adapters, roots)
-        if args.derived_from and args.derived_from != f"build:{args.agent_id}":
+        if args.derived_from and not compatible_derived_from(args.agent_id, args.derived_from):
             raise SystemExit("derived_from must reference the same Agent build")
         location["agent_id"] = args.agent_id
         location["derived_from"] = args.derived_from or f"build:{args.agent_id}"
@@ -1441,21 +1592,240 @@ def command_link_location(args: argparse.Namespace) -> int:
         location["source_id"] = args.source_id
 
     locations = group.setdefault("locations", {})
+    if not isinstance(locations, dict):
+        raise SystemExit("malformed locations registry; refusing mutation")
+    malformed_location_ids = sorted(
+        str(location_id)
+        for location_id, recorded in locations.items()
+        if not isinstance(recorded, dict)
+    )
+    if malformed_location_ids:
+        raise SystemExit(
+            "malformed location record(s); refusing mutation: "
+            + ", ".join(malformed_location_ids)
+        )
     existing = locations.get(args.location_id)
-    if existing and existing != location:
-        raise SystemExit(f"location ID already exists with different data: {args.location_id}")
+    replace = bool(getattr(args, "replace", False))
+    same_path_ids = same_path_location_ids(locations, path, args.location_id)
+    if args.kind == "local" and not args.derived_from:
+        location["derived_from"] = preserved_derived_from(existing, args.agent_id)
+    if existing and existing != location and not replace:
+        raise SystemExit(
+            f"location ID already exists with different data: {args.location_id}; "
+            "rerun with --replace to update the registered Agent identity"
+        )
+    if same_path_ids and not replace:
+        raise SystemExit(
+            f"path is already registered as {same_path_ids[0]!r}; "
+            "retire that location before registering another Agent, or rerun with "
+            "--replace to migrate the same Agent to this path"
+        )
+
+    sources: list[tuple[str, dict[str, Any]]] = []
+    if existing:
+        sources.append((args.location_id, existing))
+    for location_id in same_path_ids:
+        recorded = locations.get(location_id)
+        if isinstance(recorded, dict):
+            sources.append((location_id, recorded))
+
+    rewritten_snapshot_ids: list[str] = []
+    snapshot_changes: list[tuple[Path, bytes, Path, Path, bool]] = []
+    retired: list[str] = []
+    if replace:
+        for _, recorded in sources:
+            if recorded.get("kind") != args.kind:
+                raise SystemExit("--replace cannot change location kind")
+            recorded_path = Path(str(recorded["path"])) if recorded.get("path") else None
+            same_path = bool(recorded_path and paths_refer_to_same_location(path, recorded_path))
+            if args.kind == "local":
+                if recorded.get("agent_id") != args.agent_id:
+                    old_agent = recorded.get("agent_id")
+                    old_root = any(
+                        root.get("agent_id") == old_agent
+                        and path_is_within(path, Path(str(root["path"])))
+                        for root in roots
+                        if root.get("path")
+                    )
+                    if not same_path or old_root:
+                        raise SystemExit(
+                            "--replace cannot change agent_id on a shared or moved path; "
+                            "register the other Agent at its own path"
+                        )
+            else:
+                if not same_path:
+                    raise SystemExit("--replace cannot change the registered path")
+                if args.kind == "project" and recorded.get("project_id") != args.project_id:
+                    raise SystemExit("--replace cannot change project_id")
+                if args.kind == "external" and recorded.get("source_id") != args.source_id:
+                    raise SystemExit("--replace cannot change source_id")
+        if args.kind == "local" and not args.derived_from:
+            for _, recorded in sources:
+                if (
+                    recorded.get("agent_id") == args.agent_id
+                    and compatible_derived_from(args.agent_id, recorded.get("derived_from"))
+                ):
+                    location["derived_from"] = str(recorded["derived_from"])
+                    break
+        try:
+            for location_id, recorded in sources:
+                if recorded.get("kind") == "local" and recorded.get("agent_id") and recorded.get("path"):
+                    rewritten_snapshot_ids.extend(rewrite_agent_install_snapshots(
+                        state_dir, key,
+                        old_agent=str(recorded["agent_id"]),
+                        new_agent=str(args.agent_id),
+                        old_path=Path(str(recorded["path"])),
+                        new_path=path,
+                        changes=snapshot_changes,
+                    ))
+                if location_id != args.location_id:
+                    retired.append(location_id)
+        except BaseException as error:
+            if snapshot_changes:
+                try:
+                    restore_agent_install_snapshot_rewrites(snapshot_changes)
+                except OSError as restore_error:
+                    raise SystemExit(
+                        f"{error}; mutation rollback failed: {restore_error}"
+                    ) from error
+            raise
+        roles = group.get("roles")
+        if args.kind == "local" and isinstance(roles, dict) and roles.get("local"):
+            legacy_local = Path(str(roles["local"]))
+            moved_from_legacy = any(
+                recorded.get("path")
+                and paths_refer_to_same_location(legacy_local, Path(str(recorded["path"])))
+                and not paths_refer_to_same_location(legacy_local, path)
+                for _, recorded in sources
+                if recorded.get("kind") == "local" and recorded.get("agent_id") == args.agent_id
+            )
+            # roles.local is one shared pointer. Moving it drops any other Agent
+            # that still resolves the old path, and role rollback follows the pointer.
+            if (
+                moved_from_legacy
+                and not other_agent_resolves_path(group, legacy_local, roots, args.agent_id)
+                and not other_agent_root_contains_path(path, roots, args.agent_id)
+            ):
+                roles["local"] = normalized_absolute(path)
+
     locations[args.location_id] = location
+    for location_id in retired:
+        locations.pop(location_id, None)
     registry["schema_version"] = max(2, int(registry.get("schema_version", 1)))
     operation_at = now_iso()
     group["updated_at"] = operation_at
-    save_registry(state_dir, registry)
+    try:
+        save_registry(state_dir, registry)
+    except BaseException as error:
+        rollback_failures: list[str] = []
+        if snapshot_changes:
+            try:
+                restore_agent_install_snapshot_rewrites(snapshot_changes)
+            except OSError as restore_error:
+                rollback_failures.append(str(restore_error))
+        try:
+            if registry_before is None:
+                if registry_path.exists():
+                    registry_path.unlink()
+            else:
+                registry_path.write_bytes(registry_before)
+        except OSError as restore_error:
+            rollback_failures.append(f"restore {registry_path}: {restore_error}")
+        if rollback_failures:
+            raise SystemExit(
+                f"{error}; mutation rollback failed: {'; '.join(rollback_failures)}"
+            ) from error
+        raise
     return finish_mutation(args, registry, {
         "group": key,
         "sync_id": sync_id,
         "location_id": args.location_id,
         "location": location,
+        "retired_location_ids": retired,
+        "rewritten_snapshot_ids": sorted(set(rewritten_snapshot_ids)),
+        "replaced": bool((existing and existing != location) or retired),
         "updated_at": operation_at,
     })
+
+
+def command_unlink_location(args: argparse.Namespace) -> int:
+    state_dir = Path(args.state_dir).expanduser().resolve()
+    registry = load_registry(state_dir)
+    key, group = get_group(registry, args.group)
+    locations = group.get("locations", {})
+    if not isinstance(locations, dict):
+        raise SystemExit("malformed locations registry; refusing mutation")
+    if args.location_id not in locations:
+        raise SystemExit(f"location ID not found: {args.location_id}")
+    removed = locations.pop(args.location_id)
+    operation_at = now_iso()
+    group["updated_at"] = operation_at
+    registry["schema_version"] = max(2, int(registry.get("schema_version", 1)))
+    save_registry(state_dir, registry)
+    return finish_mutation(args, registry, {
+        "group": key,
+        "sync_id": group_id(key, group),
+        "location_id": args.location_id,
+        "removed_location": removed,
+        "updated_at": operation_at,
+    })
+
+
+def explicit_agent_install_paths(
+    group: dict[str, Any],
+    agent_id: str,
+) -> list[Path]:
+    paths: list[Path] = []
+    for location in group.get("locations", {}).values():
+        if (
+            isinstance(location, dict)
+            and location.get("kind") == "local"
+            and location.get("agent_id") == agent_id
+            and location.get("path")
+        ):
+            paths.append(Path(str(location["path"])).expanduser().absolute())
+    return paths
+
+
+def agent_resolves_path_without_legacy_role(
+    group: dict[str, Any],
+    agent_id: str,
+    path: Path,
+    roots: list[dict[str, Any]],
+) -> bool:
+    explicit = explicit_agent_install_paths(group, agent_id)
+    if explicit:
+        return any(paths_refer_to_same_location(path, candidate) for candidate in explicit)
+    return any(
+        root.get("agent_id") == agent_id
+        and root.get("path")
+        and path_is_within(path, Path(str(root["path"])))
+        for root in roots
+    )
+
+
+def agent_root_contains_path(
+    agent_id: str,
+    path: Path,
+    roots: list[dict[str, Any]],
+) -> bool:
+    return any(
+        root.get("agent_id") == agent_id
+        and root.get("path")
+        and path_is_within(path, Path(str(root["path"])))
+        for root in roots
+    )
+
+
+def agent_uses_legacy_role(
+    group: dict[str, Any],
+    agent_id: str,
+    path: Path,
+    roots: list[dict[str, Any]],
+) -> bool:
+    return not explicit_agent_install_paths(group, agent_id) and agent_root_contains_path(
+        agent_id, path, roots
+    )
 
 
 def adapter_roots_for_project(args: argparse.Namespace) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
@@ -1505,26 +1875,84 @@ def refuse_portable_sync_to_agent_install(
             )
 
 
+def agent_install_candidates(
+    group: dict[str, Any],
+    agent_id: str,
+    roots: list[dict[str, Any]],
+) -> list[tuple[str, Path]]:
+    matches = [
+        (str(location_id), Path(str(location["path"])).expanduser().absolute())
+        for location_id, location in group.get("locations", {}).items()
+        if isinstance(location, dict)
+        and location.get("kind") == "local"
+        and location.get("agent_id") == agent_id
+        and location.get("path")
+    ]
+    legacy_local = group.get("roles", {}).get("local")
+    if legacy_local:
+        path = Path(str(legacy_local)).expanduser().absolute()
+        belongs = agent_root_contains_path(agent_id, path, roots)
+        same_as_explicit = any(
+            paths_refer_to_same_location(path, candidate) for _, candidate in matches
+        )
+        current_has_explicit = bool(matches)
+        shared_by_other_agent = False
+        for other_agent in {
+            str(root.get("agent_id"))
+            for root in roots
+            if root.get("agent_id") and root.get("agent_id") != agent_id
+        }:
+            other_explicit = explicit_agent_install_paths(group, other_agent)
+            if agent_uses_legacy_role(group, other_agent, path, roots):
+                shared_by_other_agent = True
+                break
+            if current_has_explicit and any(
+                paths_refer_to_same_location(path, candidate)
+                for candidate in other_explicit
+            ):
+                shared_by_other_agent = True
+                break
+        if belongs and not same_as_explicit and not shared_by_other_agent:
+            matches.append((f"local:{agent_id}", path))
+    return matches
+
+
+def other_agent_resolves_path(
+    group: dict[str, Any],
+    path: Path,
+    roots: list[dict[str, Any]],
+    agent_id: str,
+) -> bool:
+    others = sorted({
+        root["agent_id"]
+        for root in roots
+        if root.get("agent_id") and root["agent_id"] != agent_id
+    })
+    for other in others:
+        if agent_resolves_path_without_legacy_role(group, other, path, roots):
+            return True
+    return False
+
+
+def other_agent_root_contains_path(
+    path: Path,
+    roots: list[dict[str, Any]],
+    agent_id: str,
+) -> bool:
+    return any(
+        root.get("agent_id") != agent_id
+        and root.get("path")
+        and path_is_within(path, Path(str(root["path"])))
+        for root in roots
+    )
+
+
 def registered_agent_install(
     group: dict[str, Any],
     agent_id: str,
     roots: list[dict[str, Any]],
 ) -> tuple[str, Path]:
-    matches: list[tuple[str, Path]] = []
-    for location_id, location in group.get("locations", {}).items():
-        if not isinstance(location, dict) or location.get("kind") != "local":
-            continue
-        if location.get("agent_id") == agent_id and location.get("path"):
-            matches.append((location_id, Path(str(location["path"])).expanduser().absolute()))
-    legacy_local = group.get("roles", {}).get("local")
-    if legacy_local:
-        path = Path(str(legacy_local)).expanduser().absolute()
-        belongs = any(
-            root["agent_id"] == agent_id and path_is_within(path, Path(root["path"]))
-            for root in roots
-        )
-        if belongs and not any(paths_refer_to_same_location(path, match[1]) for match in matches):
-            matches.append((f"local:{agent_id}", path))
+    matches = agent_install_candidates(group, agent_id, roots)
     if not matches:
         raise SystemExit(f"no registered local install for Agent {agent_id!r}")
     if len(matches) > 1 and not all(paths_refer_to_same_location(matches[0][1], match[1]) for match in matches[1:]):
@@ -1807,7 +2235,20 @@ def build_parser() -> argparse.ArgumentParser:
     link_location.add_argument("--derived-from")
     link_location.add_argument("--source-id")
     link_location.add_argument("--adapter-root")
+    link_location.add_argument(
+        "--replace",
+        action="store_true",
+        help="Replace an existing location ID or same-path registration after validation. Same-path Agent identity migration is allowed only from a non-shared old root. Skill files are not modified.",
+    )
     link_location.set_defaults(func=command_link_location)
+
+    unlink_location = subparsers.add_parser(
+        "unlink-location",
+        help="Remove a named project, local Agent, or external location from the registry without touching its files.",
+    )
+    unlink_location.add_argument("group", help="Existing sync ID, Skill name, or alias.")
+    unlink_location.add_argument("--location-id", required=True)
+    unlink_location.set_defaults(func=command_unlink_location)
 
     repair_install = subparsers.add_parser(
         "repair-agent-install",

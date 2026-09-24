@@ -1,6 +1,6 @@
 # Agent Build Architecture
 
-This document defines how portable Skill sources are adapted for Codex, WorkBuddy, and future Agent runtimes without spreading platform rules across every Skill.
+This document defines how portable Skill sources are adapted for Codex, WorkBuddy, WorkBuddy AI, and future Agent runtimes without spreading platform rules across every Skill.
 
 ## Responsibility Boundaries
 
@@ -53,6 +53,7 @@ python3 scripts/agent_build.py --list
 python3 scripts/agent_build.py --check
 python3 scripts/agent_build.py codex
 python3 scripts/agent_build.py workbuddy --skill sync-skills
+python3 scripts/agent_build.py workbuddy-ai --skill sync-skills
 ```
 
 For each selected Skill, the builder:
@@ -102,6 +103,11 @@ dist/workbuddy/
   .agent-build.json
   <skill>/
     SKILL.md
+
+dist/workbuddy-ai/
+  .agent-build.json
+  <skill>/
+    SKILL.md
 ```
 
 Generated output is ignored by Git. Installation commands belong to their adapter documentation or packaging layer; portable Skill READMEs describe how to use the workflow, not how a specific Agent installs it.
@@ -111,3 +117,11 @@ After a successful build, the builder prints the machine-local `skill_sync.py re
 ### Codex local roots (adapter 1.1.1)
 
 As checked on 2026-09-08, the [official Skills documentation](https://learn.chatgpt.com/docs/build-skills) lists `$HOME/.agents/skills` as the user scope (the former `developers.openai.com/codex/skills` URL redirects there). Adapter 1.1.1 discovers this root and retains `.codex/skills` for legacy local installations. A physical root shared with another adapter retains both Agent IDs. This describes inventory configuration, not a claim that every historical client version loads the same directories.
+
+### WorkBuddy local roots (adapter 1.1.1)
+
+As checked on 2026-09-17, China `WorkBuddy.app` (`com.tencent.workbuddy.mac`) uses `dataFolderName` `.workbuddy`. Adapter 1.1.1 inventories `~/.workbuddy/skills` for that product and retains `~/.agents/skills` so 1.1.0 `workbuddy` installs remain valid. A physical root shared with Codex keeps both Agent IDs; do not retarget those 1.1.0 installs to `codex`. International WorkBuddy AI is a different Agent (`workbuddy-ai`) and is not claimed by this adapter. Do not attach the process-injected `WORKBUDDY_CONFIG_DIR` variable to this adapter; a custom directory must be registered with `link-location`.
+
+### WorkBuddy AI local roots (adapter 1.0.0)
+
+As checked on 2026-09-17, international `WorkBuddy AI.app` (`com.workbuddy.workbuddy-ai`) uses `dataFolderName` / `customUserDataDir` `.workbuddy-ai`. Adapter 1.0.0 inventories `~/.workbuddy-ai/skills` for that product. China WorkBuddy remains `workbuddy`. The two products share the environment variable name `WORKBUDDY_CONFIG_DIR` at process injection time; this adapter therefore does not read that variable. A custom directory must be registered with `link-location`.
