@@ -12,15 +12,16 @@
 # The two scopes use different file names and the same keys. Commenting is off
 # unless one of them enables it: a repository that has a project-scope file is
 # decided by that file, and the install scope is read only for a repository that
-# has none. Copying this example unchanged therefore changes nothing, because
-# only `comment: true` or a matching target enables commenting.
+# has none. Replace the placeholder target below with the intended repository;
+# copying this example unchanged matches no real repository.
 
 # This scope's decision when no target below matches. Only `true` enables
 # commenting; omitting the key or writing `false` leaves commenting off.
 comment: false
 
-# Repositories that receive comments, matched by git remote. A match beats the
-# boolean above. The remote must equal the pull request's own host/owner/repo;
+# Repositories that receive comments and can enter the full loop when the
+# commenting account is also the pull-request author, matched by git remote.
+# A match beats the boolean above. The remote must equal the PR's host/owner/repo;
 # a fork's remote never matches. Remotes are compared case-insensitively,
 # ignoring the scheme, any user@, a trailing slash, and a trailing .git, so all
 # of these are the same target:
@@ -28,7 +29,7 @@ comment: false
 #   ssh://git@github.com/wk1995/skill
 #   git@github.com:wk1995/skill.git
 comment_targets:
-  - https://github.com/wk1995/skill.git
+  - https://github.com/<owner>/<repo>.git
 
 # Rounds that may produce confirmed findings before the loop stops and explains
 # why it needed that many. Checked before a round starts; a round that passed

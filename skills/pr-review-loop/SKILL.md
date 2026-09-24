@@ -1,6 +1,6 @@
 ---
 name: pr-review-loop
-description: Drive a pull-request review loop that reviews the current head, fixes and pushes the confirmed findings, and reviews again until one round produces no confirmed findings. Commenting on the pull request is off by default and happens only when the comment policy enables it for that repository, and every posted comment is labelled with the platform and model that produced it. The loop runs at most ten rounds by default, retries a review that fails to run up to three times, and explains why so many rounds were needed when it stops at the round cap. Use when a request names a pull request and asks to review it, to review and fix it, or to keep reviewing until it is clean. Do not use when no pull request is identified, when the user asks for a read-only review or a local report, or for pull-request administration such as creating, retitling, approving, or merging.
+description: Review a specific pull request. Run the fix, commit, push, and re-review loop by default only when the account that would comment is the pull-request author and the applicable configuration explicitly lists the pull request's repository address; otherwise perform one review without changing code and comment only when the comment policy enables it. Every posted comment carries the platform and model marker. The full loop has round and retry limits. Use for requests to review a named pull request or continue its review. Do not use for a local-only report, a request forbidding both comments and code changes, or pull-request administration.
 metadata:
   sync_id: "pr-review-loop"
   version: "0.1.0"
@@ -11,13 +11,13 @@ metadata:
       value: skills/pr-review-loop
   triggering:
     include:
-      - "Review a specific pull request, or review and fix it, including requests that identify the pull request by number, link, or unambiguous reference."
-      - "Post review findings as comments on a pull request, then fix, commit, and push them, when the comment policy enables comments for that repository or the user asks for comments for this review."
-      - "Keep reviewing a pull request after each fix until a round reports no findings."
-      - "Resume an unfinished review loop on a pull request whose head has moved since the last round."
+      - "Review a specific pull request identified by number, link, or unambiguous reference; select full-loop or comment-only mode from the commenting account, pull-request author, and configured repository address."
+      - "Review and fix a pull request, or keep reviewing it after each fix, when the same-account and configured-address conditions permit the full loop."
+      - "Review a pull request without changing code and post confirmed findings when the comment policy enables comments for that repository or the user requests comments for this review."
+      - "Resume an unfinished full review loop on a pull request whose head has moved since the last round."
     exclude:
       - "No pull request is identified: reviewing a local diff, branch, file, or snippet that only needs an answer in the conversation."
-      - "The user asks for a read-only review or report and states that nothing should be commented, committed, pushed, or changed."
+      - "The user wants only a local or in-conversation report, or forbids both pull-request comments and code changes."
       - "Pull-request administration without review: creating, editing, retitling, labeling, approving, closing, or merging a pull request."
       - "Resolving conflicts, rebasing, or repairing a broken worktree when no review was requested."
       - "Authoring or changing the standards that code review should apply."
@@ -27,27 +27,29 @@ metadata:
 
 ## Scope
 
-This Skill owns the loop and only the loop:
+This Skill owns mode selection and the review loop:
 
 ```text
-review current head
+resolve commenting account, PR author, and configured repository address
         |
-   confirmed findings?
-        |             \
-       yes             no
-        |               \
-   comment on the PR    comment the pass
-   only if the policy   only if the policy
-   enables it           enables it, then stop
+        +-- different account or address not configured --> review once
+        |                               --> comment if enabled, else report --> stop
         |
-   fix -> verify -> commit -> push
-        |
-   next round (back to review)
+        +-- same account and address configured --> review current head
+                                                     |
+                                                confirmed findings?
+                                                  |             \
+                                                 yes             no
+                                                  |               \
+                                            comment if enabled    pass; stop
+                                            fix -> verify -> commit -> push
+                                                  |
+                                             next round (back to review)
 ```
 
-It owns attribution, round ordering, the comment decision, the evidence each
-round leaves behind, and the stopping conditions. It does **not** own the review
-method — the passes, matrices, severity scale, invariants, and completion
+It owns attribution, mode selection, round ordering, the comment decision, the
+evidence each round leaves behind, and the stopping conditions. It does **not**
+own the review method — the passes, matrices, severity scale, invariants, and completion
 criteria applied inside a round come from an external source listed in
 [Where The Review Method Comes From](#where-the-review-method-comes-from).
 Never restate the method here, and never manufacture or inflate findings to keep
@@ -93,10 +95,10 @@ the same file also carries the limits in [Loop Limits](#loop-limits):
 # This scope's decision when no target below matches. Only `true` enables
 # commenting; omitting the key or writing `false` leaves commenting off.
 comment: false
-# Repositories that receive comments, matched by git remote.
+# Repositories that receive comments and can enter the full loop when the
+# commenting account is also the PR author, matched by git remote.
 comment_targets:
-  - https://github.com/wk1995/skill.git
-  - git@github.com:wk1995/other-repo.git
+  - https://github.com/<owner>/<repo>.git
 # Round and retry limits; see Loop Limits.
 max_rounds: 10
 review_retries: 3
@@ -124,15 +126,40 @@ state and the install file from the running Skill; if the pull request changes
 its own policy file, the base version governs and the round report records the
 discrepancy.
 
-When the policy enables commenting, every comment the loop posts carries the
-marker from [Attribution](#attribution). When it does not, a request that passed
-the [Trigger Gate](#trigger-gate) still gets a full round: the loop reviews,
-fixes, commits, and pushes, findings stay in the round ledger and the round
-report, and nothing is written to the pull request. A request that forbade those
-changes never reaches this point, because the gate stops it first. If the
-request asked for comments while the policy is off, say so plainly and name the
-file and key that would enable them for this repository instead of commenting
-anyway.
+When the policy enables commenting, every comment this Skill posts carries the
+marker from [Attribution](#attribution). A full-loop review can still fix, commit,
+and push when commenting is off; it keeps findings in the round ledger and report.
+In comment-only mode, a disabled comment policy means one review and an answer in
+the conversation, with no pull-request comment or code change. If the request
+asked for comments while the policy is off, say so plainly and name the file and
+key that would enable them instead of commenting anyway.
+
+## Select The Review Mode
+
+Resolve the mode before the first review. Compare the authenticated account that
+would post to the pull request with the pull request's author account on the same
+host. Use account identities supplied by that host, not `git config user.name`,
+the commit author, or an assumed identity. If either account cannot be resolved,
+do not assume they are the same.
+
+For the address check, use the project-scope file from the base state when it
+exists; otherwise use the running install's install-scope file. The repository is
+**configured** only when that selected file explicitly lists the pull request's
+own `host/owner/repo` in `comment_targets`, matched by the remote rule above.
+`comment: true` and a request to comment enable comments but do not substitute
+for a configured address. A project file without a matching target cannot inherit
+one from the install file. The user's comment preference still takes precedence
+for the separate comment decision.
+
+| Condition | Mode |
+| --- | --- |
+| Commenting account is the pull-request author, address is configured, and the user has not requested review without code changes | Full loop: review, optionally comment, fix, verify, commit, push, and review the new head |
+| Accounts differ, either identity is unknown, address is not configured, or the user requests review without code changes | Comment-only: review one head, comment if the policy enables it, otherwise report in the conversation; never edit, commit, or push |
+
+This is the default even when the request says only “review this PR.” A request to
+fix does not override a failed account or address check: explain the selected
+mode and the missing condition before reviewing. A request that explicitly asks
+for a local-only report stays outside this Skill.
 
 ## Loop Limits
 
@@ -168,23 +195,22 @@ protected branch, an absent tool — is blocked immediately rather than retried.
 
 ## Trigger Gate
 
-Every condition must hold before the first round starts:
+Every condition must hold before reviewing:
 
 1. A specific pull request is identified — a number, a URL, or a reference that
    resolves to exactly one open pull request. Never guess by picking the most
    recently updated pull request.
-2. The request is to review that pull request, or to review and fix it — and it
-   does not forbid changing, committing, or pushing. A request for a read-only
-   review or report, or one stating that nothing should be commented, committed,
-   pushed, or changed, stays outside this Skill; the comment decision never
-   brings it back in.
-3. The loop can write where it must write: pushing to the pull request's head
-   branch, and — only when the resolved comment policy enables commenting —
-   commenting on the pull request.
+2. The request is to review that pull request. A request for only a local or
+   in-conversation report, or one that forbids both comments and code changes,
+   stays outside this Skill. A request forbidding code changes but allowing
+   comments can use comment-only mode.
+3. The selected mode has its required capabilities: full-loop mode needs push
+   access to the pull request's head branch; either mode needs comment access
+   only when the resolved comment policy enables commenting.
 
 If the pull request is ambiguous, ask which one instead of starting. If a write
-capability the resolved policy requires is missing, do not start a loop that
-cannot honour it — report the limitation and offer a review-only answer.
+capability the selected mode requires is missing, do not start work that cannot
+honour it — report the limitation and offer an answer in the conversation.
 
 ## Attribution
 
@@ -215,23 +241,31 @@ prefix, that convention governs commits while the comment marker keeps the
 
 ## Preconditions
 
-- Resolve the comment policy first, and record its decision and source.
 - Resolve the repository, pull-request number, base branch, head branch, and
   exact head commit. Record the head commit before reviewing; it defines the
   round.
-- When commenting is enabled, confirm the comment channel before the first fix,
-  so a round cannot fail after the fix is already written.
+- Resolve the comment policy and review mode, and record each decision and its
+  evidence: commenting account, pull-request author, selected policy file, and
+  whether its `comment_targets` matches this repository.
+- When commenting is enabled, confirm the comment channel before reviewing or
+  fixing, so a review cannot fail after a fix is already written.
 - Read the pull-request description and every existing review thread. Rounds of
   this loop must stay distinguishable from comments by other reviewers and from
   earlier loops.
-- Fix on the pull request's head branch. Never prepare a fix on an unrelated
-  branch and push it at the pull request.
+- In full-loop mode, fix on the pull request's head branch. Never prepare a fix
+  on an unrelated branch and push it at the pull request.
 
 ## The Loop
 
-Start at round 1 and keep a round ledger — round number, head commit, review
-attempts and why any failed, findings, whether the round commented or withheld,
-action taken, result. A round ends in exactly one of these ways: it produces
+In comment-only mode, pin and review one head, post confirmed findings or a pass
+only when commenting is enabled, and stop. Never enter Steps 2 or 3 as a path to
+another round, and never edit, commit, or push. If commenting is disabled, deliver
+the findings or pass in the conversation. Record the exact head and mode.
+
+In full-loop mode, start at round 1 and keep a round ledger — round number, head
+commit, review attempts and why any failed, findings, whether the round
+commented or withheld, action taken, result. A round ends in exactly one of
+these ways: it produces
 findings, the round limit is not reached, and the next round starts; it produces
 findings at the round limit, so the loop stops at the cap, explains the round
 count, and escalates; it produces no findings, so the loop stops as passed; every
@@ -239,6 +273,8 @@ attempt in it fails, so the loop stops as exhausted. [Stop
 Conditions](#stop-conditions) also ends the loop on a stall or a block.
 
 ### Step 1 — Review the current head
+
+This step applies to both modes.
 
 - Pin the round to one exact head commit and review that commit, not the working
   tree and not a moving branch.
@@ -251,8 +287,8 @@ Conditions](#stop-conditions) also ends the loop on a stall or a block.
 
 ### Step 2 — Round with findings
 
-Perform these in order. When commenting is enabled the comment comes first, so
-the finding is on the record before the code changes.
+Full-loop mode only. Perform these in order. When commenting is enabled, the
+comment comes first, so the finding is on the record before code changes.
 
 1. **Comment, when the policy enables it.** Post this round's confirmed findings
    to the pull request under the attribution marker. Default to one comment per
@@ -278,9 +314,9 @@ the finding is on the record before the code changes.
 
 ### Step 3 — Round with no findings
 
-When the policy enables commenting, post the passing comment under the marker,
-naming the reviewed range and the exact commit. Either way, record the result and
-stop. Do not start another round to look thorough.
+In full-loop mode, when the policy enables commenting, post the passing comment
+under the marker, naming the reviewed range and the exact commit. Either way,
+record the result and stop. Do not start another round to look thorough.
 
 ## Stop Conditions
 
@@ -328,6 +364,8 @@ pull request under the marker; otherwise keep it in the round report.
 
 - Do not post a comment unless the resolved policy enables commenting for this
   repository or the user asked for comments for this review.
+- In comment-only mode, do not edit files, commit, or push, even if the request
+  asked for fixes; explain why the full-loop conditions were not met.
 - Do not treat a general request to review as consent to comment, and do not
   infer consent from a repository name, an earlier loop, or another author's
   comments.
@@ -359,11 +397,13 @@ source was found instead of silently reviewing with no standard.
 
 ## Round Report
 
-Close with one message: the pull request and its title, the comment decision and
-the source that made it, how many rounds ran, every review attempt that failed
+Close with one message: the pull request and its title, the selected mode and its
+account/address evidence, the comment decision and the source that made it, how
+many rounds ran, every review attempt that failed
 with its retries, per round the findings by severity and how each was resolved,
 the open questions that were deliberately not posted, the current head commit and
-check status, and the conclusion — passed, stopped at the cap, stalled, or
-blocked. When the cap was reached, include the round-count summary from
+check status, and the conclusion — passed, comment-only findings reported,
+stopped at the cap, stalled, exhausted, or blocked. When the cap was reached,
+include the round-count summary from
 [Stop Conditions](#stop-conditions) in the same message. Deliver the result, not
 the process log.

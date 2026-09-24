@@ -2,30 +2,30 @@
 
 Language: **English** | [中文](README.zh-CN.md)
 
-`pr-review-loop` runs a pull-request review loop: it reviews the current head, fixes the confirmed findings, commits and pushes the fix, and reviews again until a round reports no confirmed findings. It defines the loop — attribution, round order, the comment decision, the round and retry limits, stop conditions, and reporting — and deliberately does not define what a review must check. Commenting is off by default, and the loop stops at a round limit instead of running forever.
+`pr-review-loop` reviews a named pull request and selects a mode before it starts. When the account that would comment is the pull-request author and the applicable configuration lists that repository address, it fixes confirmed findings, commits, pushes, and reviews again by default. Otherwise it reviews one head without changing code and comments only if the comment policy permits it; with commenting off, it reports in the conversation. It defines attribution, mode selection, round order, limits, stop conditions, and reporting, but not what a review must check.
 
 ## How To Use It
 
 Point at one pull request and say what you want:
 
 ```text
-Review PR #25 and fix what you find until it is clean.
-Review https://github.com/<owner>/<repo>/pull/42, post the problems to the PR, then fix them.
+Review PR #25.
+Review https://github.com/<owner>/<repo>/pull/42 and fix what you find if the full loop is enabled.
 Continue the review loop on this PR after the last fix.
 ```
 
 Provide the pull request by number or link, and the repository if it is not the
-current checkout. The loop resolves the exact head commit, reviews it, fixes and
-pushes the findings, and repeats until a round is clean or a stop condition
-applies.
+current checkout. The Skill resolves the exact head commit and the review mode.
+The full loop repeats after each pushed fix until a round is clean or a stop
+condition applies; comment-only mode reviews one head and stops.
 
 ## Comment Policy
 
 **Commenting is off by default.** The loop writes findings to the pull request
 only when a policy source enables it for that repository, so a machine-wide
-install never comments on repositories you did not list. Naming a pull request
-and asking for a review is not consent to comment; asking for comments for this
-review is.
+install does not comment on an unlisted repository without an explicit request
+for this review. Naming a pull request and asking for a review is not consent to
+comment; asking for comments for this review is.
 
 The policy is resolved from the first source that exists, and only an explicit
 enable turns commenting on:
@@ -48,13 +48,14 @@ also carries the limits from [Loop Limits](#loop-limits):
 ```yaml
 comment: false
 comment_targets:
-  - https://github.com/wk1995/skill.git
+  - https://github.com/<owner>/<repo>.git
 max_rounds: 10
 review_retries: 3
 ```
 
-A remote that matches `comment_targets` gets comments; otherwise `comment: true`
-does; otherwise commenting stays off. Remotes are compared as `host/owner/repo`,
+A remote that matches `comment_targets` gets comments and can qualify for the
+full loop; otherwise `comment: true` enables comments only; otherwise commenting
+stays off. Remotes are compared as `host/owner/repo`,
 case-insensitively, ignoring the scheme, any `user@`, a trailing slash, and a
 trailing `.git`, and a repository must publish the remote that equals the pull
 request's own `host/owner/repo` — a fork's remote never matches. See
@@ -73,9 +74,29 @@ follow the repository's commit convention with the same identity. See
 [SKILL.md](SKILL.md) for the full loop contract, stop conditions, and
 boundaries.
 
+## Review Modes
+
+The Skill compares the authenticated account that would comment with the pull
+request's author, using the hosting service's account identity rather than a Git
+commit name. For the address check, it reads the project-scope file from the
+pull request's base state if present; otherwise it reads the running install's
+install-scope file. The address is configured only when `comment_targets` in
+that selected file explicitly matches the pull request's own repository remote.
+`comment: true` or a request to comment can enable comments, but cannot by itself
+enable the full loop.
+
+| Situation | Result |
+| --- | --- |
+| Same commenting account as pull-request author, repository address configured, and no request to avoid code changes | Full review loop by default: comment if enabled, fix, verify, commit, push, and review again |
+| Different or unknown account, address not configured, or review requested without code changes | Review one head without edits, commits, or pushes; comment if enabled, otherwise report in the conversation |
+
+Even an explicit request to fix does not bypass an account or address mismatch;
+the report explains why only a single review ran. A request to avoid comments
+and code changes entirely stays outside this Skill.
+
 ## Loop Limits
 
-The loop stops at a round limit instead of running forever, and retries a review
+The full loop stops at a round limit instead of running forever, and retries a review
 that fails to run:
 
 | Limit | Config key | Default | Counts |
@@ -99,18 +120,17 @@ See [SKILL.md](SKILL.md) for the full rules.
 
 ## When It Triggers
 
-- A specific pull request is named and the user asks to review it.
-- The user asks to review and fix a pull request, or to post findings as pull-request comments and then fix them, when the comment policy enables comments for that repository or the user asks for comments for this review.
-- The user asks to keep reviewing a pull request until no problem is found, or to resume an unfinished review loop.
+- A specific pull request is named and the user asks to review it; the account and configured address select the mode.
+- The user asks to review and fix a pull request or to keep reviewing after each fix; the full loop runs only when its account and address conditions are met.
+- The user asks for a review without code changes but permits pull-request comments; the single-review mode comments only when the policy enables it.
 
 ## When It Does Not Trigger
 
 - No pull request is identified: reviewing a local diff, branch, file, or snippet that only needs an answer in the conversation.
-- The user asks for a read-only review or a report and states that nothing should be commented, committed, pushed, or changed.
+- The user asks only for a local or in-conversation report, or forbids both pull-request comments and code changes.
 - The request is pull-request administration rather than review: creating, editing, retitling, labeling, approving, closing, or merging.
 - The task is resolving conflicts, rebasing, or repairing a worktree without a review request.
 - The user wants to author or change the standards that review should apply.
 
-When the request is review-only, use the repository's own review standard instead
-of this loop; this Skill stops at the boundary of the loop and never decides what
-a review must inspect.
+For a local-only request, use the repository's own review standard instead of
+this Skill. The Skill never decides what a review must inspect.
