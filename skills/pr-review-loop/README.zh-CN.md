@@ -29,7 +29,7 @@ max_rounds: 10
 review_retries: 3
 ```
 
-整机 Skill 建议使用[按项目配置示例](assets/pr-review-loop.machine.example.yml)：`projects` 用 `host/owner/repo` 标识仓库，每个项目独立设置 `comment`、`max_rounds`、`review_retries`；未设置的键依次取 `defaults`、旧版顶层键、内置默认值。项目条目即使设置 `comment: false` 也允许修复闭环。旧版 `comment_targets` 仍可作为目标列表使用。归一化后重复的项目键或无效值不能授权评论或修复。
+整机 Skill 建议使用[按项目配置示例](assets/pr-review-loop.machine.example.yml)：`projects` 用 `host/owner/repo` 标识仓库，每个项目独立设置 `comment`、`max_rounds`、`review_retries`；每个未设置的键依次取 `defaults` 中的对应键、旧版顶层键、内置默认值。例如，项目未设置 `comment`、`max_rounds` 或 `review_retries` 时，分别使用 `defaults` 中的对应值。项目条目即使设置 `comment: false` 也允许修复闭环。旧版 `comment_targets` 仍可作为目标列表使用。归一化后重复的项目键或无效值不能授权评论或修复。
 
 `comment: true` 开启 PR 评论，`false` 或省略则关闭；`max_rounds` 不影响评论。本次用户明确提出的评论偏好优先。只要项目配置存在，它就独立决定本项目是否评论；没写 `comment` 也不会继承安装级授权。整机 Skill 的有效 `comment: true` 只对 `projects` 或 `comment_targets` 命中的仓库生效；用户本次明确要求评论可允许未列出仓库的评论，但不能让它进入修复闭环。仅命中项目条目或目标列表不会自动开启评论。项目级模板见[示例配置](assets/pr-review-loop.example.yml)。
 

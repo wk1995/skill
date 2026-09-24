@@ -91,12 +91,13 @@ comment_targets:
 ```
 
 For a machine-wide Skill, prefer a `projects` mapping keyed by repository.
-Each entry independently controls comments and limits; `defaults` supplies
-values omitted by an entry, followed by legacy top-level keys, then built-in
-defaults. A `projects` entry is itself a loop target even when `comment` is
-false. A legacy `comment_targets` entry remains a loop target; when both match,
-the `projects` entry supplies any keys it sets. An unmatched repository gets
-neither a fix loop nor policy-enabled comments. Do not combine two normalized
+Each entry may set `comment`, `max_rounds`, and `review_retries` independently.
+For each omitted key, use that key in `defaults`, then the legacy top-level
+value, then the built-in default (`comment: false`, `max_rounds: 10`, or
+`review_retries: 3`). A `projects` entry is itself a loop target even when
+`comment` is false. A legacy `comment_targets` entry remains a loop target;
+when both match, the `projects` entry supplies any keys it sets. An unmatched
+repository gets neither a fix loop nor policy-enabled comments. Do not combine two normalized
 `projects` keys for the same repository; report the ambiguity and use one
 read-only review without policy-enabled comments or fixes.
 
@@ -109,9 +110,10 @@ projects:
   github.com/example/project-a:
     comment: true
     max_rounds: 3
+    # review_retries inherits defaults.review_retries: 3
   github.com/example/project-b:
-    comment: false
-    max_rounds: 5
+    review_retries: 2
+    # comment and max_rounds inherit false and 10 from defaults
 ```
 
 Require `projects` and `defaults` to be mappings, each project's values to be

@@ -64,6 +64,8 @@ The `projects` mapping identifies repositories by `host/owner/repo`. Each entry
 may override `comment`, `max_rounds`, and `review_retries` independently;
 omitted values come from `defaults`, then legacy top-level keys, then built-in
 defaults. A matching entry permits a fix loop even when its `comment` is false.
+For example, a project without `comment`, `max_rounds`, or `review_retries`
+uses the corresponding key in `defaults`.
 The old `comment_targets` list remains supported as a target list. Duplicate
 normalized project keys or invalid values do not authorize comments or fixes.
 

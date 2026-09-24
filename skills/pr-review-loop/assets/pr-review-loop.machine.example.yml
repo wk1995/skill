@@ -10,9 +10,10 @@ projects:
   github.com/example/project-a:
     comment: true
     max_rounds: 3
+    # review_retries inherits defaults.review_retries: 3
   github.com/example/project-b:
-    comment: false
-    max_rounds: 5
+    review_retries: 2
+    # comment and max_rounds inherit false and 10 from defaults
 
 # Legacy top-level comment, max_rounds, review_retries, and comment_targets
 # remain supported. Per-project values override defaults, which override
