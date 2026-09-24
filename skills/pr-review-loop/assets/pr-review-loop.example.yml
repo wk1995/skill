@@ -4,20 +4,24 @@
 # Project scope (governs one repository, versioned with it):
 #   <project-root>/.pr-review-loop.yml
 #
-# Install scope (governs the install that is running):
+# Install scope (governs the repositories served by the install that is running):
 #   <skill-dir>/pr-review-loop.yml
 #   $XDG_STATE_HOME/skill/pr-review-loop.yml
 #   $HOME/.local/state/skill/pr-review-loop.yml
 #
-# Commenting is off when no file decides, and both limits fall back to their
-# defaults, so copying this example unchanged changes nothing.
+# The two scopes use different file names and the same keys. Commenting is off
+# unless one of them enables it: a repository that has a project-scope file is
+# decided by that file, and the install scope is read only for a repository that
+# has none. Copying this example unchanged therefore changes nothing, because
+# only `comment: true` or a matching target enables commenting.
 
-# This scope's decision when no target below matches. Omit the key to leave the
-# scope undecided and let the next source apply.
+# This scope's decision when no target below matches. Only `true` enables
+# commenting; omitting the key or writing `false` leaves commenting off.
 comment: false
 
 # Repositories that receive comments, matched by git remote. A match beats the
-# boolean above. Remotes are compared as host/owner/repo, case-insensitively,
+# boolean above. The remote must equal the pull request's own host/owner/repo;
+# a fork's remote never matches. Remotes are compared case-insensitively,
 # ignoring the scheme, any user@, a trailing slash, and a trailing .git, so all
 # of these are the same target:
 #   https://github.com/wk1995/skill.git
@@ -27,8 +31,9 @@ comment_targets:
   - https://github.com/wk1995/skill.git
 
 # Rounds that may produce confirmed findings before the loop stops and explains
-# why it needed that many. A round that passed and an attempt that failed are
-# not counted. Omit the key to use the default of 10.
+# why it needed that many. Checked before a round starts; a round that passed
+# and an attempt that failed are not counted. Omit the key to use the default
+# of 10.
 max_rounds: 10
 
 # Further attempts allowed after a review attempt fails to run. Each retry must
