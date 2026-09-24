@@ -1,47 +1,31 @@
-# Example policy for pr-review-loop. Copy this file to the location that matches
-# the scope you want to configure, then edit it.
+# Copy to <project-root>/.pr-review-loop.yml or beside the selected Skill as
+# pr-review-loop.yml. Project scope applies to its own repository automatically.
+# A project Skill with no adjacent policy does not inherit a machine-wide policy.
+# PR changes to its own project policy do not govern that same PR's review.
 #
-# Project scope (governs one repository, versioned with it):
-#   <project-root>/.pr-review-loop.yml
-#
-# Install scope: select a project Skill by metadata.sync_id first, then the
-# machine-wide Skill only if no project Skill exists. A project Skill with no
-# policy file does not inherit the machine-wide file.
-#   <selected-skill-dir>/pr-review-loop.yml
-# For the machine-wide Skill only, if its adjacent file is absent:
+# Only a machine-wide Skill may fall back to:
 #   $XDG_STATE_HOME/skill/pr-review-loop.yml
-#   $HOME/.local/state/skill/pr-review-loop.yml
-#
-# The two scopes use different file names and the same keys. Commenting is off
-# unless one of them enables it: a repository that has a project-scope file is
-# decided by that file, and the selected Skill install is read only for a
-# repository that has none. If both machine-wide files exist, the adjacent file
-# wins. Replace the placeholder target below with the intended repository;
-# copying this example unchanged matches no real repository.
+#   $HOME/.local/state/skill/pr-review-loop.yml (when XDG_STATE_HOME is unset)
+# Its adjacent file takes priority.
 
-# This scope's decision when no target below matches. Only `true` enables
-# commenting; omitting the key or writing `false` leaves commenting off.
+# Independent PR comment switch. Only true enables comments. For a machine-wide
+# Skill, the PR repository must also be listed in comment_targets. An explicit
+# user request to comment for this review can override the comment decision but
+# cannot turn an unlisted repository into a fix-loop target.
 comment: false
 
-# Repositories that receive comments and can enter the full loop when the
-# commenting account is also the pull-request author, matched by git remote.
-# A match beats the boolean above. The remote must equal the PR's host/owner/repo;
-# a fork's remote never matches. Remotes are compared case-insensitively,
-# ignoring the scheme, any user@, a trailing slash, and a trailing .git, so all
-# of these are the same target:
-#   https://github.com/wk1995/skill.git
-#   ssh://git@github.com/wk1995/skill
-#   git@github.com:wk1995/skill.git
-comment_targets:
-  - https://github.com/<owner>/<repo>.git
-
-# Rounds that may produce confirmed findings before the loop stops and explains
-# why it needed that many. Checked before a round starts; a round that passed
-# and an attempt that failed are not counted. Omit the key to use the default
-# of 10.
+# Completed review cycles. 0 = one read-only review, 1 = one review and its
+# possible fix, 10 = at most ten reviews. A final pushed fix is not automatically
+# considered re-reviewed. This setting does not enable PR comments.
 max_rounds: 10
 
-# Further attempts allowed after a review attempt fails to run. Each retry must
-# change the approach and record the failure; retries consume no round and post
-# no comment. Omit the key to use the default of 3.
+# Further attempts after a review could not run; failed attempts do not count
+# toward max_rounds or imply a passing review.
 review_retries: 3
+
+# Only needed in a machine-wide Skill policy. Replace the placeholder with
+# repositories where the fix loop may run. The target must identify the PR's
+# own host/owner/repo; a fork remote does not match. Target matches do not by
+# themselves enable comments.
+comment_targets:
+  - https://github.com/<owner>/<repo>.git
