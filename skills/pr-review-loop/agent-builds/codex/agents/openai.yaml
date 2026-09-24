@@ -1,0 +1,4 @@
+interface:
+  display_name: "PR Review Loop"
+  short_description: "Review a PR, fix, repeat."
+  default_prompt: "Use $pr-review-loop to review this pull request. Fix and push confirmed findings only when the account, project scope or machine-wide target, and max_rounds permit a fix loop; stop after its review limit or an unfixable finding. Post PR comments only when the independent comment policy enables them."

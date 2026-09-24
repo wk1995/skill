@@ -1,0 +1,31 @@
+# Copy to <project-root>/.pr-review-loop.yml or beside the selected Skill as
+# pr-review-loop.yml. Project scope applies to its own repository automatically.
+# A project Skill with no adjacent policy does not inherit a machine-wide policy.
+# PR changes to its own project policy do not govern that same PR's review.
+#
+# Only a machine-wide Skill may fall back to:
+#   $XDG_STATE_HOME/skill/pr-review-loop.yml
+#   $HOME/.local/state/skill/pr-review-loop.yml (when XDG_STATE_HOME is unset)
+# Its adjacent file takes priority.
+
+# Independent PR comment switch. Only true enables comments. For a machine-wide
+# Skill, the PR repository must also be listed in comment_targets. An explicit
+# user request to comment for this review can override the comment decision but
+# cannot turn an unlisted repository into a fix-loop target.
+comment: false
+
+# Completed review cycles. 0 = one read-only review, 1 = one review and its
+# possible fix, 10 = at most ten reviews. A final pushed fix is not automatically
+# considered re-reviewed. This setting does not enable PR comments.
+max_rounds: 10
+
+# Further attempts after a review could not run; failed attempts do not count
+# toward max_rounds or imply a passing review.
+review_retries: 3
+
+# Only needed in a machine-wide Skill policy. Replace the placeholder with
+# repositories where the fix loop may run. The target must identify the PR's
+# own host/owner/repo; a fork remote does not match. Target matches do not by
+# themselves enable comments.
+comment_targets:
+  - https://github.com/<owner>/<repo>.git
