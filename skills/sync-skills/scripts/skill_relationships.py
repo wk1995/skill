@@ -88,9 +88,28 @@ def normalized_absolute(path: Path) -> str:
     return str(PurePosixPath(value))
 
 
-def should_ignore(path: Path, root: Path, portable: bool) -> bool:
+def is_local_review_policy(path: Path, root: Path, sync_id: str | None = None) -> bool:
+    if path.parent != root or path.name != "pr-review-loop.yml":
+        return False
+    if sync_id is None:
+        skill_file = root / "SKILL.md"
+        if skill_file.is_file():
+            frontmatter = re.match(
+                r"^---\n(.*?)\n---(?:\n|$)",
+                skill_file.read_text(encoding="utf-8").lstrip("\ufeff"),
+                re.DOTALL,
+            )
+            if frontmatter is not None:
+                sync_id = match_yaml_scalar(frontmatter.group(1), "sync_id")
+        if sync_id is None and root.name == "pr-review-loop":
+            sync_id = "pr-review-loop"
+    return sync_id == "pr-review-loop"
+
+
+def should_ignore(path: Path, root: Path, portable: bool, sync_id: str | None = None,
+                  include_local_policy: bool = False) -> bool:
     relative = path.relative_to(root)
-    if root.name == "pr-review-loop" and relative.parts == ("pr-review-loop.yml",):
+    if not include_local_policy and is_local_review_policy(path, root, sync_id):
         return True
     if any(part in IGNORED_DIRECTORY_NAMES for part in relative.parts[:-1]):
         return True
@@ -99,14 +118,15 @@ def should_ignore(path: Path, root: Path, portable: bool) -> bool:
     return path.name in IGNORED_FILE_NAMES or path.suffix in BYTECODE_SUFFIXES
 
 
-def digest_tree(root: Path, *, portable: bool = False) -> str:
+def digest_tree(root: Path, *, portable: bool = False, sync_id: str | None = None,
+                include_local_policy: bool = False) -> str:
     if not root.is_dir():
         raise RelationshipError(f"cannot digest a missing directory: {root}")
     digest = hashlib.sha256()
     for path in sorted(root.rglob("*")):
         if path.is_symlink():
             raise RelationshipError(f"Skill tree contains a symbolic link: {path}")
-        if not path.is_file() or should_ignore(path, root, portable):
+        if not path.is_file() or should_ignore(path, root, portable, sync_id, include_local_policy):
             continue
         relative = path.relative_to(root).as_posix().encode("utf-8")
         digest.update(len(relative).to_bytes(4, "big"))
@@ -117,7 +137,7 @@ def digest_tree(root: Path, *, portable: bool = False) -> str:
     return digest.hexdigest()
 
 
-def execution_modes(root: Path) -> dict[str, int]:
+def execution_modes(root: Path, *, sync_id: str | None = None) -> dict[str, int]:
     """Compare file execute bits without changing the manifest-v2 byte digest."""
     if not root.is_dir():
         raise RelationshipError(f"cannot inspect permissions of a missing directory: {root}")
@@ -125,7 +145,7 @@ def execution_modes(root: Path) -> dict[str, int]:
     for path in sorted(root.rglob("*")):
         if path.is_symlink():
             raise RelationshipError(f"Skill tree contains a symbolic link: {path}")
-        if path.is_file() and not should_ignore(path, root, portable=False):
+        if path.is_file() and not should_ignore(path, root, portable=False, sync_id=sync_id):
             modes[path.relative_to(root).as_posix()] = stat.S_IMODE(path.stat().st_mode) & 0o111
     return modes
 
@@ -157,7 +177,7 @@ def read_skill(path: Path, *, portable: bool = False) -> dict[str, Any]:
         raise RelationshipError(f"missing or invalid metadata.version: {skill_file}")
     if sync_id is not None and AGENT_ID.fullmatch(sync_id) is None:
         raise RelationshipError(f"invalid metadata.sync_id: {skill_file}")
-    digest = digest_tree(path, portable=portable)
+    digest = digest_tree(path, portable=portable, sync_id=sync_id)
     after = skill_file.stat()
     unstable = (before.st_dev, before.st_ino, before.st_size, before.st_mtime_ns) != (
         after.st_dev,
@@ -823,6 +843,7 @@ def build_report(
                       path=copy["path"])
         if not sync_id and registry_match and registry_match[0] in logical and not conflict_ids:
             sync_id = registry_match[0]
+            copy["digest"] = digest_tree(Path(copy["path"]), sync_id=sync_id)
         if sync_id in logical and not conflict_ids:
             entry = logical[sync_id]
             for agent_id in copy["agent_ids"]:
@@ -917,7 +938,8 @@ def build_report(
                 statuses.add("agent-build-missing" if not present_builds else "agent-build-partial")
                 install_statuses.add("agent-build-missing")
             elif (build["output_digest"] != local["digest"]
-                  or execution_modes(Path(build["path"])) != execution_modes(Path(local["path"]))):
+                  or execution_modes(Path(build["path"]), sync_id=sync_id)
+                  != execution_modes(Path(local["path"]), sync_id=sync_id)):
                 statuses.add("agent-install-diverged")
                 install_statuses.add("agent-install-diverged")
             if local["unstable"]:

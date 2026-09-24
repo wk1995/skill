@@ -28,6 +28,7 @@ from skill_relationships import (  # noqa: E402
     digest_tree as relationship_digest_tree,
     execution_modes,
     generate_and_write,
+    is_local_review_policy,
     load_adapters,
     normalized_absolute,
     read_builds,
@@ -121,8 +122,8 @@ def default_state_dir(
     return state_dir
 
 
-def should_ignore(path: Path) -> bool:
-    if path.name == "pr-review-loop.yml" and path.parent.name == "pr-review-loop":
+def should_ignore(path: Path, root: Path | None = None, sync_id: str | None = None) -> bool:
+    if root is not None and is_local_review_policy(path, root, sync_id):
         return True
     if path.name in IGNORE_FILES:
         return True
@@ -142,7 +143,7 @@ def require_skill_dir(path: str, role: str) -> Path:
     return skill_dir
 
 
-def copy_skill_tree(source: Path, target: Path) -> None:
+def copy_skill_tree(source: Path, target: Path, sync_id: str | None = None) -> None:
     source_real = source.resolve()
     target_real = target.resolve()
     if paths_refer_to_same_location(source_real, target_real):
@@ -153,10 +154,18 @@ def copy_skill_tree(source: Path, target: Path) -> None:
         raise SystemExit(f"refusing to copy a skill from inside its target: {source_real} is inside {target_real}")
     if target.exists() and not target.is_dir():
         raise SystemExit(f"target exists and is not a directory: {target}")
+    if sync_id is None:
+        for candidate in (source, target):
+            if (candidate / "SKILL.md").is_file():
+                sync_id = read_skill_metadata(candidate).get("sync_id")
+                if sync_id:
+                    break
+        if sync_id is None and (source.name == "pr-review-loop" or target.name == "pr-review-loop"):
+            sync_id = "pr-review-loop"
     target.mkdir(parents=True, exist_ok=True)
 
     for child in target.iterdir():
-        if should_ignore(child) or child.name in IGNORE_DIRS:
+        if should_ignore(child, target, sync_id) or child.name in IGNORE_DIRS:
             continue
         if child.is_dir():
             shutil.rmtree(child)
@@ -164,17 +173,17 @@ def copy_skill_tree(source: Path, target: Path) -> None:
             child.unlink()
 
     for item in source.iterdir():
-        if should_ignore(item):
+        if should_ignore(item, source, sync_id):
             continue
         destination = target / item.name
         if item.is_dir():
-            shutil.copytree(item, destination, ignore=ignore_names)
+            shutil.copytree(item, destination, ignore=lambda directory, names: ignore_names(directory, names, source, sync_id))
         else:
             shutil.copy2(item, destination)
 
 
-def iter_skill_files(path: Path) -> list[Path]:
-    return sorted(p for p in path.rglob("*") if p.is_file() and not should_ignore(p))
+def iter_skill_files(path: Path, sync_id: str | None = None) -> list[Path]:
+    return sorted(p for p in path.rglob("*") if p.is_file() and not should_ignore(p, path, sync_id))
 
 
 def is_relative_to(child: Path, parent: Path) -> bool:
@@ -259,18 +268,18 @@ def is_empty_dir(path: Path) -> bool:
     return path.is_dir() and not any(path.iterdir())
 
 
-def ignore_names(directory: str, names: list[str]) -> set[str]:
+def ignore_names(directory: str, names: list[str], root: Path | None = None, sync_id: str | None = None) -> set[str]:
     ignored: set[str] = set()
     for name in names:
         candidate = Path(directory) / name
-        if should_ignore(candidate):
+        if should_ignore(candidate, root, sync_id):
             ignored.add(name)
     return ignored
 
 
-def digest_skill_dir(path: Path) -> str:
+def digest_skill_dir(path: Path, sync_id: str | None = None) -> str:
     hasher = hashlib.sha256()
-    for file_path in iter_skill_files(path):
+    for file_path in iter_skill_files(path, sync_id):
         relative = file_path.relative_to(path).as_posix()
         hasher.update(relative.encode("utf-8"))
         hasher.update(b"\0")
@@ -643,7 +652,7 @@ def build_member_state(group: dict[str, Any]) -> dict[str, dict[str, Any]]:
         state[role] = {
             "path": str(skill_dir),
             "url": remote_url,
-            "digest": digest_skill_dir(skill_dir),
+            "digest": digest_skill_dir(skill_dir, group.get("sync_id")),
             "content_updated_at": content_updated_at,
             "content_updated_at_source": "git" if git_latest_commit_at else "filesystem",
             "git_first_commit_at": git_first_commit_at,
@@ -688,7 +697,7 @@ def create_snapshot(state_dir: Path, group_name: str, group: dict[str, Any], ope
 
     member_state = build_member_state(group)
     for role, info in member_state.items():
-        copy_skill_tree(Path(str(info["path"])), snapshot_dir / role)
+        copy_skill_tree(Path(str(info["path"])), snapshot_dir / role, group_id(group_name, group))
 
     manifest = {
         "group": group_name,
@@ -902,7 +911,7 @@ def command_convert(args: argparse.Namespace) -> int:
         group.setdefault("snapshots", []).append(snapshot_id)
 
     target.parent.mkdir(parents=True, exist_ok=True)
-    copy_skill_tree(source, target)
+    copy_skill_tree(source, target, expected_id)
     operation_at = now_iso()
     group["last_convert"] = {
         "at": operation_at,
@@ -984,7 +993,7 @@ def command_sync(args: argparse.Namespace) -> int:
         if role == source_role:
             continue
         differences_by_role[role] = summarize_diff(compare_skill_dirs(snapshot_dir / role, source_path))
-        copy_skill_tree(source_path, Path(str(info["path"])))
+        copy_skill_tree(source_path, Path(str(info["path"])), group_id(key, group))
 
     updated_roles = sorted(r for r in current if r != source_role)
     operation_at = now_iso()
@@ -1069,7 +1078,7 @@ def command_rollback(args: argparse.Namespace) -> int:
         if not source.is_dir():
             raise SystemExit(f"snapshot does not contain role: {role}")
         target = Path(group["roles"][role])
-        copy_skill_tree(source, target)
+        copy_skill_tree(source, target, group_id(key, group))
         restored.append(role)
 
     operation_at = now_iso()
@@ -1104,7 +1113,9 @@ def rollback_agent_install(args: argparse.Namespace, registry: dict[str, Any], k
     source = snapshot_dir / f"local-{agent_id}"
     validate_install_directory(source)
     expected_digest = manifest.get("original_digest")
-    if relationship_digest_tree(source) != expected_digest:
+    managed_digest = relationship_digest_tree(source, sync_id=group_id(key, group))
+    legacy_digest = relationship_digest_tree(source, sync_id=group_id(key, group), include_local_policy=True)
+    if expected_digest not in (managed_digest, legacy_digest):
         raise SystemExit("Agent install snapshot failed digest verification")
     original_id = read_skill_metadata(source).get("sync_id")
     if original_id not in (None, group_id(key, group)):
@@ -1113,8 +1124,8 @@ def rollback_agent_install(args: argparse.Namespace, registry: dict[str, Any], k
         raise SystemExit("snapshot and install must not overlap")
     if target.exists():
         validate_install_identity(target, group_id(key, group))
-    if (target.exists() and relationship_digest_tree(target) == expected_digest
-            and execution_modes(target) == execution_modes(source)):
+    if (target.exists() and relationship_digest_tree(target, sync_id=group_id(key, group)) == managed_digest
+            and execution_modes(target, sync_id=group_id(key, group)) == execution_modes(source, sync_id=group_id(key, group))):
         return finish_mutation(args, registry, {"group": key, "rolled_back_to": args.snapshot,
                                                "pre_rollback_snapshot": None, "status": "already-current"})
     state_dir = Path(args.state_dir).expanduser().resolve()
@@ -1123,7 +1134,8 @@ def rollback_agent_install(args: argparse.Namespace, registry: dict[str, Any], k
         undo = create_agent_install_snapshot(state_dir, key, agent_id, target,
                                              {"build_id": f"build:{agent_id}", "output_digest": expected_digest})
     try:
-        atomic_install_build(source, target, original_id, expected_digest)
+        atomic_install_build(source, target, group_id(key, group), managed_digest,
+                             allow_missing_sync_id=original_id is None)
     except (OSError, SystemExit, RelationshipError) as error:
         raise SystemExit(f"{error}; recovery snapshot: {state_dir / 'snapshots' / key / undo if undo else snapshot_dir}") from error
     if undo:
@@ -1984,14 +1996,14 @@ def create_agent_install_snapshot(
         sequence += 1
     snapshot_dir.mkdir(parents=True, exist_ok=False)
     try:
-        copy_skill_tree(local_path, snapshot_dir / f"local-{agent_id}")
+        copy_skill_tree(local_path, snapshot_dir / f"local-{agent_id}", group_key)
         manifest = {
             "group": group_key,
             "created_at": now_iso(),
             "operation": "repair-agent-install",
             "agent_id": agent_id,
             "original_path": normalized_absolute(local_path),
-            "original_digest": relationship_digest_tree(local_path),
+            "original_digest": relationship_digest_tree(local_path, sync_id=group_key),
             "derived_from": build["build_id"],
             "build_digest": build["output_digest"],
         }
@@ -1999,7 +2011,7 @@ def create_agent_install_snapshot(
             json.dumps(manifest, indent=2, sort_keys=True) + "\n",
             encoding="utf-8",
         )
-        if relationship_digest_tree(snapshot_dir / f"local-{agent_id}") != manifest["original_digest"]:
+        if relationship_digest_tree(snapshot_dir / f"local-{agent_id}", sync_id=group_key) != manifest["original_digest"]:
             raise SystemExit("Agent install snapshot failed digest verification")
         return snapshot_id
     except BaseException:
@@ -2032,13 +2044,14 @@ def validate_agent_target(agent_id: str, target: Path, adapters: list[dict[str, 
         raise SystemExit(f"registered install is outside the {agent_id} adapter roots: {target}")
 
 
-def atomic_install_build(build_path: Path, target: Path, sync_id: str | None, expected_digest: str) -> None:
+def atomic_install_build(build_path: Path, target: Path, sync_id: str | None, expected_digest: str,
+                         *, allow_missing_sync_id: bool = False) -> None:
     validate_install_directory(target)
     validate_install_directory(build_path)
     require_skill_dir(str(build_path), "Agent install source")
     if path_is_within(target, build_path) or path_is_within(build_path, target) or paths_refer_to_same_location(target, build_path):
         raise SystemExit("Agent install source and target must be separate, non-nested directories")
-    local_policy = target / "pr-review-loop.yml" if sync_id == "pr-review-loop" and target.name == "pr-review-loop" else None
+    local_policy = target / "pr-review-loop.yml" if sync_id == "pr-review-loop" else None
     if local_policy is not None and (local_policy.exists() or local_policy.is_symlink()):
         if local_policy.is_symlink() or not local_policy.is_file():
             raise SystemExit(f"local review policy must be a regular file: {local_policy}")
@@ -2057,12 +2070,12 @@ def atomic_install_build(build_path: Path, target: Path, sync_id: str | None, ex
                     raise SystemExit(f"build review policy path must not be a directory: {staged_policy}")
                 staged_policy.unlink()
         metadata = read_skill_metadata(staged)
-        if metadata.get("sync_id") != sync_id:
+        if metadata.get("sync_id") != sync_id and not (allow_missing_sync_id and metadata.get("sync_id") is None):
             raise SystemExit("staged Agent install does not contain the expected metadata.sync_id")
-        if relationship_digest_tree(staged) != expected_digest:
+        if relationship_digest_tree(staged, sync_id=sync_id) != expected_digest:
             raise SystemExit("staged Agent install failed build digest verification")
-        expected_modes = execution_modes(build_path)
-        if execution_modes(staged) != expected_modes:
+        expected_modes = execution_modes(build_path, sync_id=sync_id)
+        if execution_modes(staged, sync_id=sync_id) != expected_modes:
             raise SystemExit("staged Agent install failed executable permission verification")
         if local_policy is not None and local_policy.is_file():
             shutil.copy2(local_policy, staged / local_policy.name)
@@ -2073,9 +2086,9 @@ def atomic_install_build(build_path: Path, target: Path, sync_id: str | None, ex
         try:
             os.replace(staged, target)
             installed = True
-            if relationship_digest_tree(target) != expected_digest:
+            if relationship_digest_tree(target, sync_id=sync_id) != expected_digest:
                 raise SystemExit("installed Agent Skill failed post-install digest verification")
-            if execution_modes(target) != expected_modes:
+            if execution_modes(target, sync_id=sync_id) != expected_modes:
                 raise SystemExit("installed Agent Skill failed executable permission verification")
         except BaseException as install_error:
             try:
@@ -2122,10 +2135,10 @@ def command_repair_agent_install(args: argparse.Namespace) -> int:
     if target.exists():
         require_skill_dir(str(target), f"local:{args.agent}")
         validate_install_identity(target, sync_id)
-        local_digest = relationship_digest_tree(target)
+        local_digest = relationship_digest_tree(target, sync_id=sync_id)
         local_metadata = read_skill_metadata(target)
         if (local_digest == build["output_digest"] and local_metadata.get("sync_id") == sync_id
-                and execution_modes(target) == execution_modes(build_path)):
+                and execution_modes(target, sync_id=sync_id) == execution_modes(build_path, sync_id=sync_id)):
             location = {
                 "kind": "local",
                 "agent_id": args.agent,

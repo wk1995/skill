@@ -222,10 +222,10 @@ class ReviewRegressions(unittest.TestCase):
                         if Path(source).name == "previous" and recovery_fails:
                             raise OSError("recovery fault")
                         return original_replace(source, target)
-                    def digest(path):
+                    def digest(path, **kwargs):
                         if post_install and installed and Path(path) == self.target:
                             return "0" * 64
-                        return original_digest(path)
+                        return original_digest(path, **kwargs)
                     with patch.object(os, "replace", side_effect=replace), patch.object(sync, "relationship_digest_tree", side_effect=digest):
                         with self.assertRaises(SystemExit) as failure:
                             self.repair()
