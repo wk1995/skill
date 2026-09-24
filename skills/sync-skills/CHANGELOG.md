@@ -6,7 +6,7 @@ version, date, and a change summary.
 
 ## [Unreleased]
 
-- No unreleased changes.
+- Allow explicit same-path migration of a stale Agent identity when the old root is not shared, and keep legacy role pointers away from other Agents' roots.
 
 ## [0.3.0] - 2026-09-17
 

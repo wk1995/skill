@@ -16,11 +16,11 @@ metadata:
       - The task needs Skill provenance URLs, version history, content digests, snapshots, or difference reports.
       - The user needs to migrate legacy repository-local Skill synchronization state.
       - The user needs a machine-local relationship report across supported AI Agent Builders or needs to repair an incomplete Agent installation.
-      - The user needs to retarget a registered local Agent install to another supported root for the same Agent.
+      - The user needs to retarget a registered local Agent install to another supported root, or migrate a stale Agent identity from a non-shared root.
     exclude:
       - The user is only asking to use a Skill for its domain workflow rather than manage Skill copies.
       - The task is ordinary code editing and does not involve Skill synchronization, conversion, auditing, or rollback.
-      - The user wants to change a registered install's agent_id. link-location --replace cannot change agent_id, including a same-path retarget between workbuddy and codex.
+      - The user wants to change a registered install's agent_id without an explicit same-path migration from a non-shared old root.
 ---
 
 # Sync Skills
@@ -134,7 +134,7 @@ python skills/sync-skills/scripts/skill_sync.py link-location my-skill-id \
   --path /projects/app-a/skills/my-skill
 ```
 
-A 1.1.0 China WorkBuddy install at `~/.agents/skills/<skill>` remains a valid `workbuddy` location; do not retarget it to `codex`. After the Skill already exists at the product root, optionally migrate the registered path without changing Agent identity. `--replace` cannot change `agent_id`. It rewrites the same-Agent path only after that Agent root is validated, preserves `derived_from`, and rewrites matching repair snapshots so rollback still works. A legacy `roles.local` entry moves with that path only when no other Agent still resolves the old path; otherwise it stays, so role rollback does not follow the pointer into the new directory. An Agent that already has an explicit local location is not also selected from `roles.local`. Skill files are not copied. Same-path duplicate location IDs in the same group are retired:
+A 1.1.0 China WorkBuddy install at `~/.agents/skills/<skill>` remains a valid `workbuddy` location; do not retarget it to `codex`. After the Skill already exists at the product root, optionally migrate the registered path while keeping the Agent identity. A stale same-path identity from a non-shared old root (for example an old `workbuddy` record under `~/.workbuddy-ai`) may be migrated with `--replace` after the new Agent root is validated; shared-root retags remain rejected. It preserves `derived_from`, rewrites matching repair snapshots so rollback still works, and moves a legacy `roles.local` entry only when no other Agent resolves either path. An Agent with an explicit local location is not also selected from `roles.local`. Skill files are not copied. Same-path duplicate location IDs in the same group are retired:
 
 ```bash
 python skills/sync-skills/scripts/skill_sync.py link-location my-skill-id \
@@ -165,7 +165,7 @@ python skills/sync-skills/scripts/skill_sync.py repair-agent-install my-skill-id
 - Treat missing adapter root information as a blocking error for installation protection; a read-only inventory may continue with diagnostics for other valid adapters.
 - Compare installed file execute bits as well as manifest-v2 content digests. Permission-only differences need the same snapshot, authorized replacement, verification, and idempotency as content differences.
 - Refuse ordinary portable repo sync into a registered or adapter-discovered Agent install directory. Use the Agent build/install flow instead.
-- `link-location` refuses to change an existing location ID or to register a second same-path location ID unless `--replace` is explicit. Replacement revalidates the requested Agent root, rewrites the registered path for the same Agent, retires duplicate same-path location IDs in the same group, preserves `derived_from`, and rewrites matching Agent-install snapshots so rollback still works. It moves a legacy `roles.local` entry only when no other Agent still resolves that path. An Agent with an explicit local location is not also selected from `roles.local`. It does not modify Skill files. It cannot change `kind`, `project_id`, `source_id`, or `agent_id`. Do not retarget a 1.1.0 `workbuddy` install under `~/.agents/skills` to `codex`; keep the other Agent on its own registration. After a path change, repair with `--agent` matching the registered identity. A failed snapshot rewrite restores every manifest it changed, and retries that restore when the first attempt fails.
+- `link-location` refuses to change an existing location ID or to register a second same-path location ID unless `--replace` is explicit. Replacement revalidates the requested Agent root, rewrites same-Agent paths, and permits a same-path Agent identity migration only when the old path is not in a shared old Agent root. It retires duplicate same-path location IDs in the same group, preserves `derived_from`, and rewrites matching Agent-install snapshots so rollback still works. It moves a legacy `roles.local` entry only when no other Agent resolves the old or new path. An Agent with an explicit local location is not also selected from `roles.local`. It does not modify Skill files or change `kind`, `project_id`, or `source_id`. Do not retarget a 1.1.0 `workbuddy` install under `~/.agents/skills` to `codex`; keep shared-root registrations separate. After a path or identity change, repair with `--agent` matching the registered identity. A failed snapshot rewrite restores every manifest it changed, and retries that restore when the first attempt fails.
 - Exclude transient directories and files such as `.git`, `node_modules`, `dist`, `.DS_Store`, `__pycache__`, and Python bytecode.
 - When the skill-management repository is on `master` or its configured default branch, compare linked copies by `metadata.version`; if versions differ, synchronize and let the higher version replace the lower version.
 - When the repository is on any other branch, do not synchronize only because versions differ unless the user explicitly requests synchronization or the branch work requires updating the target copy.

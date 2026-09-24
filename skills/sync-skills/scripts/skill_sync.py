@@ -1640,10 +1640,18 @@ def command_link_location(args: argparse.Namespace) -> int:
             same_path = bool(recorded_path and paths_refer_to_same_location(path, recorded_path))
             if args.kind == "local":
                 if recorded.get("agent_id") != args.agent_id:
-                    raise SystemExit(
-                        "--replace cannot change agent_id; keep this location on its "
-                        "current Agent and register the other Agent at its own path"
+                    old_agent = recorded.get("agent_id")
+                    old_root = any(
+                        root.get("agent_id") == old_agent
+                        and path_is_within(path, Path(str(root["path"])))
+                        for root in roots
+                        if root.get("path")
                     )
+                    if not same_path or old_root:
+                        raise SystemExit(
+                            "--replace cannot change agent_id on a shared or moved path; "
+                            "register the other Agent at its own path"
+                        )
             else:
                 if not same_path:
                     raise SystemExit("--replace cannot change the registered path")
@@ -1693,7 +1701,11 @@ def command_link_location(args: argparse.Namespace) -> int:
             )
             # roles.local is one shared pointer. Moving it drops any other Agent
             # that still resolves the old path, and role rollback follows the pointer.
-            if moved_from_legacy and not other_agent_resolves_path(group, legacy_local, roots, args.agent_id):
+            if (
+                moved_from_legacy
+                and not other_agent_resolves_path(group, legacy_local, roots, args.agent_id)
+                and not other_agent_root_contains_path(path, roots, args.agent_id)
+            ):
                 roles["local"] = normalized_absolute(path)
 
     locations[args.location_id] = location
@@ -1824,6 +1836,19 @@ def other_agent_resolves_path(
             if paths_refer_to_same_location(resolved, path):
                 return True
     return False
+
+
+def other_agent_root_contains_path(
+    path: Path,
+    roots: list[dict[str, Any]],
+    agent_id: str,
+) -> bool:
+    return any(
+        root.get("agent_id") != agent_id
+        and root.get("path")
+        and path_is_within(path, Path(str(root["path"])))
+        for root in roots
+    )
 
 
 def registered_agent_install(
@@ -2117,7 +2142,7 @@ def build_parser() -> argparse.ArgumentParser:
     link_location.add_argument(
         "--replace",
         action="store_true",
-        help="Replace an existing location ID or same-path registration after validation. Skill files are not modified.",
+        help="Replace an existing location ID or same-path registration after validation. Same-path Agent identity migration is allowed only from a non-shared old root. Skill files are not modified.",
     )
     link_location.set_defaults(func=command_link_location)
 
