@@ -4,15 +4,19 @@
 # Project scope (governs one repository, versioned with it):
 #   <project-root>/.pr-review-loop.yml
 #
-# Install scope (governs the repositories served by the install that is running):
-#   <skill-dir>/pr-review-loop.yml
+# Install scope: select a project Skill by metadata.sync_id first, then the
+# machine-wide Skill only if no project Skill exists. A project Skill with no
+# policy file does not inherit the machine-wide file.
+#   <selected-skill-dir>/pr-review-loop.yml
+# For the machine-wide Skill only, if its adjacent file is absent:
 #   $XDG_STATE_HOME/skill/pr-review-loop.yml
 #   $HOME/.local/state/skill/pr-review-loop.yml
 #
 # The two scopes use different file names and the same keys. Commenting is off
 # unless one of them enables it: a repository that has a project-scope file is
-# decided by that file, and the install scope is read only for a repository that
-# has none. Replace the placeholder target below with the intended repository;
+# decided by that file, and the selected Skill install is read only for a
+# repository that has none. If both machine-wide files exist, the adjacent file
+# wins. Replace the placeholder target below with the intended repository;
 # copying this example unchanged matches no real repository.
 
 # This scope's decision when no target below matches. Only `true` enables

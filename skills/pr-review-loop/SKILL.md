@@ -30,7 +30,7 @@ metadata:
 This Skill owns mode selection and the review loop:
 
 ```text
-resolve commenting account, PR author, and configured repository address
+select project Skill if present; resolve account, author, and address
         |
         +-- different account or address not configured --> review once
         |                               --> comment if enabled, else report --> stop
@@ -76,15 +76,20 @@ commenting, is a decision of no comment.
    install scope is not consulted for it: committing the file for another key,
    such as a round limit, must never hand this repository's comment decision to
    a different file.
-3. **Install scope** — `pr-review-loop.yml` in the directory of the install that
-   is executing this loop: the machine-wide allowlist when the machine-wide
-   install is running, the project's own allowlist when a project-level install
-   is running. Only the running install is read — when both exist, the other one
-   is ignored and the two are never merged. Say which install was read. This
-   scope applies only to a repository with no project-scope file. When that
-   directory must stay clean or read-only, the same file may instead live at
+3. **Selected Skill install** — identify the project-scoped copy of this Skill
+   for the agent platform reviewing the repository, using the host's Skill
+   discovery and `metadata.sync_id: pr-review-loop`. If it exists, select it
+   before the machine-wide copy, even if both are installed. If it has no
+   adjacent `pr-review-loop.yml`, the install scope is silent; never fall through
+   to the machine-wide copy. If no project copy exists, select the machine-wide
+   copy. Read its adjacent `pr-review-loop.yml` first; only when that file is
+   absent may the machine-wide copy use
    `$XDG_STATE_HOME/skill/pr-review-loop.yml`, or
    `$HOME/.local/state/skill/pr-review-loop.yml` when `XDG_STATE_HOME` is unset.
+   The adjacent file wins if both exist. Only the selected Skill install supplies
+   install-scope policy or limits; never merge two installs. Say which Skill
+   copy and file were selected. This scope decides comments only when no
+   project-scope file exists.
 4. **Default** — no comment.
 
 The two scopes use different file names — `.pr-review-loop.yml` for the project
@@ -122,8 +127,13 @@ it as no match and say so instead of guessing.
 
 Read the policy from outside the pull request's own changes: a pull request must
 not be able to grant itself comments. Resolve the project file from the base
-state and the install file from the running Skill; if the pull request changes
-its own policy file, the base version governs and the round report records the
+state. Recognize a project Skill only if the host discovered it before this PR's
+head changes, either in the base state or as a pre-existing project installation;
+never let this PR introduce or replace the selected Skill or its policy for its
+own review. If multiple project copies have the same `sync_id` for this platform
+or the identity cannot be verified, do not guess an install policy: report the
+ambiguity and keep install-scope commenting off. If the pull request changes its
+own policy file, the base version governs and the round report records the
 discrepancy.
 
 When the policy enables commenting, every comment this Skill posts carries the
@@ -143,7 +153,7 @@ the commit author, or an assumed identity. If either account cannot be resolved,
 do not assume they are the same.
 
 For the address check, use the project-scope file from the base state when it
-exists; otherwise use the running install's install-scope file. The repository is
+exists; otherwise use the selected Skill install's policy file. The repository is
 **configured** only when that selected file explicitly lists the pull request's
 own `host/owner/repo` in `comment_targets`, matched by the remote rule above.
 `comment: true` and a request to comment enable comments but do not substitute
@@ -164,8 +174,10 @@ for a local-only report stays outside this Skill.
 ## Loop Limits
 
 Each limit resolves independently from the first source that sets its key — the
-user's statement for this review, then the project-scope file, then the
-install-scope file — and falls back to the default. Unlike the comment decision,
+user's statement for this review, then the project-scope file, then the selected
+Skill install's policy file — and falls back to the default. A project Skill
+without a policy file does not inherit limits from a machine-wide Skill.
+Unlike the comment decision,
 a limit is not owned by one scope: it only ever makes the loop stop sooner, so a
 key omitted by a more specific source is inherited from the next one.
 
@@ -245,8 +257,9 @@ prefix, that convention governs commits while the comment marker keeps the
   exact head commit. Record the head commit before reviewing; it defines the
   round.
 - Resolve the comment policy and review mode, and record each decision and its
-  evidence: commenting account, pull-request author, selected policy file, and
-  whether its `comment_targets` matches this repository.
+  evidence: commenting account, pull-request author, selected project or
+  machine-wide Skill copy and policy file, and whether its `comment_targets`
+  matches this repository.
 - When commenting is enabled, confirm the comment channel before reviewing or
   fixing, so a review cannot fail after a fix is already written.
 - Read the pull-request description and every existing review thread. Rounds of

@@ -36,10 +36,16 @@ enable turns commenting on:
 2. **Project scope** — `<project-root>/.pr-review-loop.yml`. A repository that
    has this file is decided by it, so the install scope is never read for that
    repository.
-3. **Install scope** — `pr-review-loop.yml` in the directory of the install that
-   is running, or `$XDG_STATE_HOME/skill/pr-review-loop.yml`
-   (`$HOME/.local/state/...` when `XDG_STATE_HOME` is unset). Used only for a
-   repository that has no project-scope file.
+3. **Selected Skill install** — use the host's Skill discovery and
+   `metadata.sync_id: pr-review-loop` to identify a project-scoped copy for this
+   agent platform. It takes priority over a machine-wide copy. Read
+   `pr-review-loop.yml` beside the selected project Skill; if absent, do not
+   read the machine-wide copy. Only when no project Skill exists, select the
+   machine-wide copy: read its adjacent file first, then
+   `$XDG_STATE_HOME/skill/pr-review-loop.yml` (`$HOME/.local/state/...` when
+   unset) if the adjacent file is absent. Used for comments only when no
+   project-scope file exists. A PR cannot add its own project Skill or policy to
+   change this choice for its review.
 4. **Default** — no comment.
 
 The two scopes use different file names and the same keys, and the same file
@@ -62,9 +68,10 @@ request's own `host/owner/repo` — a fork's remote never matches. See
 [assets/pr-review-loop.example.yml](assets/pr-review-loop.example.yml) for a
 commented template.
 
-To receive comments across the repositories an install serves, list their
-remotes in the install scope file; this reaches repositories with no
-project-scope file. To turn commenting on or off for one project, commit its
+To receive comments across the repositories a selected install serves, list
+their remotes in its policy file. A project Skill takes priority over the
+machine-wide install even without a policy file; it does not inherit the
+machine-wide policy. To turn commenting on or off for one project, commit its
 project scope file with `comment: true` or `comment: false` — committing that
 file for the round limit alone leaves commenting off for the repository.
 
@@ -79,8 +86,8 @@ boundaries.
 The Skill compares the authenticated account that would comment with the pull
 request's author, using the hosting service's account identity rather than a Git
 commit name. For the address check, it reads the project-scope file from the
-pull request's base state if present; otherwise it reads the running install's
-install-scope file. The address is configured only when `comment_targets` in
+pull request's base state if present; otherwise it reads the selected Skill
+install's policy file. The address is configured only when `comment_targets` in
 that selected file explicitly matches the pull request's own repository remote.
 `comment: true` or a request to comment can enable comments, but cannot by itself
 enable the full loop.
@@ -114,8 +121,9 @@ looping. A review that could not be performed at all is retried up to
 `review_retries` times, each retry changing the approach and recording the
 failure; retries consume no round, post no comment, and never turn a review that
 did not run into a passing round. Each limit can be stated for a single review or
-set in either policy file; unlike the comment decision, a limit omitted by the
-more specific file is inherited, because it can only make the loop stop sooner.
+set in the project-scope file or selected Skill install's policy file; unlike the
+comment decision, a limit omitted by the project file is inherited from the
+selected install. A project Skill never inherits a machine-wide limit.
 See [SKILL.md](SKILL.md) for the full rules.
 
 ## When It Triggers
