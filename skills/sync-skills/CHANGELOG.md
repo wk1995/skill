@@ -6,7 +6,11 @@ version, date, and a change summary.
 
 ## [Unreleased]
 
-- No unreleased changes.
+## [0.3.1] - 2026-09-24
+
+- Change-Type: fix
+- Summary: Exclude Skill-adjacent `pr-review-loop.yml` from copy, snapshot, digest, comparison, and relationship reporting; retain a target's policy during sync, Agent repair, and rollback.
+- Compatibility: Existing synchronized Skill content and commands remain supported. Project and machine-wide review policy stays with its installation instead of entering a managed copy or causing false divergence.
 
 ## [0.3.0] - 2026-09-17
 

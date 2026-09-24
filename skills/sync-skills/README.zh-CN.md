@@ -111,6 +111,8 @@ python3 skills/sync-skills/scripts/skill_sync.py sync my-skill-id --source repo
 
 `sync` 覆盖角色前会为所有现有角色副本创建快照。仅通过 `link-location` 登记的命名位置不会参与同步，也不会包含在这些快照中。如果多份副本都发生过变化且未指定来源，同步会停止并报告冲突。在仓库默认分支上，版本不一致时会选择较高的 `metadata.version`；在其他分支上，只有版本不一致并不足以授权同步。
 
+项目或已安装 Skill 旁的 `pr-review-loop.yml` 留在原位置，不参与同步复制、快照、摘要或关系报告；同步、Agent 安装修复和回滚会保留目标原有的配置。
+
 从角色快照恢复所有现有已登记角色，或只恢复指定角色：
 
 ```bash

@@ -58,7 +58,7 @@ python3 scripts/agent_build.py workbuddy-ai --skill sync-skills
 
 For each selected Skill, the builder:
 
-1. copies the portable source while excluding `agent-builds/`;
+1. copies the portable source while excluding `agent-builds/` and the private `skills/pr-review-loop/pr-review-loop.yml` project policy;
 2. applies the adapter-wide Skill overlay;
 3. applies `agent-builds/<agent>/` for that Skill;
 4. appends adapter-wide and per-Skill instruction fragments;

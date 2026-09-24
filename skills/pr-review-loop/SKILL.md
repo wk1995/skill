@@ -3,7 +3,7 @@ name: pr-review-loop
 description: Review a specific pull request. Run the fix, commit, push, and re-review loop when the authenticated account is the pull-request author and either a project-scoped policy or Skill applies or a machine-wide policy lists the pull-request repository. The independent comment switch controls PR comments; max_rounds controls review cycles, with zero allowing one read-only review. Every posted comment carries the platform and model marker. The fix loop has review-cycle and retry limits. Use for requests to review a named pull request or continue its review. Do not use for a local-only report, a request forbidding both comments and code changes, or pull-request administration.
 metadata:
   sync_id: "pr-review-loop"
-  version: "0.1.0"
+  version: "0.2.0"
   urls:
     - type: repository
       value: https://github.com/wk1995/skill.git
@@ -42,12 +42,24 @@ before the first review, and record the source of each decision:
 1. **This review** — the user explicitly enables or disables PR comments for this
    review. This choice controls comments only and cannot enter a loop excluded
    by the [Trigger Gate](#trigger-gate).
-2. **Project policy** — `<project-root>/.pr-review-loop.yml` from the PR base.
-   If present, it decides comments for this repository; a missing `comment` key
-   means off and never inherits an install-level comment grant.
+2. **Project policy** — when this project has a project-owned copy with
+   `metadata.sync_id: pr-review-loop`, put `pr-review-loop.yml` beside that
+   copy's `SKILL.md`. In this repository the path is
+   `<project-root>/skills/pr-review-loop/pr-review-loop.yml`. Create it as a
+   local file and add that exact path to the project's `.gitignore` by
+   default. A user may remove that ignore rule to commit a shared project
+   policy. Read a tracked policy only from the PR base; use an untracked local
+   policy only if it was present before the review began. Never use a symlink
+   or a policy introduced or changed by the PR head to authorize its own
+   review. For existing projects, a committed
+   `<project-root>/.pr-review-loop.yml` in the PR base remains a fallback when
+   the Skill-adjacent file is absent. The selected project file decides
+   comments for this repository; a missing `comment` key means off and never
+   inherits an install-level comment grant.
 3. **Selected Skill install** — use the host's discovery and
    `metadata.sync_id: pr-review-loop` to select a project-scoped copy for this
-   Agent platform before a machine-wide copy. Read only the selected copy's
+   Agent platform before a machine-wide copy. When no project policy decides
+   comments, read only the selected copy's
    adjacent `pr-review-loop.yml`; a project copy without that file does not
    inherit a machine-wide policy. Only if no project copy exists, select the
    machine-wide copy, reading its adjacent file first, then
@@ -56,16 +68,18 @@ before the first review, and record the source of each decision:
    file is absent. Name the selected copy and file.
 4. **Default** — no PR comment.
 
-In the selected source, only `comment: true` enables comments; `false` or an
-omitted key disables them. `comment_targets` does not turn comments on. A
-project policy or project-scoped Skill applies to its own project without a
-target list. For a machine-wide Skill, `comment_targets` must list the PR's own
-repository before its `comment: true` can enable comments there. An explicit
-request to comment for this review may enable comments on an unlisted repository,
-but does not make it eligible for a fix loop. An explicit request not to comment
-always wins. A request merely to review is not a request to comment.
+In the selected source, only an effective `comment: true` enables comments;
+`false` or an omitted key disables them. A project policy or project-scoped
+Skill applies to its own project without a target list. A machine-wide policy
+must match the PR repository through `projects` or the legacy
+`comment_targets` list before it can enable comments or a fix loop. A matching
+project entry may set `comment: false` and still permit the fix loop. An
+explicit request to comment for this review may enable comments on an unlisted
+repository, but does not make it eligible for a fix loop. An explicit request
+not to comment always wins. A request merely to review is not a request to
+comment.
 
-Project and install policy files use different names but share keys:
+Project and legacy install policies use these keys:
 
 ```yaml
 comment: false
@@ -76,16 +90,50 @@ comment_targets:
   - https://github.com/<owner>/<repo>.git
 ```
 
-Match a machine-wide target against the PR's own `host/owner/repo`, not a fork
-remote. Normalize both sides: drop the scheme and any `user@`, rewrite
+For a machine-wide Skill, prefer a `projects` mapping keyed by repository.
+Each entry may set `comment`, `max_rounds`, and `review_retries` independently.
+For each omitted key, use that key in `defaults`, then the legacy top-level
+value, then the built-in default (`comment: false`, `max_rounds: 10`, or
+`review_retries: 3`). A `projects` entry is itself a loop target even when
+`comment` is false. A legacy `comment_targets` entry remains a loop target;
+when both match, the `projects` entry supplies any keys it sets. An unmatched
+repository gets neither a fix loop nor policy-enabled comments. Do not combine two normalized
+`projects` keys for the same repository; report the ambiguity and use one
+read-only review without policy-enabled comments or fixes.
+
+```yaml
+defaults:
+  comment: false
+  max_rounds: 10
+  review_retries: 3
+projects:
+  github.com/example/project-a:
+    comment: true
+    max_rounds: 3
+    # review_retries inherits defaults.review_retries: 3
+  github.com/example/project-b:
+    review_retries: 2
+    # comment and max_rounds inherit false and 10 from defaults
+```
+
+Require `projects` and `defaults` to be mappings, each project's values to be
+a mapping, and every supplied `comment` to be a boolean. Require non-negative integer limits
+for every level; invalid or ambiguous policy cannot authorize a write. Match
+machine-wide project keys and legacy targets against the PR's own
+`host/owner/repo`, not a fork remote. Normalize both sides: drop the scheme
+and any `user@`, rewrite
 `git@host:owner/repo` as `host/owner/repo`, remove a trailing `/` or `.git`,
 and compare case-insensitively. If no remote resolves to the PR repository,
-treat the target as unmatched and explain why. A machine-wide `comment: true`
-with no matching target never grants comments by itself.
+treat the target as unmatched and explain why. Machine-wide defaults or legacy
+`comment: true` without a matching project or target never grant comments.
 
-Read the project policy from the PR base so the PR cannot grant itself a new
-policy. Recognize a project Skill only if the host discovered it before this
-PR's head changes, either in the base state or as a pre-existing project
+Check the project policy's tracked-file state before using it. A tracked
+policy is shared project configuration and must come from the PR base; an
+untracked policy is local configuration. Never copy either form into a general
+Agent build or another Skill copy. Read the legacy root policy only from the
+PR base so the PR cannot grant itself a new policy. Recognize a project Skill
+only if the host discovered it before this PR's head changes, either in the
+base state or as a pre-existing project
 installation. Never let the PR introduce or replace the Skill or policy that
 governs its own review. If project copies with the same `sync_id` are ambiguous
 or unverifiable, do not guess their install policy or loop eligibility; report
@@ -105,17 +153,18 @@ Use host account identities, not `git config user.name` or a commit author. If
 either identity is unknown, do not assume a match. This account check governs
 who may push fixes; it is independent of the comment switch.
 
-The PR is eligible for a fix loop when either (a) a project policy exists in
-the base or a pre-existing project-scoped Skill is selected for this Agent
-platform, or (b) the selected machine-wide policy's `comment_targets` matches
-the PR's own repository under the rule above. Project scope needs no
+The PR is eligible for a fix loop when either (a) a trusted Skill-adjacent
+project policy or legacy base policy exists, or a pre-existing project-scoped
+Skill is selected for this Agent platform, or (b) the selected machine-wide
+policy's `projects` or legacy `comment_targets` matches the PR's own
+repository under the rule above. Project scope needs no
 `comment_targets`. An explicit request to comment does not create loop
 eligibility. A request to fix cannot override an account mismatch or missing
-machine-wide target.
+machine-wide target or project entry.
 
 | Condition | Mode |
 | --- | --- |
-| Author account matches, project scope applies or machine-wide target matches, `max_rounds` is positive, and the user permits code changes | Review and fix for at most `max_rounds` completed review cycles; comment only if independently enabled |
+| Author account matches, project scope applies or a machine-wide project entry or legacy target matches, `max_rounds` is positive, and the user permits code changes | Review and fix for at most `max_rounds` completed review cycles; comment only if independently enabled |
 | Account differs or is unknown, scope does not qualify, `max_rounds` is zero, or the user requests no code changes | Review one base/head pair and report findings; post to the PR only if independently enabled; never edit, commit, or push |
 
 A request for only a local report remains outside this Skill. State the selected
@@ -124,8 +173,11 @@ mode and evidence before the first review.
 ## Loop Limits
 
 Resolve each limit independently from the first source setting its key: this
-review's user instruction, the base project policy, the selected Skill install
-policy, then the default. Do not inherit a machine-wide policy from an existing
+review's user instruction, the trusted Skill-adjacent project policy, the
+legacy base project policy when no Skill-adjacent policy exists, the selected
+Skill install
+policy's matching `projects` entry, its `defaults`, its legacy top-level keys,
+then the built-in default. Do not inherit a machine-wide policy from an existing
 project Skill with no adjacent file. Limits do not confer comment permission.
 Require `max_rounds` and `review_retries` to be non-negative integers; a
 missing or invalid value never implies an unlimited loop. Report invalid input

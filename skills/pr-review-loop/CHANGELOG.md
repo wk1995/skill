@@ -4,6 +4,11 @@ All notable changes to this Skill are documented here.
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-09-24
+
+- Change-Type: feature
+- Summary: Generate project policy beside the project Skill, ignored by default but optionally committed for project-wide use; add per-repository settings to machine-wide policies. Exclude project policy from builds, sync copies, and digests.
+- Compatibility: Existing root policies remain supported as a base-only fallback, and legacy machine-wide top-level settings and `comment_targets` continue to work. Existing behavior is unchanged when no new project policy or `projects` mapping is present.
 - Check this review's user criteria first, then apply required repository and project standards; record sources and explain conflicts.
 - Select the active project Skill by `metadata.sync_id` before a machine-wide copy. A project Skill without adjacent policy does not inherit the machine-wide policy, and only a machine-wide copy may use the XDG fallback. A PR cannot introduce the Skill or policy that governs its own review.
 - Separate review eligibility, `max_rounds`, and PR commenting. Project policy or a project Skill covers its own project without `comment_targets`; a machine-wide Skill requires a matching target. An authenticated PR author may fix and push for the configured review cycles even when `comment` is false. Only `comment: true` or an explicit request for this review enables PR comments; a machine-wide boolean grant also requires a matching target.

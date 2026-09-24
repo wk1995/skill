@@ -1,0 +1,20 @@
+# Copy beside the machine-wide pr-review-loop Skill as pr-review-loop.yml.
+# Entries match the PR repository's host/owner/repo, never a fork remote.
+# An unmatched repository gets no fix loop or policy-enabled comments.
+defaults:
+  comment: false
+  max_rounds: 10
+  review_retries: 3
+
+projects:
+  github.com/example/project-a:
+    comment: true
+    max_rounds: 3
+    # review_retries inherits defaults.review_retries: 3
+  github.com/example/project-b:
+    review_retries: 2
+    # comment and max_rounds inherit false and 10 from defaults
+
+# Legacy top-level comment, max_rounds, review_retries, and comment_targets
+# remain supported. Per-project values override defaults, which override
+# legacy top-level values.

@@ -3,7 +3,7 @@ name: sync-skills
 description: Use when linking, converting, synchronizing, inventorying, reporting, repairing Agent installs, versioning, auditing, or rolling back Skill copies across repository, project, machine-wide, or explicit external locations.
 metadata:
   sync_id: "sync-skills"
-  version: "0.3.0"
+  version: "0.3.1"
   urls:
     - type: repository
       value: https://github.com/wk1995/skill.git
@@ -174,12 +174,13 @@ python skills/sync-skills/scripts/skill_sync.py repair-agent-install my-skill-id
 - Refuse ordinary portable repo sync into a registered or adapter-discovered Agent install directory. Use the Agent build/install flow instead.
 - `link-location` refuses to change an existing location ID or to register a second same-path location ID unless `--replace` is explicit. Replacement revalidates the requested Agent root, rewrites same-Agent paths, and permits a same-path Agent identity migration only when the old path is not in a shared old Agent root. It retires duplicate same-path location IDs in the same group, preserves `derived_from`, and rewrites matching Agent-install snapshots so rollback still works. It moves a legacy `roles.local` entry only when no other Agent resolves the old or new path. An explicit local location suppresses a legacy role only when it is the same physical path or the legacy role is shared by another Agent; distinct candidates remain ambiguous and fail closed. It does not modify Skill files or change `kind`, `project_id`, or `source_id`. Do not retarget a 1.1.0 `workbuddy` install under `~/.agents/skills` to `codex`; keep shared-root registrations separate. After a path or identity change, repair with `--agent` matching the registered identity. A failed snapshot rewrite restores every manifest it changed, and retries that restore when the first attempt fails.
 - Exclude transient directories and files such as `.git`, `node_modules`, `dist`, `.DS_Store`, `__pycache__`, and Python bytecode.
+- Exclude `pr-review-loop.yml` beside a project or installed `pr-review-loop` Skill from copy, snapshot, digest, comparison, and relationship reporting; preserve an existing target policy during synchronization, Agent repair, and rollback.
 - When the skill-management repository is on `master` or its configured default branch, compare linked copies by `metadata.version`; if versions differ, synchronize and let the higher version replace the lower version.
 - When the repository is on any other branch, do not synchronize only because versions differ unless the user explicitly requests synchronization or the branch work requires updating the target copy.
 - If versions are equal but digests differ, use normal conflict handling and require an explicit source unless only one linked role changed since the previous snapshot.
 - If two or more copies changed since the previous snapshot and no source was specified, stop and report the conflict instead of choosing silently.
 - Keep the immutable sync-group identity in `metadata.sync_id` and the logical Skill version in `metadata.version` in `SKILL.md`. New Skills must define a stable sync ID that does not change with `metadata.name`; `rename --to` is reserved for migrating legacy name-keyed registry entries and cannot change an existing stable ID.
-- Use this Skill's own sync ID as `sync-skills` and its version as `0.3.0`.
+- Use this Skill's own sync ID as `sync-skills` and its version as `0.3.1`.
 - Store registry and snapshot runtime state outside the repository. By default, use `$XDG_STATE_HOME/sync-skills/<checkout-id>/`, or `$HOME/.local/state/sync-skills/<checkout-id>/` when `XDG_STATE_HOME` is unset. Treat repository-local `.skill-sync/` as legacy migration input only.
 - Legacy registries keyed by a Skill name remain readable; run `rename <old-reference> --to <sync-id> --name <new-name>` to migrate the group and its snapshots before linking a renamed Skill.
 - Record Skill addresses in the registry: `skill_urls` for canonical repository/documentation/registry/source URLs, and `role_urls` for role-specific remote/source URLs.
