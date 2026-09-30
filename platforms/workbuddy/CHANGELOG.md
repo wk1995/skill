@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+## [artifact 0.3.0] - 2026-09-30
+
+- Change-Type: feature
+- Summary: Bundle the shared-machine-policy PR review workflow. Every Agent reads one state file, and the first review upgrades an identical legacy Skill-adjacent policy.
+- Compatibility: Existing installed Skills retain their workflow. A new machine policy is no longer stored beside the WorkBuddy Skill; identical pre-0.3.0 adjacent policies are copied to the shared state file.
+
 ## [artifact 0.2.0] - 2026-09-24
 
 - Change-Type: feature

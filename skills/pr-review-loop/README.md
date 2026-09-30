@@ -39,19 +39,21 @@ A project-scoped Skill discovered for the active Agent platform by
 `metadata.sync_id: pr-review-loop` also applies to its own project. Neither
 needs `comment_targets` for its own repository. A selected project Skill does
 not inherit a machine-wide policy when its adjacent `pr-review-loop.yml` is
-absent. When no project Skill exists, use the machine-wide copy and require a
+absent. When no project Skill exists, use the shared machine policy and require a
 matching `projects` entry or legacy `comment_targets` entry for the fix loop.
 
-When a general machine-wide Skill generates its own settings, place
-`pr-review-loop.yml` beside that installed Skill. Policy selection prefers the
-Skill-adjacent project file, then a legacy root policy from the PR base, then
-the selected Skill's adjacent `pr-review-loop.yml`.
-Only a machine-wide Skill may use
-`$XDG_STATE_HOME/skill/pr-review-loop.yml` (or
-`$HOME/.local/state/skill/pr-review-loop.yml` when unset) if its adjacent file
-is absent. The adjacent file wins when both exist. The PR cannot add its own
-project Skill or policy for its review; only a pre-existing local file, the
-base policy, or a pre-existing installation governs.
+Every Agent platform reads one shared machine policy:
+`$XDG_STATE_HOME/skill/pr-review-loop.yml`, or
+`$HOME/.local/state/skill/pr-review-loop.yml` when unset. Do not place a new
+machine policy beside an installed Skill. On the first review under `0.3.0`,
+an adjacent `pr-review-loop.yml` in a supported Agent Skill root is copied to
+that shared path when the shared file is absent and every such legacy file has
+identical content. An existing shared file is kept, and differing legacy files
+are reported instead of merged. Policy selection is the Skill-adjacent project
+file, then a legacy root policy from the PR base, then the shared machine file.
+The PR cannot add its own project Skill or policy for its review; only a
+pre-existing local file, the base policy, or the pre-existing shared machine
+policy governs.
 
 ```yaml
 comment: false
@@ -59,7 +61,7 @@ max_rounds: 10
 review_retries: 3
 ```
 
-For a machine-wide Skill, use the [per-project policy example](assets/pr-review-loop.machine.example.yml).
+For the shared machine policy, use the [per-project policy example](assets/pr-review-loop.machine.example.yml).
 The `projects` mapping identifies repositories by `host/owner/repo`. Each entry
 may override `comment`, `max_rounds`, and `review_retries` independently;
 omitted values come from `defaults`, then legacy top-level keys, then built-in
@@ -73,7 +75,7 @@ normalized project keys or invalid values do not authorize comments or fixes.
 them. `max_rounds` never changes this decision. The user's explicit comment
 preference for this review takes priority. The selected project policy decides
 its repository's comment setting even if it omits the key, without inheriting an
-install's grant. For a machine-wide Skill, effective `comment: true` applies
+install's grant. For the shared machine policy, effective `comment: true` applies
 only to a repository matched by `projects` or `comment_targets`; an explicit
 request to comment may permit an unlisted repository, but does not enable its
 fix loop. A matching entry alone does not enable comments. See [the project

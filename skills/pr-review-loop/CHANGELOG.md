@@ -4,6 +4,15 @@ All notable changes to this Skill are documented here.
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-09-30
+
+- Change-Type: feature
+- Summary: Read one shared machine policy for every Agent platform, and upgrade a pre-existing Skill-adjacent machine policy into that file without changing its content.
+- Compatibility: Project-adjacent policy, the legacy project-root fallback, `projects`, and `comment_targets` remain valid. A new machine policy is no longer read from beside an installed Skill. On first use, identical legacy machine files are copied to `$XDG_STATE_HOME/skill/pr-review-loop.yml` (or `$HOME/.local/state/skill/pr-review-loop.yml`); an existing shared file is preserved, and differing legacy files are reported instead of merged.
+- All Agent platforms resolve machine settings from the same state file. Do not create `pr-review-loop.yml` beside Codex, WorkBuddy, or WorkBuddy AI installations.
+- Before resolving policy, copy one regular legacy `<agent-skill-root>/pr-review-loop/pr-review-loop.yml` to the shared path only when the shared file is absent and every such legacy file has identical bytes. Preserve file mode, refuse symlinks, and leave the legacy files in place.
+- A project Skill without its own adjacent policy still does not inherit the shared machine policy.
+
 ## [0.2.0] - 2026-09-24
 
 - Change-Type: feature

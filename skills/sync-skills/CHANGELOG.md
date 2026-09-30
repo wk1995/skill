@@ -6,6 +6,12 @@ version, date, and a change summary.
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-09-30
+
+- Change-Type: feature
+- Summary: Add `upgrade-machine-policy`, which copies identical legacy `pr-review-loop.yml` files from supported Agent Skill roots into the single shared machine policy.
+- Compatibility: Existing sync, repair, and rollback commands still preserve a Skill-adjacent policy and do not copy it between Skill trees. The new command creates `$XDG_STATE_HOME/skill/pr-review-loop.yml` (or the `$HOME/.local/state` equivalent) only when that file is absent and every legacy file has identical bytes. An existing shared file and differing legacy files are left unchanged.
+
 ## [0.3.1] - 2026-09-24
 
 - Change-Type: fix

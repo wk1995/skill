@@ -2044,6 +2044,71 @@ def validate_agent_target(agent_id: str, target: Path, adapters: list[dict[str, 
         raise SystemExit(f"registered install is outside the {agent_id} adapter roots: {target}")
 
 
+def shared_machine_policy_path() -> Path:
+    """One machine policy for every Agent platform."""
+    configured = os.environ.get("XDG_STATE_HOME")
+    root = Path(configured).expanduser() if configured else Path.home() / ".local/state"
+    if not root.is_absolute():
+        raise SystemExit("XDG_STATE_HOME must be an absolute path")
+    return root / "skill/pr-review-loop.yml"
+
+
+def legacy_machine_policy_candidates(adapters: list[dict[str, Any]]) -> list[Path]:
+    """Skill-adjacent policies installed before the shared machine file existed."""
+    candidates: list[Path] = []
+    seen: set[str] = set()
+    for adapter in adapters:
+        for root in adapter.get("local_skill_roots", []):
+            configured = root.get("path")
+            if not configured or root.get("status") not in (None, "resolved"):
+                continue
+            candidate = Path(configured) / "pr-review-loop/pr-review-loop.yml"
+            identity = normalized_absolute(candidate)
+            if identity not in seen:
+                seen.add(identity)
+                candidates.append(candidate)
+    return candidates
+
+
+def upgrade_shared_machine_policy(adapters: list[dict[str, Any]]) -> dict[str, Any]:
+    """Copy identical legacy machine policies once; never merge or overwrite."""
+    destination = shared_machine_policy_path()
+    if destination.is_symlink() or (destination.exists() and not destination.is_file()):
+        raise SystemExit(f"shared machine policy must be a regular file: {destination}")
+    legacy = legacy_machine_policy_candidates(adapters)
+    present = [path for path in legacy if path.exists() or path.is_symlink()]
+    for path in present:
+        if path.is_symlink() or not path.is_file():
+            raise SystemExit(f"legacy machine policy must be a regular file: {path}")
+    if destination.is_file():
+        return {"status": "shared-present", "path": normalized_absolute(destination), "legacy": [normalized_absolute(path) for path in present]}
+    if not present:
+        return {"status": "absent", "path": normalized_absolute(destination), "legacy": []}
+    payloads = {path.read_bytes() for path in present}
+    if len(payloads) != 1:
+        raise SystemExit(
+            "legacy machine policies differ; shared policy was not created: "
+            + ", ".join(normalized_absolute(path) for path in present)
+        )
+    source = present[0]
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    temporary = destination.with_name(f".{destination.name}.upgrade")
+    try:
+        shutil.copy2(source, temporary)
+        os.replace(temporary, destination)
+    finally:
+        if temporary.exists():
+            temporary.unlink()
+    if destination.read_bytes() != source.read_bytes():
+        raise SystemExit(f"shared machine policy failed verification: {destination}")
+    return {
+        "status": "upgraded",
+        "path": normalized_absolute(destination),
+        "source": normalized_absolute(source),
+        "legacy": [normalized_absolute(path) for path in present],
+    }
+
+
 def atomic_install_build(build_path: Path, target: Path, sync_id: str | None, expected_digest: str,
                          *, allow_missing_sync_id: bool = False) -> None:
     validate_install_directory(target)
@@ -2106,6 +2171,13 @@ def atomic_install_build(build_path: Path, target: Path, sync_id: str | None, ex
     finally:
         if not preserve_staging:
             shutil.rmtree(staging_root)
+
+
+def command_upgrade_machine_policy(args: argparse.Namespace) -> int:
+    adapters, _roots = adapter_roots_for_project(args)
+    result = upgrade_shared_machine_policy(adapters)
+    print(json.dumps(result, indent=2, sort_keys=True))
+    return 0
 
 
 def command_repair_agent_install(args: argparse.Namespace) -> int:
@@ -2225,6 +2297,12 @@ def build_parser() -> argparse.ArgumentParser:
         help="Legacy repository-local state directory. Default: .skill-sync",
     )
     migrate_state.set_defaults(func=command_migrate_state)
+
+    upgrade_policy = subparsers.add_parser(
+        "upgrade-machine-policy",
+        help="Copy identical legacy pr-review-loop machine policies to the shared state file.",
+    )
+    upgrade_policy.set_defaults(func=command_upgrade_machine_policy)
 
     relationships = subparsers.add_parser(
         "relationships",

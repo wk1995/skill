@@ -4,15 +4,16 @@
 # rule and commit the file if the user wants project-wide shared settings.
 # Do not bundle or sync either form into a general Agent install.
 # An existing <project-root>/.pr-review-loop.yml on the PR base is a fallback.
-# For a machine-wide Skill, generate beside the selected installed Skill as
-# pr-review-loop.yml. Project scope applies to its own repository automatically.
-# A project Skill with no adjacent policy does not inherit a machine-wide policy.
+# Project scope applies to its own repository automatically.
+# A project Skill with no adjacent policy does not inherit the shared machine policy.
 # PR changes to a tracked policy do not govern that same PR's review.
 #
-# Only a machine-wide Skill may fall back to:
+# Every Agent platform reads one shared machine policy:
 #   $XDG_STATE_HOME/skill/pr-review-loop.yml
 #   $HOME/.local/state/skill/pr-review-loop.yml (when XDG_STATE_HOME is unset)
-# Its adjacent file takes priority.
+# Do not create a new machine policy beside an installed Skill. A pre-0.3.0
+# adjacent file is copied there once when the shared file is absent and all
+# legacy copies match.
 
 # Independent PR comment switch. Only true enables comments. Machine-wide
 # policies use the separate pr-review-loop.machine.example.yml template.

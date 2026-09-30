@@ -111,7 +111,13 @@ python3 skills/sync-skills/scripts/skill_sync.py sync my-skill-id --source repo
 
 Every existing role copy is snapshotted before `sync` overwrites a role. Named locations registered only by `link-location` are not synchronized or included in these snapshots. If more than one copy changed and no source is specified, synchronization stops and reports the conflict. On the repository's default branch, a version mismatch selects the higher `metadata.version`; on another branch, a version mismatch alone does not authorize synchronization.
 
-The `pr-review-loop.yml` beside a project or installed Skill stays at that location. It is excluded from sync copies, snapshots, digests, and relationship reports; a target's own policy is preserved during sync, Agent repair, and rollback.
+The `pr-review-loop.yml` beside a project or installed Skill stays at that location. It is excluded from sync copies, snapshots, digests, and relationship reports; a target's own policy is preserved during sync, Agent repair, and rollback. To move identical legacy machine policies into the one file shared by every Agent, run:
+
+```bash
+python3 skills/sync-skills/scripts/skill_sync.py upgrade-machine-policy
+```
+
+The command writes `$XDG_STATE_HOME/skill/pr-review-loop.yml`, or `$HOME/.local/state/skill/pr-review-loop.yml` when unset. It does nothing when that file exists, and it stops without writing when legacy files differ.
 
 Restore all existing registered roles, or only the selected roles, from a role snapshot:
 

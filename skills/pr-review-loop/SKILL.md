@@ -3,7 +3,7 @@ name: pr-review-loop
 description: Review a specific pull request. Run the fix, commit, push, and re-review loop when the authenticated account is the pull-request author and either a project-scoped policy or Skill applies or a machine-wide policy lists the pull-request repository. The independent comment switch controls PR comments; max_rounds controls review cycles, with zero allowing one read-only review. Every posted comment carries the platform and model marker. The fix loop has review-cycle and retry limits. Use for requests to review a named pull request or continue its review. Do not use for a local-only report, a request forbidding both comments and code changes, or pull-request administration.
 metadata:
   sync_id: "pr-review-loop"
-  version: "0.2.0"
+  version: "0.3.0"
   urls:
     - type: repository
       value: https://github.com/wk1995/skill.git
@@ -56,16 +56,12 @@ before the first review, and record the source of each decision:
    the Skill-adjacent file is absent. The selected project file decides
    comments for this repository; a missing `comment` key means off and never
    inherits an install-level comment grant.
-3. **Selected Skill install** — use the host's discovery and
-   `metadata.sync_id: pr-review-loop` to select a project-scoped copy for this
-   Agent platform before a machine-wide copy. When no project policy decides
-   comments, read only the selected copy's
-   adjacent `pr-review-loop.yml`; a project copy without that file does not
-   inherit a machine-wide policy. Only if no project copy exists, select the
-   machine-wide copy, reading its adjacent file first, then
-   `$XDG_STATE_HOME/skill/pr-review-loop.yml` (or
-   `$HOME/.local/state/skill/pr-review-loop.yml` when unset) if the adjacent
-   file is absent. Name the selected copy and file.
+3. **Shared machine policy** — use this only when no project policy and no
+   project-scoped copy decide the review. Every Agent platform reads the same
+   file: `$XDG_STATE_HOME/skill/pr-review-loop.yml`, or
+   `$HOME/.local/state/skill/pr-review-loop.yml` when `XDG_STATE_HOME` is unset.
+   Do not read `pr-review-loop.yml` beside an installed Skill; that location is
+   legacy. Name the shared file when it decides the review.
 4. **Default** — no PR comment.
 
 In the selected source, only an effective `comment: true` enables comments;
@@ -90,7 +86,7 @@ comment_targets:
   - https://github.com/<owner>/<repo>.git
 ```
 
-For a machine-wide Skill, prefer a `projects` mapping keyed by repository.
+The shared machine policy uses a `projects` mapping keyed by repository.
 Each entry may set `comment`, `max_rounds`, and `review_retries` independently.
 For each omitted key, use that key in `defaults`, then the legacy top-level
 value, then the built-in default (`comment: false`, `max_rounds: 10`, or
@@ -155,7 +151,7 @@ who may push fixes; it is independent of the comment switch.
 
 The PR is eligible for a fix loop when either (a) a trusted Skill-adjacent
 project policy or legacy base policy exists, or a pre-existing project-scoped
-Skill is selected for this Agent platform, or (b) the selected machine-wide
+Skill is selected for this Agent platform, or (b) the shared machine
 policy's `projects` or legacy `comment_targets` matches the PR's own
 repository under the rule above. Project scope needs no
 `comment_targets`. An explicit request to comment does not create loop
@@ -177,7 +173,7 @@ review's user instruction, the trusted Skill-adjacent project policy, the
 legacy base project policy when no Skill-adjacent policy exists, the selected
 Skill install
 policy's matching `projects` entry, its `defaults`, its legacy top-level keys,
-then the built-in default. Do not inherit a machine-wide policy from an existing
+then the built-in default. Do not inherit the shared machine policy from an existing
 project Skill with no adjacent file. Limits do not confer comment permission.
 Require `max_rounds` and `review_retries` to be non-negative integers; a
 missing or invalid value never implies an unlimited loop. Report invalid input
@@ -371,6 +367,16 @@ is enabled; otherwise include it in the conversation report.
   comments.
 - Do not create, edit, or relocate a comment policy file to enable your own
   comments.
+- On the first review under `0.3.0`, upgrade every pre-existing machine policy
+  before resolving it. For each supported Agent root, if
+  `<root>/pr-review-loop/pr-review-loop.yml` is a regular file and the shared
+  machine file is absent, copy that legacy file to the shared path with its
+  bytes and permissions unchanged. If several legacy files exist, copy one only
+  when every regular legacy file has identical bytes; otherwise stop and report
+  the differing paths without choosing one. When the shared file already exists,
+  leave every legacy file in place and use only the shared file. Refuse a
+  symlink at either location. Run this upgrade once per machine, then resolve
+  policy normally. Do not treat the upgrade as authorization to comment or fix.
 - Do not merge, approve, close, retitle, label, or delete branches.
 - Do not edit or delete another author's comments. Reply by quoting and adding
   the marker.

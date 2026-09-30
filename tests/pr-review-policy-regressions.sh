@@ -10,6 +10,7 @@ import importlib.util
 import json
 import os
 import shutil
+import stat
 import subprocess
 import sys
 from pathlib import Path
@@ -203,4 +204,60 @@ for role in ("external", "project"):
     assert preserved.read_bytes() == example.read_bytes()
 assert relationships.digest_tree(source, portable=True) == relationships.digest_tree(destination, portable=True)
 print("PASS: public repair, rollback, convert, and sync preserve only the local root policy")
+
+home = temp / "policy-home"
+codex_policy = home / ".codex/skills/pr-review-loop/pr-review-loop.yml"
+workbuddy_policy = home / ".workbuddy/skills/pr-review-loop/pr-review-loop.yml"
+shared = home / ".local/state/skill/pr-review-loop.yml"
+payload = b"defaults:\n  comment: false\nprojects:\n  github.com/example/app:\n    comment: true\n"
+codex_policy.parent.mkdir(parents=True)
+codex_policy.write_bytes(payload)
+workbuddy_policy.parent.mkdir(parents=True)
+workbuddy_policy.write_bytes(payload)
+os.chmod(codex_policy, 0o640)
+adapters = [
+    {"id": "codex", "local_skill_roots": [{"path": str(home / ".codex/skills"), "status": "resolved"}]},
+    {"id": "workbuddy", "local_skill_roots": [{"path": str(home / ".workbuddy/skills"), "status": "resolved"}]},
+]
+old_home = os.environ.get("HOME")
+old_xdg = os.environ.get("XDG_STATE_HOME")
+os.environ["HOME"] = str(home)
+os.environ.pop("XDG_STATE_HOME", None)
+try:
+    upgraded = sync_module.upgrade_shared_machine_policy(adapters)
+    assert upgraded["status"] == "upgraded"
+    assert shared.read_bytes() == payload
+    assert stat.S_IMODE(shared.stat().st_mode) == 0o640
+    assert codex_policy.read_bytes() == payload
+    again = sync_module.upgrade_shared_machine_policy(adapters)
+    assert again["status"] == "shared-present"
+    assert shared.read_bytes() == payload
+    shared.unlink()
+    workbuddy_policy.write_bytes(payload + b"max_rounds: 1\n")
+    try:
+        sync_module.upgrade_shared_machine_policy(adapters)
+    except SystemExit as error:
+        assert "differ" in str(error)
+    else:
+        raise AssertionError("different legacy policies must not be merged")
+    assert not shared.exists()
+    workbuddy_policy.unlink()
+    workbuddy_policy.symlink_to(codex_policy)
+    try:
+        sync_module.upgrade_shared_machine_policy(adapters)
+    except SystemExit as error:
+        assert "regular file" in str(error)
+    else:
+        raise AssertionError("symlinked legacy policy must be rejected")
+    assert not shared.exists()
+finally:
+    if old_home is None:
+        os.environ.pop("HOME", None)
+    else:
+        os.environ["HOME"] = old_home
+    if old_xdg is None:
+        os.environ.pop("XDG_STATE_HOME", None)
+    else:
+        os.environ["XDG_STATE_HOME"] = old_xdg
+print("PASS: identical legacy machine policies upgrade once to the shared file")
 PY

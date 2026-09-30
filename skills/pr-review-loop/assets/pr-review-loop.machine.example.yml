@@ -1,4 +1,6 @@
-# Copy beside the machine-wide pr-review-loop Skill as pr-review-loop.yml.
+# Shared by every Agent platform. Copy to:
+#   $XDG_STATE_HOME/skill/pr-review-loop.yml
+#   $HOME/.local/state/skill/pr-review-loop.yml (when XDG_STATE_HOME is unset)
 # Entries match the PR repository's host/owner/repo, never a fork remote.
 # An unmatched repository gets no fix loop or policy-enabled comments.
 defaults:
