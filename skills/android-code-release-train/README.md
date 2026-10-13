@@ -19,6 +19,8 @@ The Skill resolves the default branch, holds requirement branches until a versio
 
 ## When It Triggers
 
+New integration trains initialize both version values from the selected target under the repository's own version policy. Existing trains are validated and reused without another increment. The Skill discovers and uses project lifecycle tooling when available; otherwise it performs equivalent Git and version-file operations. No project script, fixed version-code formula, or particular branch naming convention is required. Promotion preserves that initialized target; an early release branch starts at the recorded default-branch baseline.
+
 Use this Skill for Android requirement branches, version scope selection, `dev/<version>` and `release/<version>` integration, code gates, source version metadata, default-branch synchronization, or source tags.
 
 ## When It Does Not Trigger

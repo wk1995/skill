@@ -17,9 +17,10 @@
 
 - Resolve the default branch from repository metadata.
 - A requirement branch has no integration PR until its version is selected. Its integration PR targets only that version's `dev/B`.
-- `dev/B` contains only requirements explicitly selected for B and is deleted only after promotion succeeds.
+- A new `dev/B` records the exact default-branch baseline and contains a verified version-initialization commit plus only requirements explicitly selected for B. Both version values advance under repository policy; all maintained representations agree. Reusing a verified train never repeats the increment.
 - `release/B` contains version metadata and release fixes after promotion and is deleted only after default-branch synchronization and tag verification.
-- Version metadata changes only in the protected release source flow. Artifact jobs read it but never modify it.
+- Version metadata is initialized in the integration source flow and preserved at promotion, with only repository-authorized release/build-counter adjustments. Artifact jobs read it but never modify it.
+- A promotion branch created before integration starts at the recorded pre-initialization baseline. A project script is optional; equivalent Git/file operations must enforce the same validation and failure-state invariants.
 - The release tag points to the exact accepted source commit and is never moved or recreated by artifact automation.
 - This contract contains no binary artifact, signing, upload, distribution, store, or retention state.
 
@@ -33,7 +34,8 @@
 ## Failure handling
 
 - Review or code-check failure: stop before merge, tag, or branch cleanup.
-- Version-policy failure: keep `release/B`, correct metadata through a reviewed commit, and rerun source gates.
+- Initialization validation failure: do not create or push a new train. A failure after local edits or a failed commit must preserve and report that state without pushing it.
+- Version-policy failure on an existing train: preserve the branch, correct metadata through a reviewed source commit, and rerun source gates.
 - Default-branch merge conflict: repair through a protected PR; never force-push.
 - Existing or invalid tag: stop without replacing it and resolve the version or tag policy.
 - Artifact failure after `tagged-source`: retain the verified source tag; artifact retries must consume the same ref unless a new source release is explicitly created.

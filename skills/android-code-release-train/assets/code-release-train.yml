@@ -16,6 +16,10 @@ android_source:
   version_name_key: VERSION_NAME
   version_code_key: VERSION_CODE
   version_policy: TODO
+  initialize_versions_on_integration_creation: true
+  record_default_branch_baseline: true
+  # An optional repository helper may implement initialization. Without one,
+  # use equivalent Git/file operations under the configured version policy.
 
 code_gates:
   requirement: [lint, unit-test, compile-check]

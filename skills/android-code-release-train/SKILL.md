@@ -3,7 +3,7 @@ name: android-code-release-train
 description: Orchestrate Android source code from a requirement branch through version-train integration, release promotion, default-branch synchronization, and an immutable source tag. Use for feature/bugfix branches, versioned dev and release PRs, code-readiness gates, version metadata, or source-release tags; do not use for APK/AAB/AAR builds, signing, packaging, or artifact uploads.
 metadata:
   sync_id: "android-code-release-train"
-  version: "2.0.0"
+  version: "3.0.0"
   urls:
     - type: repository
       value: https://github.com/wk1995/skill.git
@@ -32,6 +32,7 @@ The output is a reviewed, versioned source commit and immutable tag. This Skill 
 
 - Read [references/code-train-contract.md](references/code-train-contract.md) before a mutating train operation.
 - Resolve the repository default branch instead of assuming `main` or `master`.
+- Discover the project's branch conventions, authoritative version sources, and version policy. The `dev/B`, `release/B`, and `vB` names below are examples; use repository-owned equivalents.
 - Require `gh`, `git`, a clean worktree, and GitHub authentication for repository operations.
 - Use the repository's GitHub App when automated branch, PR, merge, or tag operations must retrigger workflows. Do not substitute `GITHUB_TOKEN` when its events would not retrigger ordinary workflows.
 - Use [assets/code-release-train.yml](assets/code-release-train.yml) as the source-flow configuration template when bootstrapping a repository.
@@ -56,21 +57,31 @@ Do not open a PR until the user explicitly selects an existing `dev/B` train. Ne
 
 ### Inventory and select a version scope
 
-Run the bundled read-only inventory and selection validation:
+Use the bundled read-only inventory and selection validation when its conventions match the repository; otherwise use repository tooling or equivalent Git/hosting reads:
 
 ```bash
 python3 scripts/code_release_train.py inventory --format table
 python3 scripts/code_release_train.py select --version 1.4.0 --branches feature/login,feature/report
 ```
 
-After selection, create `dev/B` and the feature-to-dev PRs through the configured automation identity. A branch is **ready** only when its PR is open, non-draft, targets `dev/B`, has approval, and all reported code checks succeed. A PR targeting another branch is **misrouted**. Ready means eligible for code integration, not product acceptance and not artifact readiness.
+After selection, initialize or reuse `dev/B` as described below, then create the feature-to-dev PRs through the configured automation identity. A branch is **ready** only when its PR is open, non-draft, targets the selected integration branch, has approval, and all reported code checks succeed. Ready means eligible for code integration, not product acceptance and not artifact readiness. Adapt the bundled inventory's branch assumptions through repository tooling or equivalent Git/hosting reads when project conventions differ.
+
+### Initialize a version integration branch
+
+Create each new version integration branch from an exact, freshly fetched default-branch commit and record that baseline before updating versions. Initialize `versionName` to the selected target and `versionCode` to that target's first build according to the project's existing policy. Both must advance from the baseline; synchronize every maintained representation of those values. Never assume a decimal encoding, build counter, filename, or property key. If the project has no documented way to derive the new values, resolve that policy before writing.
+
+Prefer a discovered, trusted repository command that creates the branch, validates the target, writes the version sources, and commits the initialization. **No project script is required:** when such an entry point is absent, perform the same steps with Git and normal file tools: verify a clean worktree and target availability, capture the default-branch SHA, validate the proposed values, create the branch, edit and verify all version sources, commit only the initialization changes, and push only when authorized. Do not install a project-specific helper or copy another project's version formula just to use this Skill. If verification or commit fails, preserve and report the local state without publishing a partially initialized train.
+
+Reuse an existing integration branch without another increment or initialization commit. Validate its branch/target agreement and version consistency before any update or early-success return; do not reset it to the latest default branch or rewrite its history. Legacy trains may lack a recorded baseline: reuse them only when their identity and version configuration can be verified, and preserve their established promotion branch.
+
+When promotion/release branches are initialized in advance, start them from the recorded **pre-initialization default-branch baseline**, not from the integration branch's version commit. This keeps the first build and the version-only integration diff consistent with repository policy. Later promotion, including repositories that create the release branch only at promotion time, must preserve the initialized target. CI should validate integration branch names, source versions and duplicate configuration, and the baseline before creating a missing promotion branch. Repeated runs must preserve existing branches and must not bump versions merely because the command or event was retried.
 
 ### Promote and finalize source code
 
 Only promote after all selected requirement PRs are merged into `dev/B` and integration code checks pass:
 
 1. Create `release/B` from the default branch and the unique `dev/B -> release/B` PR.
-2. Update the repository-owned version metadata in that protected release flow and validate it against repository policy.
+2. Preserve the version initialized on `dev/B`, validate it against repository policy, and apply only the policy's permitted release/build-number adjustments. Do not repeat the initial version bump at promotion or in artifact jobs.
 3. Delete `dev/B` only after promotion is merged and `release/B` contains every selected commit.
 4. Accept only release fixes on `release/B`; require the configured source review and code gates.
 5. Merge the accepted release source into the default branch, tag that exact commit as `vB`, verify the tag, then delete `release/B`.
