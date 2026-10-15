@@ -25,6 +25,14 @@ RESERVED_OVERRIDE_FILES = {"SKILL.append.md"}
 TRANSIENT_DIRECTORY_NAMES = {".git", "dist", "node_modules", "__pycache__", ".pytest_cache"}
 TRANSIENT_FILE_NAMES = {".DS_Store"}
 TRANSIENT_SUFFIXES = {".pyc", ".pyo"}
+LOCAL_SKILL_POLICIES = {"pr-review-loop": "pr-review-loop.yml"}
+
+
+def is_local_skill_policy(root: Path, relative: Path) -> bool:
+    if root.parent != SKILLS_DIR or relative.parts != ("pr-review-loop.yml",):
+        return False
+    _, sync_id, _ = skill_metadata(root)
+    return relative.parts == (LOCAL_SKILL_POLICIES.get(sync_id),)
 
 
 class BuildError(Exception):
@@ -168,6 +176,7 @@ def copy_tree(
             or any(part in TRANSIENT_DIRECTORY_NAMES for part in relative.parts[:-1])
             or path.name in TRANSIENT_FILE_NAMES
             or path.suffix in TRANSIENT_SUFFIXES
+            or is_local_skill_policy(source, relative)
         ):
             continue
         require(not path.is_symlink(), f"build inputs must not contain symbolic links: {path}")
@@ -228,6 +237,7 @@ def digest_tree(root: Path, *, skip_top: set[str] | None = None) -> str:
             or any(part in TRANSIENT_DIRECTORY_NAMES for part in relative_path.parts[:-1])
             or path.name in TRANSIENT_FILE_NAMES
             or path.suffix in TRANSIENT_SUFFIXES
+            or is_local_skill_policy(root, relative_path)
         ):
             continue
         relative = relative_path.as_posix().encode("utf-8")

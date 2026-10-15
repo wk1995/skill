@@ -283,15 +283,29 @@ class VersionGuardTests(unittest.TestCase):
 
     def test_all_owners_reject_wrong_increments(self):
         for kind in ("skill", "adapter", "artifact"):
-            for value, change_type in (("1.2.2", "fix"), ("1.2.5", "fix"), ("2.0.0", "fix"),
-                                       ("1.3.1", "feature"), ("2.1.0", "breaking"),
-                                       ("3.0.0", "breaking"), ("2.0.0", "stable")):
+            for value, change_type in (("1.2.2", "fix"), ("2.0.0", "fix"),
+                                       ("1.3.1", "feature"), ("1.2.0", "feature"),
+                                       ("2.1.0", "breaking"), ("1.0.0", "breaking"),
+                                       ("2.0.0", "stable")):
                 with self.subTest(kind=kind, version=value, change=change_type):
                     self.reset()
                     self.set_version(kind, value)
                     self.add_release(kind, value, change_type)
                     self.commit()
                     self.run_guard("does not match Change-Type")
+
+    def test_all_owners_allow_skipped_numbers_at_the_selected_level(self):
+        for kind in ("skill", "adapter", "artifact"):
+            for value, change_type, extra in (
+                ("1.2.5", "fix", ""), ("1.5.0", "feature", ""),
+                ("3.0.0", "breaking", "- Breaking-Change: Old command removed; use new command.\n- Migration: Replace old calls with new calls.\n"),
+            ):
+                with self.subTest(kind=kind, version=value):
+                    self.reset()
+                    self.set_version(kind, value)
+                    self.add_release(kind, value, change_type, extra)
+                    self.commit()
+                    self.run_guard()
 
     def test_all_owners_require_new_changelog_and_breaking_evidence(self):
         for kind in ("skill", "adapter", "artifact"):
@@ -413,15 +427,15 @@ class VersionGuardTests(unittest.TestCase):
         self.assertEqual(version_guard.version_parts("9" * 5000 + ".0.0", "test")[1:], ("0", "0"))
 
     def test_skill_rename_preserves_version_history(self):
-        self.set_version("skill", "1.2.5")
-        self.add_release("skill", "1.2.5", "fix")
+        self.set_version("skill", "1.3.0")
+        self.add_release("skill", "1.3.0", "fix")
         self.skill.parent.rename(self.skill.parent.with_name("renamed"))
         self.commit()
         self.run_guard("does not match Change-Type")
         moved = self.root / "skills/renamed/SKILL.md"
-        moved.write_text(moved.read_text().replace("1.2.5", "1.2.4"))
+        moved.write_text(moved.read_text().replace("1.3.0", "1.2.4"))
         log = moved.with_name("CHANGELOG.md")
-        log.write_text(log.read_text().replace("1.2.5", "1.2.4"))
+        log.write_text(log.read_text().replace("[1.3.0]", "[1.2.4]"))
         self.commit()
         self.run_guard()
 
@@ -503,16 +517,18 @@ class VersionGuardTests(unittest.TestCase):
     def test_push_all_owners_allow_only_single_step_upgrades(self):
         for kind in ("skill", "adapter", "artifact"):
             for value, change_type, extra in (
-                ("1.2.4", "fix", ""), ("1.3.0", "feature", ""),
+                ("1.2.4", "fix", ""), ("1.2.5", "fix", ""), ("1.3.0", "feature", ""),
+                ("1.5.0", "feature", ""),
                 ("2.0.0", "breaking", "- Breaking-Change: Old command removed.\n- Migration: Switch to the new command.\n"),
-                ("1.2.5", "fix", ""), ("1.3.1", "feature", ""), ("3.0.0", "breaking", ""),
+                ("3.0.0", "breaking", "- Breaking-Change: Old command removed.\n- Migration: Switch to the new command.\n"),
+                ("1.3.1", "feature", ""), ("2.1.0", "breaking", ""),
             ):
                 with self.subTest(kind=kind, version=value):
                     self.reset()
                     self.set_version(kind, value)
                     self.add_release(kind, value, change_type, extra)
                     after = self.commit()
-                    expected = None if value in {"1.2.4", "1.3.0", "2.0.0"} else "does not match Change-Type"
+                    expected = None if value not in {"1.3.1", "2.1.0"} else "does not match Change-Type"
                     self.run_guard(expected, mode="push", head=after)
 
     def test_push_uses_event_before_not_last_commit(self):
@@ -524,9 +540,9 @@ class VersionGuardTests(unittest.TestCase):
         self.set_version("skill", "1.2.5")
         self.add_release("skill", "1.2.5", "fix")
         second = self.commit()
-        # Two separate pushes are valid; the same two commits in one push skip a version.
+        # Separate pushes and one combined push may both advance the same part.
         self.run_guard(mode="push", base=first, head=second)
-        self.run_guard("does not match Change-Type", mode="push", head=second)
+        self.run_guard(mode="push", head=second)
 
     def test_push_rejects_rewinds_and_divergent_history(self):
         self.write(self.root / "README.md", "First timeline.\n")
