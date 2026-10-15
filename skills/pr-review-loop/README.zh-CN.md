@@ -21,7 +21,9 @@
 
 项目级 Skill 生成的配置放在其 `SKILL.md` 旁的 `pr-review-loop.yml`，默认把实际路径写入项目 `.gitignore`。在本仓库中，该路径是 `<项目根>/skills/pr-review-loop/pr-review-loop.yml`。用户可移除忽略规则并提交文件，使其成为项目共享配置。已跟踪配置只从 PR base 读取；未跟踪的本地配置须在审查开始前存在。两者都不会进入通用 Agent 构建产物或同步到其他 Skill 副本。兼容旧项目：Skill 旁的文件不存在时，仍可读取 PR base 中已提交的 `<项目根>/.pr-review-loop.yml`。当前 Agent 平台按 `metadata.sync_id: pr-review-loop` 发现的项目级 Skill 也默认适用于本项目；这些项目级来源都不需要 `comment_targets`。项目 Skill 即使没有相邻的 `pr-review-loop.yml`，也不会继承整机配置。没有项目 Skill 时才使用共用整机配置；它必须通过 `projects` 或旧版 `comment_targets` 命中 PR 仓库，才能进入修复闭环。
 
-所有 Agent 平台读取同一份整机配置：`$XDG_STATE_HOME/skill/pr-review-loop.yml`，未设置时为 `$HOME/.local/state/skill/pr-review-loop.yml`。不要再把新的整机配置放在已安装 Skill 旁边。`0.2.0` 第一次审查时，若共用文件不存在，且各受支持 Agent Skill 根目录旁的旧 `pr-review-loop.yml` 内容一致，就把其中一份原样复制到共用路径；共用文件已存在时保留它。内容不一致的旧文件只报告路径，不自动合并。选择顺序是项目 Skill 旁的文件、PR base 中的旧项目根文件，然后才是这份共用整机配置。PR 不能靠自身新增 Skill 或配置来改变本次评审；未跟踪文件须预先存在，已跟踪文件只认 base。
+所有 Agent 平台读取同一份整机配置：`$XDG_STATE_HOME/skill/pr-review-loop.yml`，未设置时为 `$HOME/.local/state/skill/pr-review-loop.yml`。不要再把新的整机配置放在已安装 Skill 旁边。`1.0.0` 第一次审查时，若共用文件不存在，且各受支持 Agent Skill 根目录旁的旧 `pr-review-loop.yml` 内容一致，就把其中一份原样复制到共用路径；共用文件已存在时保留它。内容不一致的旧文件只报告路径，不自动合并。选择顺序是项目 Skill 旁的文件、PR base 中的旧项目根文件，然后才是这份共用整机配置。PR 不能靠自身新增 Skill 或配置来改变本次评审；未跟踪文件须预先存在，已跟踪文件只认 base。
+
+本次发布改变整机配置优先级：已有共用文件现在优先于安装目录旁的旧文件。首次审查前应比较这些文件，并在共用文件中明确选定评论目标和轮数限制；参见[破坏性变更与迁移说明](CHANGELOG.md)。
 
 ```yaml
 comment: false

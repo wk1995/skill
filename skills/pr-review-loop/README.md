@@ -45,7 +45,7 @@ matching `projects` entry or legacy `comment_targets` entry for the fix loop.
 Every Agent platform reads one shared machine policy:
 `$XDG_STATE_HOME/skill/pr-review-loop.yml`, or
 `$HOME/.local/state/skill/pr-review-loop.yml` when unset. Do not place a new
-machine policy beside an installed Skill. On the first review under `0.2.0`,
+machine policy beside an installed Skill. On the first review under `1.0.0`,
 an adjacent `pr-review-loop.yml` in a supported Agent Skill root is copied to
 that shared path when the shared file is absent and every such legacy file has
 identical content. An existing shared file is kept, and differing legacy files
@@ -54,6 +54,8 @@ file, then a legacy root policy from the PR base, then the shared machine file.
 The PR cannot add its own project Skill or policy for its review; only a
 pre-existing local file, the base policy, or the pre-existing shared machine
 policy governs.
+
+This release changes machine-policy precedence: an existing shared file now wins over an installed adjacent file. Before reviewing, compare those files and explicitly select the intended comment targets and limits in the shared file; see the [breaking release and migration](CHANGELOG.md).
 
 ```yaml
 comment: false

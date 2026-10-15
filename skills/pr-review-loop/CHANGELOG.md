@@ -4,11 +4,13 @@ All notable changes to this Skill are documented here.
 
 ## [Unreleased]
 
-## [0.2.0] - 2026-09-30
+## [1.0.0] - 2026-10-15
 
-- Change-Type: feature
+- Change-Type: breaking
 - Summary: Add project policy beside the project Skill and one shared machine policy for every Agent platform. Upgrade a pre-existing Skill-adjacent machine policy into that shared file without changing its content. Exclude project policy from builds, sync copies, and digests.
-- Compatibility: Existing root policies remain supported as a base-only fallback, and legacy machine-wide top-level settings and `comment_targets` continue to work. Existing behavior is unchanged when no new project policy or `projects` mapping is present. A new machine policy is no longer read from beside an installed Skill. On first use, identical legacy machine files are copied to `$XDG_STATE_HOME/skill/pr-review-loop.yml` (or `$HOME/.local/state/skill/pr-review-loop.yml`); an existing shared file is preserved, and differing legacy files are reported instead of merged.
+- Compatibility: Existing root policies remain supported as a base-only fallback, and legacy machine-wide top-level settings and `comment_targets` continue to work. A new machine policy is no longer read from beside an installed Skill. On first use, identical legacy machine files are copied to `$XDG_STATE_HOME/skill/pr-review-loop.yml` (or `$HOME/.local/state/skill/pr-review-loop.yml`); an existing shared file is preserved, and differing legacy files are reported instead of merged.
+- Breaking-Change: Previously, an installed adjacent machine policy took priority over an existing shared XDG file; now the shared file is authoritative. With adjacent `comment: false` and shared `comment: true` plus a matching legacy target, comments change from disabled to enabled even without a `projects` mapping. This changes existing authorization precedence for Codex, WorkBuddy, and WorkBuddy AI installations.
+- Migration: Before the first review, compare every legacy adjacent policy with the shared file and explicitly select the intended settings in the shared file. Keep comments disabled there until the effective targets and limits are verified. If the shared file is absent, identical legacy files can be copied with `upgrade-machine-policy`; differing files require manual reconciliation. Legacy originals are retained.
 - All Agent platforms resolve machine settings from the same state file. Do not create `pr-review-loop.yml` beside Codex, WorkBuddy, or WorkBuddy AI installations.
 - Before resolving policy, copy one regular legacy `<agent-skill-root>/pr-review-loop/pr-review-loop.yml` to the shared path only when the shared file is absent and every such legacy file has identical bytes. Preserve file mode, refuse symlinks, and leave the legacy files in place.
 - A project Skill without its own adjacent policy still does not inherit the shared machine policy.

@@ -9,7 +9,7 @@ version, date, and a change summary.
 ## [0.4.0] - 2026-09-30
 
 - Change-Type: feature
-- Summary: Exclude Skill-adjacent `pr-review-loop.yml` from copy, snapshot, digest, comparison, and relationship reporting, and add `upgrade-machine-policy` to copy identical legacy files into the single shared machine policy.
+- Summary: Exclude Skill-adjacent `pr-review-loop.yml` from copy, snapshot, digest, comparison, and relationship reporting, and add `upgrade-machine-policy` to copy identical legacy files into the single shared machine policy using private staging and atomic no-clobber publication.
 - Compatibility: Existing synchronized Skill content and commands remain supported. Sync, repair, and rollback retain a target's policy instead of copying it between Skill trees. `upgrade-machine-policy` creates `$XDG_STATE_HOME/skill/pr-review-loop.yml` (or the `$HOME/.local/state` equivalent) only when that file is absent and every legacy file has identical bytes. An existing shared file and differing legacy files are left unchanged.
 
 ## [0.3.0] - 2026-09-17

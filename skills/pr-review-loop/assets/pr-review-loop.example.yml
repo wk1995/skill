@@ -11,7 +11,7 @@
 # Every Agent platform reads one shared machine policy:
 #   $XDG_STATE_HOME/skill/pr-review-loop.yml
 #   $HOME/.local/state/skill/pr-review-loop.yml (when XDG_STATE_HOME is unset)
-# Do not create a new machine policy beside an installed Skill. A pre-0.2.0
+# Do not create a new machine policy beside an installed Skill. A pre-1.0.0
 # adjacent file is copied there once when the shared file is absent and all
 # legacy copies match.
 

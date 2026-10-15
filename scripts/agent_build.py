@@ -29,7 +29,10 @@ LOCAL_SKILL_POLICIES = {"pr-review-loop": "pr-review-loop.yml"}
 
 
 def is_local_skill_policy(root: Path, relative: Path) -> bool:
-    return root.parent == SKILLS_DIR and relative.parts == (LOCAL_SKILL_POLICIES.get(root.name),)
+    if root.parent != SKILLS_DIR or relative.parts != ("pr-review-loop.yml",):
+        return False
+    _, sync_id, _ = skill_metadata(root)
+    return relative.parts == (LOCAL_SKILL_POLICIES.get(sync_id),)
 
 
 class BuildError(Exception):

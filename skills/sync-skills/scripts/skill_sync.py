@@ -2092,15 +2092,23 @@ def upgrade_shared_machine_policy(adapters: list[dict[str, Any]]) -> dict[str, A
         )
     source = present[0]
     destination.parent.mkdir(parents=True, exist_ok=True)
-    temporary = destination.with_name(f".{destination.name}.upgrade")
+    staging = Path(tempfile.mkdtemp(prefix=".review-policy-upgrade-", dir=destination.parent))
+    temporary = staging / "policy"
     try:
         shutil.copy2(source, temporary)
-        os.replace(temporary, destination)
+        if temporary.read_bytes() != next(iter(payloads)):
+            raise SystemExit("legacy machine policy changed during migration; shared policy was not created")
+        try:
+            # A hard link publishes the complete regular file atomically, but
+            # refuses to overwrite a destination created since preflight.
+            os.link(temporary, destination)
+        except FileExistsError:
+            if destination.is_symlink() or not destination.is_file():
+                raise SystemExit(f"shared machine policy must be a regular file: {destination}")
+            return {"status": "shared-present", "path": normalized_absolute(destination),
+                    "legacy": [normalized_absolute(path) for path in present]}
     finally:
-        if temporary.exists():
-            temporary.unlink()
-    if destination.read_bytes() != source.read_bytes():
-        raise SystemExit(f"shared machine policy failed verification: {destination}")
+        shutil.rmtree(staging)
     return {
         "status": "upgraded",
         "path": normalized_absolute(destination),
