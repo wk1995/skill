@@ -6,7 +6,7 @@ version, date, and a change summary.
 
 ## [Unreleased]
 
-## [0.3.1] - 2026-09-30
+## [0.4.0] - 2026-09-30
 
 - Change-Type: feature
 - Summary: Exclude Skill-adjacent `pr-review-loop.yml` from copy, snapshot, digest, comparison, and relationship reporting, and add `upgrade-machine-policy` to copy identical legacy files into the single shared machine policy.
