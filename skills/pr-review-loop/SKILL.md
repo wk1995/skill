@@ -3,7 +3,7 @@ name: pr-review-loop
 description: Review a specific pull request. Run the fix, commit, push, and re-review loop when the authenticated account is the pull-request author and either a project-scoped policy or Skill applies or a machine-wide policy lists the pull-request repository. The independent comment switch controls PR comments; max_rounds controls review cycles, with zero allowing one read-only review. Every posted comment carries the platform and model marker. The fix loop has review-cycle and retry limits. Use for requests to review a named pull request or continue its review. Do not use for a local-only report, a request forbidding both comments and code changes, or pull-request administration.
 metadata:
   sync_id: "pr-review-loop"
-  version: "0.3.0"
+  version: "0.2.0"
   urls:
     - type: repository
       value: https://github.com/wk1995/skill.git
@@ -367,7 +367,7 @@ is enabled; otherwise include it in the conversation report.
   comments.
 - Do not create, edit, or relocate a comment policy file to enable your own
   comments.
-- On the first review under `0.3.0`, upgrade every pre-existing machine policy
+- On the first review under `0.2.0`, upgrade every pre-existing machine policy
   before resolving it. For each supported Agent root, if
   `<root>/pr-review-loop/pr-review-loop.yml` is a regular file and the shared
   machine file is absent, copy that legacy file to the shared path with its

@@ -4,20 +4,14 @@ All notable changes to this Skill are documented here.
 
 ## [Unreleased]
 
-## [0.3.0] - 2026-09-30
+## [0.2.0] - 2026-09-30
 
 - Change-Type: feature
-- Summary: Read one shared machine policy for every Agent platform, and upgrade a pre-existing Skill-adjacent machine policy into that file without changing its content.
-- Compatibility: Project-adjacent policy, the legacy project-root fallback, `projects`, and `comment_targets` remain valid. A new machine policy is no longer read from beside an installed Skill. On first use, identical legacy machine files are copied to `$XDG_STATE_HOME/skill/pr-review-loop.yml` (or `$HOME/.local/state/skill/pr-review-loop.yml`); an existing shared file is preserved, and differing legacy files are reported instead of merged.
+- Summary: Add project policy beside the project Skill and one shared machine policy for every Agent platform. Upgrade a pre-existing Skill-adjacent machine policy into that shared file without changing its content. Exclude project policy from builds, sync copies, and digests.
+- Compatibility: Existing root policies remain supported as a base-only fallback, and legacy machine-wide top-level settings and `comment_targets` continue to work. Existing behavior is unchanged when no new project policy or `projects` mapping is present. A new machine policy is no longer read from beside an installed Skill. On first use, identical legacy machine files are copied to `$XDG_STATE_HOME/skill/pr-review-loop.yml` (or `$HOME/.local/state/skill/pr-review-loop.yml`); an existing shared file is preserved, and differing legacy files are reported instead of merged.
 - All Agent platforms resolve machine settings from the same state file. Do not create `pr-review-loop.yml` beside Codex, WorkBuddy, or WorkBuddy AI installations.
 - Before resolving policy, copy one regular legacy `<agent-skill-root>/pr-review-loop/pr-review-loop.yml` to the shared path only when the shared file is absent and every such legacy file has identical bytes. Preserve file mode, refuse symlinks, and leave the legacy files in place.
 - A project Skill without its own adjacent policy still does not inherit the shared machine policy.
-
-## [0.2.0] - 2026-09-24
-
-- Change-Type: feature
-- Summary: Generate project policy beside the project Skill, ignored by default but optionally committed for project-wide use; add per-repository settings to machine-wide policies. Exclude project policy from builds, sync copies, and digests.
-- Compatibility: Existing root policies remain supported as a base-only fallback, and legacy machine-wide top-level settings and `comment_targets` continue to work. Existing behavior is unchanged when no new project policy or `projects` mapping is present.
 - Check this review's user criteria first, then apply required repository and project standards; record sources and explain conflicts.
 - Select the active project Skill by `metadata.sync_id` before a machine-wide copy. A project Skill without adjacent policy does not inherit the machine-wide policy, and only a machine-wide copy may use the XDG fallback. A PR cannot introduce the Skill or policy that governs its own review.
 - Separate review eligibility, `max_rounds`, and PR commenting. Project policy or a project Skill covers its own project without `comment_targets`; a machine-wide Skill requires a matching target. An authenticated PR author may fix and push for the configured review cycles even when `comment` is false. Only `comment: true` or an explicit request for this review enables PR comments; a machine-wide boolean grant also requires a matching target.
