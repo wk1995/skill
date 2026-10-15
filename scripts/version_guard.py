@@ -221,15 +221,19 @@ def validate_release(base: Tree, result: Tree, old: Component | None, new: Compo
         require(change_type == "initial" and new.version in {"0.1.0", "1.0.0"},
                 f"{new.path}: new components require Change-Type: initial and version 0.1.0 or 1.0.0")
     else:
-        major, minor, patch = version_parts(old.version, old.path)
-        expected = {"fix": f"{major}.{minor}.{increment(patch)}",
-                    "feature": f"{major}.{increment(minor)}.0",
-                    "breaking": f"{increment(major)}.0.0"}
-        if major == "0":
-            expected["stable"] = "1.0.0"
-        require(change_type in expected and new.version == expected.get(change_type),
+        old_major, old_minor, old_patch = (int(part) for part in version_parts(old.version, old.path))
+        new_major, new_minor, new_patch = (int(part) for part in version_parts(new.version, new.path))
+        advanced = (new_major, new_minor, new_patch) > (old_major, old_minor, old_patch)
+        same_level = {
+            "fix": advanced and (new_major, new_minor) == (old_major, old_minor),
+            "feature": advanced and new_major == old_major and new_minor > old_minor and new_patch == 0,
+            "breaking": advanced and new_major > old_major and (new_minor, new_patch) == (0, 0),
+        }
+        if old_major == 0:
+            same_level["stable"] = (new_major, new_minor, new_patch) == (1, 0, 0)
+        require(same_level.get(change_type, False),
                 f"{new.path}: {old.version} -> {new.version} does not match Change-Type: {change_type}; "
-                f"allowed next releases: {expected}")
+                "the selected part must increase and every lower part must be zero")
     if change_type == "breaking":
         declaration(body, "Breaking-Change", new.changelog)
         declaration(body, "Migration", new.changelog)

@@ -90,7 +90,7 @@ reviewing a version. These rules apply to Skill `metadata.version`, adapter
 boundary; they do not apply to integer schema versions or external projects.
 
 Run `python3 scripts/version_guard.py --base <PR-base>` on committed changes.
-The required CI gate checks canonical formats, one-step increments, and changelog
+The required CI gate checks canonical formats, same-level increments, and changelog
 declarations before catalog generation. Every new or changed version needs
 `Change-Type`, `Summary`, and `Compatibility` bullets in its dated release entry;
 breaking releases also need `Breaking-Change` and `Migration`, and first-stable
@@ -100,10 +100,9 @@ See the policy's CI section for enum values and initial-release requirements.
 CI validates declared impact; reviewers must still verify the declaration.
 After updates to the default branch, the `default-branch-version` workflow also
 checks the entire push with `--mode push --base <event.before> --head <event.after>`.
-Use the event's previous tip, not `HEAD^`; two increments of the same selected
-part in one push must not be accepted as one. Existing versions may stay unchanged;
-changed versions must increment exactly one selected part by one and reset all
-lower parts.
+Use the event's previous tip, not `HEAD^`. Existing versions may stay unchanged.
+A changed version must advance one selected part by one or more and reset all
+lower parts, including when one push contains several increments of that part.
 
 - Use exactly `MAJOR.MINOR.PATCH`: three non-negative decimal integers without
   leading zeroes, a `v` prefix, prerelease suffixes, or build metadata.
@@ -118,8 +117,8 @@ lower parts.
 - Apply the same impact rules to `0.x.x`; promotion to `1.0.0` may also explicitly
   declare the first stable contract, but must not disguise an ordinary fix.
 - Compare all changes since the last release of the same component. Increment
-  only the highest required level once, by one, and reset lower levels. Do not
-  bump once per commit or carry digits at nine (`1.2.9 -> 1.2.10`).
+  only the highest required level once, by one or more, and reset lower levels.
+  Do not bump once per commit or carry digits at nine (`1.2.9 -> 1.2.10`).
 - Documentation-only clarifications, tests, and repository maintenance do not
   require a component bump when behavior and its contract stay unchanged.
   Agent-facing instructions that change behavior are not documentation-only.

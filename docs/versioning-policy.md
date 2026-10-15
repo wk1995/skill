@@ -60,13 +60,15 @@ document the result before choosing a level. Do not default to MAJOR to be safe.
 
 ## Increment Mechanics And Early Versions
 
-- Increment the selected part by exactly one and set every lower part to zero:
-  PATCH `1.2.3 -> 1.2.4`, MINOR `1.2.3 -> 1.3.0`, MAJOR `1.2.3 -> 2.0.0`.
+- Increase the selected part by one or more and set every lower part to zero:
+  PATCH `1.2.3 -> 1.2.4` or `1.2.5`, MINOR `1.2.3 -> 1.3.0` or `1.5.0`,
+  MAJOR `1.2.3 -> 2.0.0` or `3.0.0`. A skipped number is allowed when one
+  release covers several compatible increments of that same part.
 - Numbers have no decimal carry: `1.2.9 -> 1.2.10` for a fix, and
   `1.9.7 -> 1.10.0` for a compatible feature.
 - For one release, aggregate pending changes and use the highest required level
-  once. Three fixes plus one compatible feature mean `1.2.3 -> 1.3.0`.
-  Do not bump once per commit or skip version numbers without a release reason.
+  once. Three fixes plus one compatible feature mean at least
+  `1.2.3 -> 1.3.0`. Do not bump once per commit.
 - A new experimental component starts at `0.1.0`; a component with an explicitly
   established stable contract may start at `1.0.0`.
 - This repository also protects documented compatibility during `0.x.x`:
