@@ -1,9 +1,9 @@
 ---
 name: build-pipeline-engineering
-description: Configure, validate, run, and troubleshoot reproducible distributable builds from an exact source ref, including CI environments, user-selected build variants, Android signing, APK/AAB/AAR or plugin packaging, output verification, manifests, checksums, and uploads. For variant-based builds default to release; for CI output default to GitHub Actions Artifacts. Do not use for requirement branches, PR integration, source version changes, or tag creation.
+description: Configure, validate, run, and troubleshoot reproducible distributable builds from an exact source ref for Android, Windows, Linux, and plugins, including installer/package selection, CI, signing, runtime dependencies, verification, manifests, checksums, and uploads. For variant-based builds default to release; for CI output default to GitHub Actions Artifacts. Do not use for requirement branches, PR integration, source version changes, or tag creation.
 metadata:
   sync_id: "build-pipeline-engineering"
-  version: "2.0.0"
+  version: "2.1.0"
   urls:
     - type: repository
       value: https://github.com/wk1995/skill.git
@@ -13,11 +13,13 @@ metadata:
     include:
       - The user asks to configure or troubleshoot CI that builds, signs, packages, verifies, or uploads software outputs for a selected build variant.
       - The task produces APK, AAB, AAR, JAR, Gradle plugin, native, mapping, metadata, checksum, or archive outputs from a specified source ref.
+      - The user asks to package source for Windows as an EXE installer, MSI, MSIX, or portable bundle, or for Linux as DEB, RPM, AppImage, or tar archives, including target architecture, runtime dependencies, and installation validation.
       - The user asks to build a signed Android package or store build outputs in GitHub Actions Artifacts or another explicit destination.
     exclude:
       - The task selects Android requirements for a version, creates feature/dev/release branches or PRs, changes source version metadata, merges code, or creates release tags; use android-code-release-train for that source lifecycle.
       - The request is a normal compile or test used only to validate a code edit and does not retain a distributable artifact.
       - The request only manages copies or metadata of Skills; use sync-skills instead.
+      - The request only compares installer formats or explains certificates without preparing, configuring, running, or troubleshooting a distributable build.
 ---
 
 # Build Pipeline Engineering
@@ -29,7 +31,7 @@ Turn one exact source ref and build variant into verified, traceable outputs. Th
 Input:
 
 - Repository and immutable commit SHA or verified tag. A branch is acceptable only when the user explicitly requests a branch build; record the resolved commit.
-- Output target and build variant. Use the requested variant; default to `release` only when none is supplied.
+- Output target, OS baseline/distribution, architecture, package format, and build variant. For targets with variants, use the requested variant; default to `release` only when none is supplied, mapping to the build system's spelling (for example, `Release`).
 - Build/version metadata already present in source or supplied as non-source build inputs.
 
 Output:
@@ -43,10 +45,12 @@ If the required source ref, version commit, branch promotion, or tag does not ex
 
 ## Start Here
 
-1. Identify the output target, source ref, local or CI execution environment, requested build variant, and signing requirements. Default the variant to `release` when omitted.
+1. Identify the output target, source ref, local or CI execution environment, requested build variant, and signing requirements. For targets with variants, default to `release` when omitted. For desktop/server packages, also establish the supported OS/distribution, CPU architecture, installer versus portable output, runtime bundling, and install/upgrade behavior. Infer inputs from repository configuration first; ask only for missing choices that affect the deliverable.
 2. Inspect build files, wrapper/toolchain versions, CI workflows, output paths, and existing secret references.
 3. Read only the applicable reference:
    - [references/build-pipeline-model.md](references/build-pipeline-model.md) for a new or cross-target pipeline.
+   - [references/windows-app-build.md](references/windows-app-build.md) for Windows EXE/MSI/MSIX installers, portable bundles, Authenticode signing, and installation tests.
+   - [references/linux-app-build.md](references/linux-app-build.md) for Linux DEB/RPM/AppImage/archives, distribution and ABI compatibility, package signing, and installation tests.
    - [references/android-app-build.md](references/android-app-build.md) for APK/AAB and Android signing.
    - [references/android-component-build.md](references/android-component-build.md) for AAR, SDK, Maven, or component outputs.
    - [references/gradle-plugin-build.md](references/gradle-plugin-build.md) for Gradle plugin outputs.
@@ -58,7 +62,8 @@ If the required source ref, version commit, branch promotion, or tag does not ex
 
 - **Source:** immutable commit/tag and checkout verification.
 - **Toolchain:** runner OS, Java/Gradle/AGP or other versions, caches, and dependency locks.
-- **Build inputs:** module, requested variant (default `release`), tasks, and permitted non-source parameters.
+- **Platform:** target OS/distribution baseline, architecture, package format, host-versus-target constraints, bundled versus external runtimes, and the installation/upgrade test environment.
+- **Build inputs:** module, requested variant (default `release` where variants apply), tasks, and permitted non-source parameters.
 - **Signing:** secret names, protected environment, keystore/certificate identity, and verification command. Never print or commit secrets.
 - **Outputs:** exact paths and required companion files such as mapping, POM, metadata, or symbols.
 - **Identity:** version read from source and any build/run number; verify rather than edit source.
@@ -66,9 +71,11 @@ If the required source ref, version commit, branch promotion, or tag does not ex
 - **Destination:** GitHub Actions Artifacts by default for CI, including artifact name and retention; use another destination only when explicitly requested or already configured.
 - **Failure policy:** which missing or invalid output stops the job and which optional telemetry may warn.
 
+For Windows/Linux packages, capture application ID/name, publisher/maintainer, existing version, icons, licenses, assets, install scope, privileges, shortcuts/desktop integration, services/autostart, and upgrade/uninstall/data-retention behavior as applicable. Preserve configured choices; do not add privileged integration or change package identity merely to make a build succeed.
+
 ## Configure CI
 
-Prefer repository-owned workflows and scripts. For a new GitHub Actions pipeline with no requested destination, expose or honor the requested variant and default it to `release`:
+Prefer repository-owned workflows and scripts. For a new GitHub Actions pipeline with no requested destination, expose or honor the requested variant and default it to `release` where variants apply:
 
 1. Check out the requested ref and record `git rev-parse HEAD`.
 2. Install the pinned toolchain and restore safe caches.
@@ -76,13 +83,15 @@ Prefer repository-owned workflows and scripts. For a new GitHub Actions pipeline
 4. Build once, verify the outputs and signatures, and generate a manifest plus checksums.
 5. Upload the verified files with `actions/upload-artifact`, using a traceable name and explicit retention.
 
+For an OS/architecture/package matrix, resolve one source commit for all jobs, pin each toolchain, isolate caches and staging outputs by target, and use unique artifact names containing OS, architecture, format, variant, and source/run identity. Prefer a native target runner unless the chosen toolchain explicitly supports cross-building; packaging success alone does not verify target runtime compatibility. Preserve Linux executable modes and symlinks in a tar archive or native package before artifact upload, and verify the extracted/downloaded result.
+
 Do not add branch creation, PR management, version commits, merging, or tag creation to an artifact workflow. A tag-triggered workflow may consume a tag but must never create, move, or delete it.
 
 ## Execute or Troubleshoot a Build
 
 1. Resolve the requested ref to an exact commit and ensure the worktree or CI checkout matches it.
 2. Run the repository's existing build entry point; do not invent a parallel build path without explaining why.
-3. Verify every required artifact exists, has the expected version/variant, and is signed when required.
+3. Verify every required artifact exists, has the expected version/variant/architecture, and is signed when required. For installers and Linux packages, inspect payload metadata and exercise the applicable install, launch, upgrade, and uninstall contract in a disposable target environment. Record unavailable checks explicitly; do not call a package installation-verified without target execution.
 4. Generate or validate the build manifest and checksums.
 5. Upload exactly those verified files. Do not rebuild separately for another destination.
 6. Report source ref, commands, artifacts, signatures, checksums, destination, retention, and any skipped or failed checks.
