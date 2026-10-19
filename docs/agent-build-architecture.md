@@ -1,6 +1,6 @@
 # Agent Build Architecture
 
-This document defines how portable Skill sources are adapted for Codex, WorkBuddy, WorkBuddy AI, and future Agent runtimes without spreading platform rules across every Skill.
+This document defines how portable Skill sources are adapted for Codex, WorkBuddy, WorkBuddy AI, DeepSeek Harness, and future Agent runtimes without spreading platform rules across every Skill.
 
 ## Responsibility Boundaries
 
@@ -52,6 +52,7 @@ Run:
 python3 scripts/agent_build.py --list
 python3 scripts/agent_build.py --check
 python3 scripts/agent_build.py codex
+python3 scripts/agent_build.py dsh --skill sync-skills
 python3 scripts/agent_build.py workbuddy --skill sync-skills
 python3 scripts/agent_build.py workbuddy-ai --skill sync-skills
 ```
@@ -108,6 +109,11 @@ dist/workbuddy-ai/
   .agent-build.json
   <skill>/
     SKILL.md
+
+dist/dsh/
+  .agent-build.json
+  <skill>/
+    SKILL.md
 ```
 
 Generated output is ignored by Git. Installation commands belong to their adapter documentation or packaging layer; portable Skill READMEs describe how to use the workflow, not how a specific Agent installs it.
@@ -125,3 +131,7 @@ As checked on 2026-09-17, China `WorkBuddy.app` (`com.tencent.workbuddy.mac`) us
 ### WorkBuddy AI local roots (adapter 1.0.0)
 
 As checked on 2026-09-17, international `WorkBuddy AI.app` (`com.workbuddy.workbuddy-ai`) uses `dataFolderName` / `customUserDataDir` `.workbuddy-ai`. Adapter 1.0.0 inventories `~/.workbuddy-ai/skills` for that product. China WorkBuddy remains `workbuddy`. The two products share the environment variable name `WORKBUDDY_CONFIG_DIR` at process injection time; this adapter therefore does not read that variable. A custom directory must be registered with `link-location`.
+
+### DeepSeek Harness local roots (adapter 1.0.0)
+
+As checked on 2026-10-19 against the `@deepseek-ai/dsh-skill-filesystem` provider `0.2.0-rc.2` bundled in DeepSeek Harness `0.2.0-rc.2`, the Harness discovers one level of directory-bundle (`<name>/SKILL.md`) and flat Markdown (`<name>.md`) Skills from project roots `<projectRoot>/.dsh/skills` and `<projectRoot>/.agents/skills`, configured custom roots, and user roots `$DSH_HOME/skills` (default `~/.dsh/skills`) and `$DSH_AGENTS_HOME/skills` (default `~/.agents/skills`). Adapter 1.0.0 inventories the two default user roots for machine-local relationship reporting; project roots belong to the report's explicit project arguments. A physical root shared with Codex and WorkBuddy retains all Agent IDs. Do not attach the process-injected `DSH_HOME` or `DSH_AGENTS_HOME` variables to this adapter; a custom directory must be registered with `link-location`. The adapter writes a plain Skill collection (`skills_path: "."`) because each Skill installs directly under a discovered user root.
