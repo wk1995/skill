@@ -1,6 +1,6 @@
 # Agent Build Architecture
 
-This document defines how portable Skill sources are adapted for Codex, WorkBuddy, WorkBuddy AI, DeepSeek Harness, and future Agent runtimes without spreading platform rules across every Skill.
+This document defines how portable Skill sources are adapted for Codex, WorkBuddy, WorkBuddy AI, DeepSeek Harness, OpenCode, and future Agent runtimes without spreading platform rules across every Skill.
 
 ## Responsibility Boundaries
 
@@ -53,6 +53,7 @@ python3 scripts/agent_build.py --list
 python3 scripts/agent_build.py --check
 python3 scripts/agent_build.py codex
 python3 scripts/agent_build.py dsh --skill sync-skills
+python3 scripts/agent_build.py opencode --skill sync-skills
 python3 scripts/agent_build.py workbuddy --skill sync-skills
 python3 scripts/agent_build.py workbuddy-ai --skill sync-skills
 ```
@@ -114,6 +115,11 @@ dist/dsh/
   .agent-build.json
   <skill>/
     SKILL.md
+
+dist/opencode/
+  .agent-build.json
+  <skill>/
+    SKILL.md
 ```
 
 Generated output is ignored by Git. Installation commands belong to their adapter documentation or packaging layer; portable Skill READMEs describe how to use the workflow, not how a specific Agent installs it.
@@ -135,3 +141,7 @@ As checked on 2026-09-17, international `WorkBuddy AI.app` (`com.workbuddy.workb
 ### DeepSeek Harness local roots (adapter 1.0.0)
 
 As checked on 2026-10-19 against the `@deepseek-ai/dsh-skill-filesystem` provider `0.2.0-rc.2` bundled in DeepSeek Harness `0.2.0-rc.2`, the Harness discovers one level of directory-bundle (`<name>/SKILL.md`) and flat Markdown (`<name>.md`) Skills from project roots `<projectRoot>/.dsh/skills` and `<projectRoot>/.agents/skills`, configured custom roots, and user roots `$DSH_HOME/skills` (default `~/.dsh/skills`) and `$DSH_AGENTS_HOME/skills` (default `~/.agents/skills`). Adapter 1.0.0 inventories directory-bundle Skills under the two default user roots for machine-local relationship reporting; project roots belong to the report's explicit project arguments. A physical root shared with Codex and WorkBuddy retains all Agent IDs. Do not attach the `DSH_HOME` or `DSH_AGENTS_HOME` variables to this adapter: `DSH_HOME` is injected into model-facing shells and `DSH_AGENTS_HOME` is an optional process-environment override, so neither is a stable inventory root. A custom directory is not auto-inventoried; add it to the report as an explicit project or external location (or with `--local-root`). Local-install registration and `repair-agent-install` accept only the adapter-declared roots. The adapter writes a plain Skill collection (`skills_path: "."`) because each Skill installs directly under a discovered user root.
+
+### OpenCode local roots (adapter 1.0.0)
+
+As checked on 2026-10-19 against the [OpenCode V2 Skills documentation](https://opencode.ai/v2/docs/skills), OpenCode discovers Skills globally from `~/.config/opencode/skills` plus the global compatibility roots `~/.claude/skills` and `~/.agents/skills`, and per project from `.opencode/skills`, `.claude/skills`, and `.agents/skills` searched from the current directory up to the project root; every source accepts a `<name>/SKILL.md` directory bundle and a flat `<name>.md` file. Adapter 1.0.0 inventories the three global roots for machine-local relationship reporting as directory bundles, which is the shape this builder emits; flat Markdown copies are not part of that inventory, and project sources belong to the report's explicit project arguments. A physical root shared with Codex, DeepSeek Harness, and WorkBuddy retains all Agent IDs; `~/.claude/skills` is claimed by this adapter alone because it is a documented OpenCode global source and no other adapter here declares it. Do not attach `XDG_CONFIG_HOME` to this adapter: the `env` resolver reads one variable whose value is the root itself, so it cannot express `$XDG_CONFIG_HOME/opencode/skills`. A relocated config home, a directory added through the `skills` array in `opencode.json`, or an HTTP skill catalog is not auto-inventoried; add it to the report as an explicit project or external location (or with `--local-root`). Local-install registration and `repair-agent-install` accept only the adapter-declared roots. The adapter writes a plain Skill collection (`skills_path: "."`) because each generated Skill installs directly under a discovered global root, where OpenCode derives the Skill ID from the directory name.

@@ -1,0 +1,3 @@
+## OpenCode Build Adaptation
+
+This generated copy targets OpenCode (`opencode`). Discover and trigger the Skill from the portable `name` and `description` in `SKILL.md`; Codex-only `$` invocation syntax and `agents/openai.yaml` are not required, and OpenCode advertises a Skill from its frontmatter `description`. Install the generated `{{skill_name}}` directory under an OpenCode global Skill root (`~/.config/opencode/skills`, or the global compatibility roots `~/.claude/skills` and `~/.agents/skills`) so that OpenCode derives the Skill ID `{{skill_name}}` from that directory name. These rules belong to OpenCode adapter `{{adapter_version}}` and do not change the portable Skill core version.

@@ -6,7 +6,7 @@ Personal Skills is a monorepo for managing personal Agent Skills. Each Skill own
 
 ## Current State
 
-- Done: repository purpose, portable Skill conventions, declarative Codex, WorkBuddy, WorkBuddy AI, and DeepSeek Harness adapters, deterministic Agent builds, and PR validation.
+- Done: repository purpose, portable Skill conventions, declarative Codex, WorkBuddy, WorkBuddy AI, DeepSeek Harness, and OpenCode adapters, deterministic Agent builds, and PR validation.
 - Planned: shared management packages, CLI, MCP server, installation, registry publishing, and release automation.
 - Not yet available: project-level executable commands. Commands shown in this README describe the target interface.
 
@@ -58,7 +58,10 @@ skill/
 |   |-- workbuddy-ai/
 |   |   |-- adapter.json
 |   |   `-- SKILL.append.md
-|   `-- dsh/
+|   |-- dsh/
+|   |   |-- adapter.json
+|   |   `-- SKILL.append.md
+|   `-- opencode/
 |       |-- adapter.json
 |       `-- SKILL.append.md
 |-- scripts/
@@ -263,6 +266,7 @@ python3 scripts/agent_build.py --list
 python3 scripts/agent_build.py --check
 python3 scripts/agent_build.py codex
 python3 scripts/agent_build.py dsh
+python3 scripts/agent_build.py opencode
 python3 scripts/agent_build.py workbuddy
 python3 scripts/agent_build.py workbuddy-ai
 ```

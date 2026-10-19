@@ -368,7 +368,7 @@ class ReviewRegressions(unittest.TestCase):
         # Real adapters and real portable Skill, then execute outside the checkout
         # using only the standard library (-S) and no optional executables.
         for agent, relative in (("codex", "skills/sync-skills"), ("dsh", "sync-skills"),
-                                ("workbuddy", "sync-skills")):
+                                ("opencode", "sync-skills"), ("workbuddy", "sync-skills")):
             output = self.root / f"distribution-{agent}"
             built = subprocess.run([sys.executable, str(ROOT / "scripts/agent_build.py"), agent,
                                     "--skill", "sync-skills", "--output", str(output)], capture_output=True, text=True)
@@ -479,14 +479,37 @@ class ReviewRegressions(unittest.TestCase):
         self.assertNotIn(str(self.root / "home/.dsh/skills"), wb_ai_paths)
         self.assertNotIn(str(self.root / "home/.workbuddy/skills"), dsh_paths)
         self.assertNotIn(str(self.root / "home/.workbuddy-ai/skills"), dsh_paths)
+        opencode = next(a for a in adapters if a["id"] == "opencode")
+        opencode_paths = {r.get("path") for r in opencode["local_skill_roots"]}
+        self.assertEqual(opencode_paths, {
+            str(self.root / "home/.config/opencode/skills"),
+            str(self.root / "home/.claude/skills"),
+            str(self.root / "home/.agents/skills"),
+        })
+        self.assertNotIn(str(self.root / "home/.config/opencode/skills"), wb_paths)
+        self.assertNotIn(str(self.root / "home/.config/opencode/skills"), wb_ai_paths)
+        self.assertNotIn(str(self.root / "home/.config/opencode/skills"), dsh_paths)
+        self.assertNotIn(str(self.root / "home/.claude/skills"), wb_paths)
+        self.assertNotIn(str(self.root / "home/.claude/skills"), dsh_paths)
+        self.assertNotIn(str(self.root / "home/.workbuddy/skills"), opencode_paths)
+        self.assertNotIn(str(self.root / "home/.workbuddy-ai/skills"), opencode_paths)
+        self.assertNotIn(str(self.root / "home/.dsh/skills"), opencode_paths)
+        self.assertNotIn(str(self.root / "home/.codex/skills"), opencode_paths)
         shared_legacy = [r for r in rel.deduplicate_roots(adapters)
                          if r.get("path") == str(self.root / "home/.agents/skills")]
         self.assertEqual(len(shared_legacy), 1)
-        self.assertEqual(shared_legacy[0]["agent_ids"], ["codex", "dsh", "workbuddy"])
+        self.assertEqual(shared_legacy[0]["agent_ids"], ["codex", "dsh", "opencode", "workbuddy"])
+        claude_compat = [r for r in rel.deduplicate_roots(adapters)
+                         if r.get("path") == str(self.root / "home/.claude/skills")]
+        self.assertEqual(len(claude_compat), 1)
+        self.assertEqual(claude_compat[0]["agent_ids"], ["opencode"])
         env_names = {root["resolver"] for root in workbuddy["local_skill_roots"] + workbuddy_ai["local_skill_roots"]}
         self.assertTrue(all(not name.startswith("env:WORKBUDDY_CONFIG_DIR") for name in env_names))
         dsh_env_names = {root["resolver"] for root in dsh["local_skill_roots"]}
         self.assertTrue(all(not name.startswith("env:DSH_") for name in dsh_env_names))
+        opencode_env_names = {root["resolver"] for root in opencode["local_skill_roots"]}
+        self.assertTrue(all(not name.startswith("env:") for name in opencode_env_names),
+                        "XDG_CONFIG_HOME must not be attached as an inventory root")
         # A root claimed by two Builders is attributed to both, independent of adapter config.
         shared = str(self.root / "home/.shared/skills")
         adapters_shared, _ = rel.load_adapters(
