@@ -1,6 +1,6 @@
 export const TYPES = ['smoke', 'functional', 'performance', 'compatibility', 'stability', 'security', 'usability', 'install-upgrade', 'integration'];
 export const STATUSES = ['passed', 'failed', 'partial', 'blocked', 'untested'];
-export const empty = () => ({schemaVersion: 1, revision: 0, plans: [], environments: [], rounds: []});
+export const empty = () => ({schemaVersion: 1, revision: 0, plans: [], environments: [], rounds: [], annotations: []});
 const copy = value => structuredClone(value);
 const require = (ok, message) => { if (!ok) throw new Error(message); };
 const object = value => value !== null && typeof value === 'object' && !Array.isArray(value);
@@ -68,7 +68,80 @@ export function validate(state) {
       for (const key of ['tester', 'notes', 'evidence']) text(observation[key], `observation.${key}`, key !== 'tester');
     }
   }
+  unique(state.annotations === undefined ? [] : state.annotations, 'annotations');
+  for (const note of state.annotations ?? []) validateAnnotation(state, note);
   return state;
+}
+export function annotationContext(state, input) {
+  const plan = find(state.plans, input.planId, 'Plan');
+  const round = input.roundId ? find(state.rounds, input.roundId, 'Round') : null;
+  require(!round || round.planId === plan.id, 'Annotation round belongs to another plan');
+  const item = find(round?.cases ?? plan.cases, input.caseId, 'Annotation case');
+  const observation = input.observationId ? find(round?.observations ?? [], input.observationId, 'Annotation observation') : null;
+  require(!observation || observation.caseId === item.id, 'Annotation observation belongs to another case');
+  return {version: round?.version ?? plan.version, source: round?.source ?? plan.source, planTitle: plan.title,
+    roundName: round?.name ?? '', case: copy(item), observation: observation ? copy(observation) : null};
+}
+function targetText(context, field) {
+  if (field === 'case') return [context.case.title, context.case.preconditions, context.case.steps, context.case.expected].join('\n');
+  if (field === 'observation') {
+    require(context.observation, 'Annotation has no observation target');
+    return [context.observation.status, context.observation.tester, context.observation.notes, context.observation.evidence].join('\n');
+  }
+  require(['preconditions', 'steps', 'expected'].includes(field), 'Invalid annotation field');
+  return context.case[field];
+}
+function validateAnnotation(state, note) {
+  for (const key of ['id', 'planId', 'caseId', 'roundId', 'observationId']) text(note[key], `annotation.${key}`, ['roundId','observationId'].includes(key));
+  const plan = find(state.plans, note.planId, 'Annotation plan');
+  require(['web', 'browser'].includes(note.origin), 'Invalid annotation origin');
+  require(object(note.context) && object(note.target), 'Annotation context and target required');
+  for (const key of ['version','source','planTitle','roundName']) text(note.context[key], `annotation.context.${key}`, key === 'roundName');
+  validateCase(note.context.case); require(note.context.case.id === note.caseId, 'Annotation case snapshot conflict');
+  require(note.context.version === plan.version, 'Annotation version conflict');
+  if (note.roundId) {
+    const round = find(state.rounds, note.roundId, 'Annotation round');
+    require(round.planId === note.planId && round.source === note.context.source && same(find(round.cases,note.caseId,'Annotation case'),note.context.case), 'Annotation round snapshot conflict');
+  }
+  if (note.observationId) {
+    const round = find(state.rounds, note.roundId, 'Annotation observation round');
+    const observation = find(round.observations, note.observationId, 'Annotation observation');
+    require(observation.caseId === note.caseId && same(observation, note.context.observation), 'Annotation observation snapshot conflict');
+  } else require(note.context.observation === null, 'Unexpected annotation observation snapshot');
+  text(note.target.quote, 'annotation quote', true);
+  const content = targetText(note.context, note.target.field);
+  require(!note.target.quote || content.includes(note.target.quote), 'Annotation quote does not match its snapshot');
+  unique(note.events, 'annotation events');require(note.events.length > 0 && note.events[0].kind === 'comment', 'Annotation must start with a comment');
+  for (const event of note.events) {
+    require(['comment','resolve','reopen'].includes(event.kind), 'Invalid annotation event kind');
+    text(event.author, 'annotation author');text(event.body, 'annotation body', event.kind !== 'comment');timestamp(event.createdAt, 'annotation event time');
+  }
+}
+export const annotationsFor = (state, context) => (state.annotations ?? []).filter(note => note.planId === context.planId && note.roundId === (context.roundId ?? '') && (!context.caseId || note.caseId === context.caseId) && (!context.observationId || note.observationId === context.observationId));
+export const orderedAnnotationEvents = note => [...note.events].sort((a,b) => Date.parse(a.createdAt)-Date.parse(b.createdAt) || (a.id===b.id?0:a.id<b.id?-1:1));
+export function annotationStatus(note) {
+  const latest = orderedAnnotationEvents(note).filter(event => event.kind !== 'comment').at(-1);
+  return latest?.kind === 'resolve' ? 'resolved' : 'open';
+}
+export function addAnnotation(state, input) {
+  validate(state);
+  require(!(state.annotations ?? []).some(note => note.id === input.id), 'Annotation ID already exists');
+  const context = annotationContext(state, input);
+  require(!input.expectedContext || same(context, input.expectedContext), 'Annotation definition changed; reload and review');
+  const note = {id:input.id,planId:input.planId,roundId:input.roundId??'',caseId:input.caseId,observationId:input.observationId??'',
+    origin:input.origin??'web',context,target:copy(input.target),events:[copy(input.event)]};
+  return change(state, next => { next.annotations ??= [];next.annotations.push(note); });
+}
+export function addAnnotationEvent(state, noteId, event) {
+  validate(state);const note = find(state.annotations ?? [], noteId, 'Annotation');
+  const old = note.events.find(item => item.id === event.id);
+  if (old) { require(same(old,event), 'Conflicting annotation event');return state; }
+  require(['comment','resolve','reopen'].includes(event.kind), 'Invalid annotation event kind');
+  if ((event.kind === 'resolve' && annotationStatus(note) === 'resolved') || (event.kind === 'reopen' && annotationStatus(note) === 'open')) {
+    // A no-op still validates the supplied event before returning success.
+    text(event.id,'annotation event ID');text(event.author,'annotation author');text(event.body,'annotation body',true);timestamp(event.createdAt,'annotation event time');return state;
+  }
+  return change(state, next => find(next.annotations,noteId,'Annotation').events.push(copy(event)));
 }
 function change(state, action) {
   validate(state);
@@ -173,6 +246,18 @@ export function importArchive(state, incoming) {
       const existing = old.observations.find(item => item.id === observation.id);
       require(!existing || same(existing, observation), 'Conflicting historical observation');
       if (!existing) old.observations.push(copy(observation));
+    }
+  }
+  for (const note of incoming.annotations ?? []) {
+    next.annotations ??= [];
+    const old = next.annotations.find(item => item.id === note.id);
+    if (!old) { next.annotations.push(copy(note));continue; }
+    const fixed = item => Object.fromEntries(Object.entries(item).filter(([key]) => key !== 'events'));
+    require(same(fixed(old),fixed(note)), 'Conflicting annotation context');
+    for (const event of note.events) {
+      const existing = old.events.find(item => item.id === event.id);
+      require(!existing || same(existing,event), 'Conflicting annotation event');
+      if (!existing) old.events.push(copy(event));
     }
   }
   validate(next);

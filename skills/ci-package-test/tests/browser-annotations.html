@@ -1,0 +1,56 @@
+<!doctype html><meta charset="utf-8"><title>Workbench annotation tests</title>
+<h1>Isolated web annotation and native context checks</h1><pre id="result">Running…</pre><iframe id="app" title="Isolated annotation workbench" style="width:100%;height:700px"></iframe>
+<script type="module">
+import {openStore,read,update} from '../assets/workbench/store.mjs';
+import * as m from '../assets/workbench/model.mjs';
+const workspace=`annotations-test-${crypto.randomUUID()}`,db=await openStore(`ci-package-test-workbench:${workspace}`);
+const frame=document.getElementById('app'),output=document.getElementById('result'),lines=[];
+const require=(condition,message)=>{if(!condition)throw new Error(message);};
+async function until(check) {for(let i=0;i<200;i++){if(await check())return;await new Promise(resolve=>setTimeout(resolve,20));}throw new Error('Timed out waiting for annotation state');}
+const fill=(form,name,value)=>{const input=form.elements.namedItem(name);input.value=value;input.dispatchEvent(new Event('input',{bubbles:true}));};
+try {
+  const original=await read(db);
+  await update(db,original.revision,state=>{
+    let next=m.importPlan(state,{id:'p',revision:0,version:'fixture',title:'Annotation fixture',source:'sha',build:'',pr:'',cases:['A','B'].map(id=>({id,title:`Case ${id}`,priority:'P0',types:['smoke'],preconditions:'Fixture',steps:'Select this exact sentence.',expected:'Expected'}))});
+    for(const id of ['first','second'])next=m.createRound(next,{id,name:id,planId:'p',createdAt:id==='first'?'2026-10-22T01:00:00Z':'2026-10-22T02:00:00Z'});
+    next.revision=state.revision+1;return next;
+  });
+  frame.src=`../assets/workbench/?workspace=${workspace}#plan=p&round=first&case=A`;
+  await until(()=>frame.contentDocument?.querySelector('.annotation-form'));
+  let doc=frame.contentDocument,form=doc.querySelector('.annotation-form');
+  const text=doc.querySelector('[data-annotation-field="steps"]').firstChild,range=doc.createRange();range.setStart(text,7);range.setEnd(text,17);
+  const selection=frame.contentWindow.getSelection();selection.removeAllRanges();selection.addRange(range);
+  [...form.querySelectorAll('button')].find(button=>button.textContent==='引用所选文字').click();
+  require(form.elements.quote.value==='this exact'&&form.elements.field.value==='steps','Quote capture lost text or target');lines.push('PASS selected excerpt retains the exact text and field');
+  fill(form,'author','Fixture author');fill(form,'body','<img src=x onerror=alert(1)> review this');
+  [...form.querySelectorAll('button')].find(button=>button.textContent==='保存批注').click();
+  await until(async()=>(await read(db)).annotations.length===1);
+  let saved=await read(db);require(saved.rounds[0].observations.length===0,'Annotation created an execution result');
+  require(saved.annotations[0].roundId==='first'&&saved.annotations[0].caseId==='A','Wrong annotation scope');
+  require(!doc.querySelector('.annotation img'),'Annotation text executed as markup');lines.push('PASS annotation saves without a device, preserves scope and renders text inertly');
+  let reply=doc.querySelector('.annotation form');fill(reply,'author','Reviewer');
+  [...reply.querySelectorAll('button')].find(button=>button.textContent==='标记已处理').click();
+  await until(async()=>m.annotationStatus((await read(db)).annotations[0])==='resolved');lines.push('PASS resolution appends an event');
+  const loaded=new Promise(resolve=>frame.addEventListener('load',resolve,{once:true}));frame.contentWindow.location.reload();await loaded;
+  await until(()=>frame.contentDocument?.querySelector('.annotation form'));doc=frame.contentDocument;
+  require(doc.querySelector('.annotation strong').textContent.includes('已处理'),'Reload lost annotation status');lines.push('PASS annotation and status survive reload');
+  reply=doc.querySelector('.annotation form');fill(reply,'author','Reviewer');
+  [...reply.querySelectorAll('button')].find(button=>button.textContent==='重新打开').click();
+  await until(async()=>m.annotationStatus((await read(db)).annotations[0])==='open');lines.push('PASS reopen preserves the original comment and resolution');
+  const round=doc.getElementById('round');round.value='second';round.dispatchEvent(new Event('change'));
+  require(!doc.querySelector('.annotation'),'Another round inherited the annotation');lines.push('PASS annotations remain isolated between rounds');
+  saved=await read(db);
+  await update(db,saved.revision,state=>{
+    let next=m.addAnnotation(state,{id:'library-note',planId:'p',roundId:'',caseId:'A',target:{field:'steps',quote:'exact'},event:{id:'library-event',kind:'comment',author:'Fixture',body:'Keep the original definition',createdAt:'2026-10-22T06:00:00Z'}});
+    next=m.importPlan(next,{...next.plans[0],revision:1,cases:[next.plans[0].cases[1]]});next.revision=state.revision+1;return next;
+  });
+  frame.src=`../assets/workbench/?workspace=${workspace}#plan=p&round=&case=A&view=annotations&annotation=library-note`;
+  await until(()=>frame.contentDocument?.getElementById('annotation-library-note'));
+  doc=frame.contentDocument;doc.querySelector('#annotation-library-note button[type="button"]').click();
+  require(frame.contentDocument.getElementById('annotation-library-note')&&new URLSearchParams(frame.contentWindow.location.hash.slice(1)).get('case')==='A','Removed library case lost annotation navigation');lines.push('PASS removed library cases retain navigable annotation snapshots');
+  frame.contentWindow.location.hash='plan=p&round=missing&case=B&view=cases';
+  await until(()=>frame.contentDocument?.querySelector('#detail h2')?.textContent==='无法定位批注上下文');
+  require(!frame.contentDocument.querySelector('.annotation-form'),'Unknown native context displayed a write form');lines.push('PASS unknown native/deep-link context blocks annotation writes');
+  output.textContent=lines.join('\n')+'\nALL 8 ANNOTATION CHECKS PASSED';
+}catch(error){output.textContent=lines.join('\n')+'\nFAIL '+error.stack;}finally{db.close();}
+</script>

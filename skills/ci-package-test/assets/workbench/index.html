@@ -16,7 +16,7 @@
     <details><summary>登记可复用环境 / 设备</summary><form id="environment-form"><label>名称<input name="label" required placeholder="Chrome / 测试机 A"></label><label>环境类型<select name="kind"><option value="browser">浏览器</option><option value="mobile">移动设备</option><option value="desktop">桌面</option><option value="service">服务</option><option value="library">库 / 运行时</option><option value="other">其他</option></select></label><label>配置快照<textarea name="configuration" required placeholder="系统、版本、型号、运行时、部署地址等"></textarea></label><button>登记环境</button></form></details>
     <p class="storage">数据保存在此浏览器的 IndexedDB。导出可备份或迁移；当前模板不提供多人同步。</p>
   </aside><main><section id="stats" class="stats"></section>
-    <div class="actions view-actions"><button id="cases-view">测试用例</button><button id="records-view">执行记录</button><button id="copy-results">复制本轮结果</button></div>
+    <div class="actions view-actions"><button id="cases-view">测试用例</button><button id="records-view">执行记录</button><button id="annotations-view">批注</button><button id="copy-results">复制本轮结果</button></div>
     <section class="workspace"><div class="cases"><div class="filters"><input id="search" aria-label="搜索用例" placeholder="搜索编号或标题"><select id="type" aria-label="测试类型"></select><select id="status" aria-label="结果筛选"></select></div><nav id="case-list" aria-label="测试用例"></nav></div>
       <article id="detail"></article></section>
   </main></div>

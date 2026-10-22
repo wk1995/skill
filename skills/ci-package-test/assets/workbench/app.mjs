@@ -1,5 +1,6 @@
 import * as model from './model.mjs';
 import {openStore, read, update} from './store.mjs';
+import {markTarget, selectedTarget, renderComposer, renderThreads} from './annotation-ui.mjs';
 const $ = id => document.getElementById(id);
 const labels = {smoke:'冒烟',functional:'功能',performance:'性能',compatibility:'兼容性',stability:'稳定性',security:'安全',usability:'易用性','install-upgrade':'安装升级',integration:'集成',passed:'通过',failed:'失败',partial:'部分执行',blocked:'阻塞',untested:'未测试'};
 const el = (tag, text, className) => { const node = document.createElement(tag); if (text != null) node.textContent = text; if (className) node.className = className; return node; };
@@ -8,7 +9,8 @@ const uuid = () => crypto.randomUUID();
 const now = () => new Date().toISOString();
 const localTime = () => { const date = new Date(); return new Date(date - date.getTimezoneOffset()*60000).toISOString().slice(0,16); };
 const hash = new URLSearchParams(location.hash.slice(1));
-let state = model.empty(), db, planId = hash.get('plan') ?? '', roundId = hash.get('round') ?? '', caseId = hash.get('case') ?? '', environmentId = '', view=hash.get('view')==='records'?'records':'cases';
+let state = model.empty(), db, planId = hash.get('plan') ?? '', roundId = hash.get('round') ?? '', caseId = hash.get('case') ?? '', environmentId = '', view=['records','annotations'].includes(hash.get('view'))?hash.get('view'):'cases', observationTarget=hash.get('observation')??'', annotationId=hash.get('annotation')??'';
+let linkError='';
 const selections=new Map();
 const drafts = new Map();
 const draftKey = () => JSON.stringify([roundId,caseId,environmentId]);
@@ -17,9 +19,34 @@ function download(value, name) {
   const url = URL.createObjectURL(new Blob([JSON.stringify(value,null,2)],{type:'application/json'}));
   const anchor=el('a'); anchor.href=url; anchor.download=name; anchor.click(); setTimeout(()=>URL.revokeObjectURL(url),1000);
 }
-async function save(action) {
-  try { state=await update(db,state.revision,action); render(); message('已保存 · 历史记录保留'); }
-  catch(error) { message(error.message,true); }
+async function save(action,onSuccess=()=>{}) {
+  try { state=await update(db,state.revision,action);onSuccess();if(linkError)readLocation();render();message('已保存 · 历史记录保留');return true; }
+  catch(error) { message(error.message,true);return false; }
+}
+function syncLocation(field='') {
+  if(linkError)return;
+  const params=new URLSearchParams({plan:planId,round:roundId,case:caseId,view});
+  if(observationTarget)params.set('observation',observationTarget);if(annotationId)params.set('annotation',annotationId);if(field)params.set('field',field);
+  history.replaceState(null,'',`#${params}`);
+}
+function readLocation() {
+  const params=new URLSearchParams(location.hash.slice(1));
+  planId=params.get('plan')??'';roundId=params.get('round')??'';caseId=params.get('case')??'';observationTarget=params.get('observation')??'';annotationId=params.get('annotation')??'';
+  view=['records','annotations'].includes(params.get('view'))?params.get('view'):'cases';linkError='';
+  const plan=state.plans.find(item=>item.id===planId),round=state.rounds.find(item=>item.id===roundId),note=(state.annotations??[]).find(item=>item.id===annotationId);
+  if(planId&&!plan)linkError='链接中的方案不存在；请先导入对应归档或明确选择目标方案。';
+  else if(roundId&&(!round||round.planId!==planId))linkError='链接中的轮次不属于此方案，请核对批注上下文。';
+  else if(annotationId&&(!note||note.planId!==planId||note.roundId!==roundId||note.caseId!==caseId))linkError='链接中的批注与用例上下文不一致。';
+  else if(caseId&&!(round?.cases??plan?.cases??[]).some(item=>item.id===caseId)&&!note)linkError='链接中的用例不存在，不能自动改为其他用例。';
+  else if(observationTarget&&!round?.observations.some(item=>item.id===observationTarget&&item.caseId===caseId))linkError='链接中的执行记录与用例不一致。';
+  if(note&&!linkError){observationTarget=note.observationId;if(!(round?.cases??plan?.cases??[]).some(item=>item.id===caseId))view='annotations';}
+}
+function navigateAnnotation(note) {
+  linkError='';
+  planId=note.planId;roundId=note.roundId;caseId=note.caseId;observationTarget=note.observationId;annotationId=note.id;
+  const definitions=roundId?state.rounds.find(round=>round.id===roundId)?.cases:state.plans.find(plan=>plan.id===planId)?.cases;
+  view=definitions?.some(item=>item.id===caseId)?'cases':'annotations';
+  $('search').value='';$('type').value='';$('status').value='';render();document.getElementById(`annotation-${note.id}`)?.scrollIntoView({block:'center'});
 }
 function select(id, items, selected) { $(id).replaceChildren(...items.map(([value,label])=>option(value,label))); $(id).value=selected; }
 const pill=(text,type)=>el('span',text,`pill ${type??''}`);
@@ -41,7 +68,7 @@ function render() {
   $('stats').replaceChildren(...[['用例总数',definitions.length],...model.STATUSES.map(status=>[labels[status],counts[status]])].map(([label,count])=>{const div=el('div',null,'stat');div.append(el('strong',count),el('span',label));return div;}));
   const query=$('search').value.toLowerCase();
   const shown=definitions.filter(item=>(`${item.id} ${item.title}`).toLowerCase().includes(query)&&(!$('type').value||item.types.includes($('type').value))&&(!$('status').value||(round?model.statusOf(round,item.id):'untested')===$('status').value));
-  if(!shown.some(item=>item.id===caseId)) caseId=shown[0]?.id??'';
+  if(!shown.some(item=>item.id===caseId)&&view!=='annotations') caseId=shown[0]?.id??'';
   const selected=selections.get(roundId)??new Set();selections.set(roundId,selected);
   $('case-list').replaceChildren(...shown.map(item=>{
     const wrapper=el('div',null,'case-row');
@@ -49,10 +76,18 @@ function render() {
     const button=el('button',null,item.id===caseId?'selected':''); button.append(el('span',`${item.id} · ${item.priority}`,'case-id'),el('span',item.title));
     for(const type of item.types) button.append(pill(labels[type],type));
     const status=round?model.statusOf(round,item.id):'untested';button.append(pill(labels[status],status));
-    button.onclick=()=>{caseId=item.id;view='cases';render();};wrapper.append(button);return wrapper;
+    button.onclick=()=>{linkError='';caseId=item.id;view='cases';observationTarget='';annotationId='';render();};wrapper.append(button);return wrapper;
   }));
   const detail=$('detail');detail.replaceChildren();
-  history.replaceState(null,'',`#${new URLSearchParams({plan:planId,round:roundId,case:caseId,view})}`);
+  if(linkError){detail.append(el('h2','无法定位批注上下文'),el('p',linkError,'context'));return;}
+  if(!round?.observations.some(item=>item.id===observationTarget&&item.caseId===caseId))observationTarget='';
+  const scoped={planId,roundId};
+  if(!(state.annotations??[]).some(note=>note.id===annotationId&&note.planId===planId&&note.roundId===roundId&&note.caseId===caseId))annotationId='';
+  syncLocation();
+  if(view==='annotations') {
+    detail.append(el('h2','批注'),el('p','网页批注可回复、标记处理或重新打开；原生批注通过稳定定位与原文快照联调。','context'));
+    renderThreads(detail,{state,scope:scoped,save,message,navigate:navigateAnnotation});return;
+  }
   if(view==='records') {
     detail.append(el('h2','执行记录'),el('p',round?'本轮所有观察逐条保留；切换轮次可查看历史。':'请选择一个执行轮次。','context'));
     if(round) for(const observation of [...round.observations].reverse()) renderObservation(detail,observation);
@@ -60,12 +95,15 @@ function render() {
   }
   const item=definitions.find(item=>item.id===caseId);
   if(!item) {detail.append(el('p',plan?'没有匹配的用例。':'导入测试方案开始。一个工作台持续管理所有版本、方案和测试轮次。','empty'));return;}
-  detail.append(el('span',`${item.id} · ${round?.name??'当前方案定义'}`,'eyebrow'),el('h2',item.title));
+  const caseScope={planId,roundId,caseId:item.id};
+  detail.dataset.planId=planId;detail.dataset.roundId=roundId;detail.dataset.caseId=item.id;
+  detail.append(el('span',`${item.id} · ${round?.name??'当前方案定义'}`,'eyebrow'),markTarget(el('h2',item.title),caseScope,'case'));
   for(const type of item.types) detail.append(pill(labels[type],type));
   if(round) for(const reason of item.selectionReasons??[]) detail.append(pill(({'previous-failure':'失败复测',smoke:'每轮冒烟',change:'变更纳入',unfinished:'上轮未完成'})[reason]??reason));
-  for(const [label,value] of [['前置条件',item.preconditions],['测试步骤',item.steps],['预期结果',item.expected]]) detail.append(el('h3',label),el('div',value||'无','prose'));
+  for(const [label,value,field] of [['前置条件',item.preconditions,'preconditions'],['测试步骤',item.steps,'steps'],['预期结果',item.expected,'expected']]) detail.append(el('h3',label),markTarget(el('div',value||'','prose'),caseScope,field));
   const link=el('button','复制用例定位信息'); link.onclick=async()=>{try {await navigator.clipboard.writeText(`${plan.version} / ${plan.title} / ${round?.name??'方案定义'} / ${caseId}\n${location.href}`);message('定位信息已复制');}catch{message(location.href);}};detail.append(link);
   if(!round) renderEditor(detail,plan,item); else renderExecution(detail,round,item);
+  renderComposer(detail,{state,scope:{...caseScope,observationId:observationTarget},save,message,navigate:navigateAnnotation});
 }
 function field(form,label,name,value='',tag='input') {
   const wrapper=el('label',label),input=el(tag);input.name=name;input.value=value;input.setAttribute('aria-label',label);wrapper.append(input);form.append(wrapper);return input;
@@ -105,19 +143,27 @@ function renderExecution(detail,round,item) {
   for(const record of round.observations.filter(record=>record.caseId===item.id).reverse()) renderObservation(detail,record);
 }
 function renderObservation(detail,record) {
-  const card=el('div',null,'record');card.append(el('strong',`${record.caseId} · ${labels[record.status]} · ${record.environment.label} · ${record.tester}`),el('small',`执行：${record.executedAt} / 记录：${record.recordedAt}`),el('small',record.environment.configuration),el('p',record.notes||'无备注','prose'),el('div',record.evidence,'prose'));detail.append(card);
+  const card=el('div',null,'record'),scope={planId,roundId,caseId:record.caseId,observationId:record.id};card.id=`observation-${record.id}`;
+  card.dataset.caseId=record.caseId;card.dataset.observationId=record.id;
+  card.append(el('strong',`${record.caseId} · ${labels[record.status]} · ${record.environment.label} · ${record.tester}`),el('small',`执行：${record.executedAt} / 记录：${record.recordedAt}`),el('small',record.environment.configuration),markTarget(el('p',record.notes,'prose'),scope,'observation'),markTarget(el('div',record.evidence,'prose'),scope,'observation'));
+  const annotate=el('button','批注此记录');annotate.type='button';annotate.onclick=()=>{caseId=record.caseId;observationTarget=record.id;annotationId='';view='cases';$('search').value='';$('type').value='';$('status').value='';render();document.querySelector('.annotation-compose')?.scrollIntoView({block:'center'});};card.append(annotate);detail.append(card);
 }
-for(const mode of ['cases','records']) $(`${mode}-view`).onclick=()=>{view=mode;render();};
+for(const mode of ['cases','records','annotations']) $(`${mode}-view`).onclick=()=>{view=mode;render();};
+document.addEventListener('selectionchange',()=>{
+  const selected=selectedTarget($('detail'));if(!selected||selected.planId!==planId||selected.roundId!==roundId)return;
+  caseId=selected.caseId;observationTarget=selected.observationId;annotationId='';syncLocation(selected.field);
+});
 $('copy-results').onclick=async()=>{const round=state.rounds.find(item=>item.id===roundId);if(!round){message('请选择执行轮次。',true);return;}const report=[`${round.version} / ${round.name}\nSource: ${round.source}\nCI: ${round.build}`, ...round.cases.map(item=>`${item.id} ${item.title}: ${labels[model.statusOf(round,item.id)]}`), ...round.observations.map(item=>`${item.caseId} · ${item.environment.label} · ${item.executedAt} · ${labels[item.status]}\n${item.notes}\n${item.evidence}`)].join('\n');try{await navigator.clipboard.writeText(report);message('本轮结果已复制');}catch{message('剪贴板不可用，请导出 JSON 归档。',true);}};
 for(const [id,items] of [['type',model.TYPES],['status',model.STATUSES]]) select(id,[['','全部'+(id==='type'?'类型':'结果')],...items.map(value=>[value,labels[value]])],'');
 for(const id of ['search','type','status']) $(id).addEventListener('input',render);
-$('version').onchange=()=>{planId=state.plans.find(plan=>plan.version===$('version').value)?.id??'';roundId='';render();};
-$('plan').onchange=()=>{planId=$('plan').value;roundId='';render();};$('round').onchange=()=>{roundId=$('round').value;render();};
+$('version').onchange=()=>{linkError='';planId=state.plans.find(plan=>plan.version===$('version').value)?.id??'';roundId='';render();};
+$('plan').onchange=()=>{linkError='';planId=$('plan').value;roundId='';render();};$('round').onchange=()=>{linkError='';roundId=$('round').value;render();};
 $('import-button').onclick=()=>$('import').click();
 $('import').onchange=async event=>{try{if(!event.target.files.length)return;const value=JSON.parse(await event.target.files[0].text());await save(state=>value.schemaVersion?model.importArchive(state,value):model.importPlan(state,value));}catch(error){message(error.message,true);}finally{event.target.value='';}};
 $('json-form').onsubmit=async event=>{event.preventDefault();try{const value=JSON.parse(new FormData(event.target).get('json'));await save(state=>value.schemaVersion?model.importArchive(state,value):model.importPlan(state,value));}catch(error){message(error.message,true);}};
 $('export').onclick=()=>download(state,'test-workbench-archive.json');
-$('reload').onclick=async()=>{try{state=await read(db);render();message('已读取最新数据；未保存的草稿保留。');}catch(error){message(error.message,true);}};
+$('reload').onclick=async()=>{try{state=await read(db);if(linkError)readLocation();render();message('已读取最新数据；未保存的草稿保留。');}catch(error){message(error.message,true);}};
 $('round-form').onsubmit=event=>{event.preventDefault();const data=new FormData(event.target),id=uuid(),changed=data.get('changed').trim();save(state=>model.createRound(state,{id,name:data.get('name'),planId,createdAt:now(),changedIds:changed?changed.split(',').map(value=>value.trim()).filter(Boolean):undefined,includeUnfinished:data.has('unfinished')})).then(()=>{if(!$('message').classList.contains('error')){roundId=id;render();}});};
 $('environment-form').onsubmit=event=>{event.preventDefault();const data=Object.fromEntries(new FormData(event.target)),id=uuid();save(state=>model.registerEnvironment(state,{id,...data})).then(()=>{if(!$('message').classList.contains('error')){environmentId=id;render();}});};
-try { const workspace=new URLSearchParams(location.search).get('workspace');db=await openStore(workspace?`ci-package-test-workbench:${workspace}`:undefined);state=await read(db);render(); } catch(error) {message(`无法载入数据：${error.message}。请保留原数据库并导出可用备份，不要清空。`,true);}
+window.addEventListener('hashchange',async()=>{if(!db)return;try{state=await read(db);readLocation();$('search').value='';$('type').value='';$('status').value='';render();}catch(error){message(error.message,true);}});
+try { const workspace=new URLSearchParams(location.search).get('workspace');db=await openStore(workspace?`ci-package-test-workbench:${workspace}`:undefined);state=await read(db);readLocation();render(); } catch(error) {message(`无法载入数据：${error.message}。请保留原数据库并导出可用备份，不要清空。`,true);}

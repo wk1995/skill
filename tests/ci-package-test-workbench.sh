@@ -5,4 +5,4 @@ command -v node >/dev/null 2>&1 || { echo "FAIL: Node.js 18+ is required for wor
 for module in "$ROOT"/skills/ci-package-test/assets/workbench/*.mjs; do
   node --check "$module"
 done
-node --test "$ROOT/skills/ci-package-test/tests/workbench.test.mjs"
+node --test "$ROOT"/skills/ci-package-test/tests/*.test.mjs

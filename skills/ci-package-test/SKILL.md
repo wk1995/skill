@@ -1,6 +1,6 @@
 ---
 name: ci-package-test
-description: Connect CI packages with PR-derived regression cases and a reusable web test workbench across platforms and distribution channels. Improve and visualize plans, rounds, environments, execution records and repeat testing. Ordinary CI archives artifacts; external publication requires an explicit request.
+description: Connect CI packages with PR-derived regression cases and a reusable web test workbench across platforms and distribution channels. Improve and visualize plans, rounds, environments, execution records, web/native annotation context and repeat testing. Ordinary CI archives artifacts; external publication requires an explicit request.
 metadata:
   sync_id: "android-ci-fir-test"
   version: "0.0.1"
@@ -9,6 +9,7 @@ metadata:
       - Build a test package through CI from a selected source ref for any platform or distribution channel.
       - Derive regression cases from a PR or change set and connect them to the exact package.
       - Improve, visualize, create or maintain the testing process as a reusable web workbench with cases, rounds, environments and records.
+      - Add or use persistent web annotations and browser-native annotation context within this testing workflow.
       - Continue this workflow by preparing or installing a package, executing tests, recording results or preparing subsequent rounds.
       - Explicitly publish a verified CI artifact through the project's separate publication process.
     exclude:
@@ -49,6 +50,7 @@ Read [references/test-rounds.md](references/test-rounds.md) for cases, environme
 - Read the complete PR/change diff at exact base/head, including affected callers. Confirm which changes exist in the package. Cases for absent changes remain blocked.
 - Prepare stable IDs, priorities, multiple test types, prerequisites, steps, expected outcomes and evidence requirements. New results remain pending.
 - Expose versions, multiple plans per version, multiple rounds per plan, case filters/details, registered environments/devices and append-only observations in the web workbench. Include CI/package/PR links, progress, defects, evidence and coverage gaps.
+- Support persistent annotations with selected excerpts, definition snapshots, replies and resolved/reopened state. Keep annotations separate from outcomes, pin them to the correct case/round/observation, and include them in archive import/export. Read [references/annotations.md](references/annotations.md) for web comments and browser-native annotation linkage; native host transport is not an automatic website-to-chat API.
 - Each round includes prior failed cases first, all current smoke cases, change-derived cases, then optional unfinished cases, deduplicated by ID. Smoke runs again after previous passes or an empty diff. Define smoke before starting a round if missing.
 - Keep the current library authoritative. Preserve PR-updated steps and classifications until a newer explicit edit supersedes them; distinguish stale imports from intentional edits. Freeze each round's selected definitions.
 - Register and select an environment before saving results. For mobile this includes physical device details; for web, desktop, services or libraries it includes browser, OS, runtime, deployment or consumer configuration. A shared model name does not establish identical environments.

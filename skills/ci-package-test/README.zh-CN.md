@@ -2,13 +2,14 @@
 
 语言：[English](README.md) | **简体中文**
 
-`ci-package-test` 串联 CI 测试包、基于 PR 的用例和可复用网页测试工作台，适用于不同平台和分发渠道。工作台组织版本、方案、轮次、环境/设备及执行记录。普通 CI 只归档产物，对外发布须明确要求。初始版本仍为 `0.0.1`。
+`ci-package-test` 串联 CI 测试包、基于 PR 的用例和可复用网页测试工作台，适用于不同平台和分发渠道。工作台组织版本、方案、轮次、环境/设备、执行记录及批注。普通 CI 只归档产物，对外发布须明确要求。初始版本仍为 `0.0.1`。
 
 ## 如何使用
 
 ```text
 通过 CI 打测试包，并根据这个 PR 准备回归用例。
 完善测试流程，以可复用网页展示用例、轮次、环境和测试结果。
+支持网页内保存批注，以及 Codex 浏览器原生批注联调，保留摘录、回复和处理状态。
 复用现有工作台准备下一轮：失败优先，每轮包含全部冒烟，再纳入发布 PR diff 得出的用例。
 把 Web 构建放到指定测试环境执行，逐条记录浏览器及配置。
 把 CI run <run-id> 已验证的产物发布到指定分发渠道。
@@ -18,7 +19,9 @@
 
 模板支持版本/方案/轮次导航、多选测试类型、失败及冒烟项纳入、环境登记、带时间的观察记录、冻结轮次定义、JSON 导入导出及用例定位链接。数据保存在当前浏览器的 IndexedDB；多人协作需接入项目服务端。复制模板后可运行 `python3 -m http.server 4317 --bind 127.0.0.1 --directory <工作台目录>`。初始工作台为空，应导入实际变更生成的方案，不能把演示结果当成测试证据。
 
-详细说明见 [SKILL.md](SKILL.md)、[网页交付](references/web-workbench.md)、[CI 与发布](references/ci-and-publication.md)和[测试轮次](references/test-rounds.md)。仓库中运行 `node --test skills/ci-package-test/tests/workbench.test.mjs` 验证模板，需要 Node.js 18+。改名时保留原来的不可变同步 ID。
+批注可以关联用例、具体字段或执行记录，保留引用文字及当时的原文快照，支持回复、标记已处理、重新打开，并随归档保存。浏览器原生批注通过稳定链接、DOM 上下文及“复制原生批注上下文”联调；发送到聊天由宿主提供，核对后可按“原生批注录入”存入工作台，不会自动发送聊天或回写。详见[批注说明](references/annotations.md)。
+
+详细说明见 [SKILL.md](SKILL.md)、[网页交付](references/web-workbench.md)、[CI 与发布](references/ci-and-publication.md)和[测试轮次](references/test-rounds.md)。仓库中运行 `node --test skills/ci-package-test/tests/*.test.mjs` 验证模板，需要 Node.js 18+。改名时保留原来的不可变同步 ID。
 
 ## 何时触发
 

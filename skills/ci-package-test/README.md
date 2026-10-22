@@ -2,13 +2,14 @@
 
 Language: **English** | [简体中文](README.zh-CN.md)
 
-`ci-package-test` connects CI packages, PR-derived cases and a reusable web test workbench across platforms and distribution channels. The workbench organizes versions, plans, rounds, environments/devices and execution records. Ordinary CI archives artifacts; external publication requires an explicit request. The initial version remains `0.0.1`.
+`ci-package-test` connects CI packages, PR-derived cases and a reusable web test workbench across platforms and distribution channels. The workbench organizes versions, plans, rounds, environments/devices, execution records and annotations. Ordinary CI archives artifacts; external publication requires an explicit request. The initial version remains `0.0.1`.
 
 ## How To Use It
 
 ```text
 Build a test package through CI and prepare regression cases for this PR.
 Improve our testing process and display cases, rounds, environments and results in a reusable web workbench.
+Support saved web comments and Codex browser-native annotations, with excerpts, replies and resolution status.
 Use the existing workbench for the next round: failures first, all smoke cases, then cases from the release PR diff.
 Prepare the web build in the specified test environment and record browser/configuration with each result.
 Publish the verified artifact from CI run <run-id> to the specified distribution channel.
@@ -18,7 +19,9 @@ Complete test-process or web-display requests deliver a working web workbench, r
 
 The template supports version/plan/round navigation, multi-type cases, failure/smoke selection, environment registration, timestamped observations, immutable round definitions, JSON import/export and deep links. Storage is browser-local IndexedDB; shared collaboration needs a project-owned server. Serve a copied template with `python3 -m http.server 4317 --bind 127.0.0.1 --directory <workbench-directory>`. It starts empty: import a plan based on actual changes, not demonstration results.
 
-See [SKILL.md](SKILL.md), [web delivery](references/web-workbench.md), [CI and publication](references/ci-and-publication.md) and [test rounds](references/test-rounds.md). Template tests: `node --test skills/ci-package-test/tests/workbench.test.mjs` from this repository (Node.js 18+). The immutable sync ID retains its original value across the rename.
+Annotations can target a case, a field or an execution record; they retain the quoted text and original snapshot, support replies and resolve/reopen events, and are included in archives. Browser-native tools use the stable link/DOM context and a copy-context button. Sending a native annotation to chat is provided by the host; confirmed comments can be recorded in the workbench as native-origin annotations. There is no automatic chat send or writeback. See [annotations](references/annotations.md).
+
+See [SKILL.md](SKILL.md), [web delivery](references/web-workbench.md), [CI and publication](references/ci-and-publication.md) and [test rounds](references/test-rounds.md). Template tests: `node --test skills/ci-package-test/tests/*.test.mjs` from this repository (Node.js 18+). The immutable sync ID retains its original value across the rename.
 
 ## When It Triggers
 
