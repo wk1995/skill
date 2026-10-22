@@ -14,6 +14,8 @@ Open the local URL and import a plan JSON file. The template starts empty and us
 
 The UI includes version/plan/round navigation, case search/type/result filters, current definition editing, frozen round definitions, environment registration and attachment, observations with execution/recording time, and JSON import/export. Deep links include plan, round and case IDs and can be copied for review/annotation context; they do not implement an agent-specific annotation transport. Preserve unsaved form/environment binding when changing case or round.
 
+The optional `?workspace=<name>` URL isolates another browser-local workspace on the same origin; keep that URL stable for reuse. Deep links also retain the cases/records view and update when changing rounds in either view.
+
 ## Plan input
 
 Generate this shape from the actual PR/change set. All case types use the English enum keys exported by `model.mjs`; UI labels are Chinese and can be localized by the target project. Timestamps in archives include a timezone. Build/PR may be empty when unavailable; source must identify the tested revision.
@@ -54,5 +56,7 @@ For team use, keep these contracts while moving persistence behind the project's
 ## Acceptance
 
 Run `node --test <skill-directory>/tests/workbench.test.mjs` (Node.js 18+). Exercise the actual copied/built app in a browser with isolated data: import, edit classification/steps, create a round, register/attach an environment, reject missing registration, append results, reload, export/import and prepare a subsequent no-diff smoke round. Verify another environment's pass cannot clear a failure, and old rounds remain unchanged. Check stale-tab saves preserve the newer state.
+
+For automated browser fixtures, serve the Skill directory and open `tests/browser-store.html` and `tests/browser-ui.html`. They create uniquely named disposable databases, test real IndexedDB transactions and deep-link round/view restoration, and report PASS/FAIL on the page. These browser checks complement the Node suite; they are not run by the shell gate.
 
 Deliver the functioning URL, where data is stored, backup/export instructions, and tested limits. Do not mark demonstration observations as real product-test results or claim multi-user/cloud persistence from this template.

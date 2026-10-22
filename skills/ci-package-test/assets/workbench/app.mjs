@@ -8,7 +8,7 @@ const uuid = () => crypto.randomUUID();
 const now = () => new Date().toISOString();
 const localTime = () => { const date = new Date(); return new Date(date - date.getTimezoneOffset()*60000).toISOString().slice(0,16); };
 const hash = new URLSearchParams(location.hash.slice(1));
-let state = model.empty(), db, planId = hash.get('plan') ?? '', roundId = hash.get('round') ?? '', caseId = hash.get('case') ?? '', environmentId = '', view='cases';
+let state = model.empty(), db, planId = hash.get('plan') ?? '', roundId = hash.get('round') ?? '', caseId = hash.get('case') ?? '', environmentId = '', view=hash.get('view')==='records'?'records':'cases';
 const selections=new Map();
 const drafts = new Map();
 const draftKey = () => JSON.stringify([roundId,caseId,environmentId]);
@@ -52,6 +52,7 @@ function render() {
     button.onclick=()=>{caseId=item.id;view='cases';render();};wrapper.append(button);return wrapper;
   }));
   const detail=$('detail');detail.replaceChildren();
+  history.replaceState(null,'',`#${new URLSearchParams({plan:planId,round:roundId,case:caseId,view})}`);
   if(view==='records') {
     detail.append(el('h2','执行记录'),el('p',round?'本轮所有观察逐条保留；切换轮次可查看历史。':'请选择一个执行轮次。','context'));
     if(round) for(const observation of [...round.observations].reverse()) renderObservation(detail,observation);
@@ -59,7 +60,6 @@ function render() {
   }
   const item=definitions.find(item=>item.id===caseId);
   if(!item) {detail.append(el('p',plan?'没有匹配的用例。':'导入测试方案开始。一个工作台持续管理所有版本、方案和测试轮次。','empty'));return;}
-  history.replaceState(null,'',`#${new URLSearchParams({plan:planId,round:roundId,case:caseId})}`);
   detail.append(el('span',`${item.id} · ${round?.name??'当前方案定义'}`,'eyebrow'),el('h2',item.title));
   for(const type of item.types) detail.append(pill(labels[type],type));
   if(round) for(const reason of item.selectionReasons??[]) detail.append(pill(({'previous-failure':'失败复测',smoke:'每轮冒烟',change:'变更纳入',unfinished:'上轮未完成'})[reason]??reason));
@@ -120,4 +120,4 @@ $('export').onclick=()=>download(state,'test-workbench-archive.json');
 $('reload').onclick=async()=>{try{state=await read(db);render();message('已读取最新数据；未保存的草稿保留。');}catch(error){message(error.message,true);}};
 $('round-form').onsubmit=event=>{event.preventDefault();const data=new FormData(event.target),id=uuid(),changed=data.get('changed').trim();save(state=>model.createRound(state,{id,name:data.get('name'),planId,createdAt:now(),changedIds:changed?changed.split(',').map(value=>value.trim()).filter(Boolean):undefined,includeUnfinished:data.has('unfinished')})).then(()=>{if(!$('message').classList.contains('error')){roundId=id;render();}});};
 $('environment-form').onsubmit=event=>{event.preventDefault();const data=Object.fromEntries(new FormData(event.target)),id=uuid();save(state=>model.registerEnvironment(state,{id,...data})).then(()=>{if(!$('message').classList.contains('error')){environmentId=id;render();}});};
-try { db=await openStore();state=await read(db);render(); } catch(error) {message(`无法载入数据：${error.message}。请保留原数据库并导出可用备份，不要清空。`,true);}
+try { const workspace=new URLSearchParams(location.search).get('workspace');db=await openStore(workspace?`ci-package-test-workbench:${workspace}`:undefined);state=await read(db);render(); } catch(error) {message(`无法载入数据：${error.message}。请保留原数据库并导出可用备份，不要清空。`,true);}
