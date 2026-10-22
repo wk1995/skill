@@ -32,10 +32,25 @@ export function nextTest(round,caseId,environmentId) {
   if(!round.workflow)return {action:'unavailable',reason:'Legacy round: prepare a managed round for environment-bound routing.'};
   const view=inspectWorkflow(round),execution=view.executions.find(entry=>entry.caseId===caseId&&entry.environmentId===environmentId);
   const observation=round.observations.find(entry=>entry.id===execution.observationId);
-  const context={roundId:round.id,caseId,environmentId,state:execution.state,unresolvedFailureId:execution.unresolvedFailureId,basedOnObservationId:observation?.id??null,notes:observation?.notes??'',evidence:observation?.evidence??''};
-  if(!RESULTS.includes(execution.state))return {...context,action:'current',reason:'Execute or continue the current case before selecting an outcome branch.',target:structuredClone(item),available:view.state==='running'};
+  const context={roundId:round.id,caseId,environmentId,state:execution.state,dependenciesSatisfied:execution.dependenciesSatisfied,unmetDependencies:execution.unmetDependencies,dependencyStale:execution.dependencyStale,dependencyEvidence:execution.dependencyEvidence,unresolvedFailureId:execution.unresolvedFailureId,basedOnObservationId:observation?.id??null,notes:observation?.notes??'',evidence:observation?.evidence??''};
+  const byId=new Map(view.executions.filter(entry=>entry.environmentId===environmentId).map(entry=>[entry.caseId,entry]));
+  const prerequisiteAdvice=(id,requestedTargetCaseId=id)=>{
+    while(!byId.get(id).dependenciesSatisfied)id=byId.get(id).unmetDependencies[0].caseId;
+    const target=structuredClone(round.cases.find(entry=>entry.id===id));
+    return {...context,action:'prerequisite',reason:'Complete the unmet prerequisite in this same round/environment before starting the requested case.',target,targetCaseId:id,targetState:byId.get(id).state,requestedTargetCaseId,available:view.state==='running'};
+  };
+  if(execution.state==='running'&&execution.dependencyStale)return {...context,action:'stale',reason:'Prerequisite evidence changed during execution; record blocked, then restart with current prerequisite evidence.',target:structuredClone(item),targetCaseId:caseId,targetState:execution.state,available:false};
+  if(execution.state==='passed'&&execution.dependencyStale){
+    if(!execution.dependenciesSatisfied)return prerequisiteAdvice(caseId);
+    return {...context,action:'retry',reason:'Prerequisite evidence changed; retest this case before using its previous pass.',target:structuredClone(item),targetCaseId:caseId,targetState:execution.state,available:view.state==='running'};
+  }
+  if(!RESULTS.includes(execution.state)){
+    if(!execution.dependenciesSatisfied)return prerequisiteAdvice(caseId);
+    return {...context,action:'current',reason:'Execute or continue the current case before selecting an outcome branch.',target:structuredClone(item),available:view.state==='running'};
+  }
   if(!item.next)return {...context,action:'unconfigured',reason:'No next-test branch is defined for this case; do not infer the next test.'};
   const route=item.next[execution.state];
+  if(['test','retry'].includes(route.action)&&!byId.get(route.caseId).dependenciesSatisfied)return prerequisiteAdvice(route.caseId,route.caseId);
   const target=['test','retry'].includes(route.action)?structuredClone(round.cases.find(entry=>entry.id===route.caseId)):null;
   return {...context,action:route.action,reason:route.reason,...(route.action==='wait'?{resumeWhen:route.resumeWhen}:{}),target,available:view.state==='running'&&Boolean(target),targetCaseId:target?.id??null,
     targetState:target?view.executions.find(entry=>entry.caseId===target.id&&entry.environmentId===environmentId).state:null};

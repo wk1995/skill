@@ -10,6 +10,7 @@ Language: **English** | [简体中文](README.zh-CN.md)
 Build a test package through CI and prepare regression cases for this PR.
 Improve our testing process and display cases, rounds, environments and results in a reusable web workbench.
 Support saved web comments and Codex browser-native annotations, with excerpts, replies and resolution status.
+Express case prerequisites: require LOGIN01 and CART01 to pass before PAY01 in this round/environment.
 Define what to test next after pass, failure, partial execution, blocking or skipping; distinguish blockers from product defects.
 Use machine-readable state machines for cases/executions and export current states, event history and allowed next actions for AI.
 Use the existing workbench for the next round: failures first, all smoke cases, then cases from the release PR diff.
@@ -26,6 +27,8 @@ Annotations can target a case, a field or an execution record; they retain the q
 New rounds follow draft → ready → running → completed; executions are tracked separately per case/environment, with explicit start/retest and guarded outcomes. Events retain actor, time and original evidence. Ending a round does not mean all passed. **Export AI state snapshot** includes the shared contract, original archive, current states and allowed next actions. Older archives remain explicitly legacy; no history is fabricated. See [state machines](references/state-machine.md).
 
 Cases can define explicit outcome branches to another test, retry, wait (with a recovery condition), or end that branch. The webpage and AI show the concrete target procedure per environment. Known failures remain unresolved through partial/blocked/skipped retests until a passing retest. Older flat cases show missing routing explicitly. See [conditional tests and outcome meanings](references/conditional-tests.md).
+
+Use `dependsOn` for required prerequisite cases and `next` for outcome branches. The workbench orders prerequisites, rejects cyclic dependencies, blocks ineligible starts and exposes exactly which cases are missing. Upstream retests make downstream evidence stale until revalidated; original records remain intact. See [dependencies](references/dependencies.md).
 
 See [SKILL.md](SKILL.md), [web delivery](references/web-workbench.md), [CI and publication](references/ci-and-publication.md) and [test rounds](references/test-rounds.md). Template tests: `node --test skills/ci-package-test/tests/*.test.mjs` from this repository (Node.js 18+). The immutable sync ID retains its original value across the rename.
 

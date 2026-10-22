@@ -30,6 +30,10 @@ Every event has an immutable ID, scope, action, expected `from`, computed `to`, 
 
 Event-array order is authoritative. Replay validates every transition and observation reference before persistence; wall-clock timestamps do not reorder workflow history. Summaries use each environment's current execution state. A failed environment takes priority over blocked, partial, running, untested, skipped, then passed, so another device passing cannot clear a failure. A new round begins untested and must rerun smoke.
 
+## Prerequisite cases
+
+Use [dependencies.md](dependencies.md) for `dependsOn`, same-round/environment prerequisite passes, acyclic ordering and evidence freshness. Replay enforces start/result guards, UI and AI expose readiness, and old dependent passes become stale after upstream retests without rewriting history.
+
 ## Concrete next tests
 
 Read [conditional-tests.md](conditional-tests.md) for `case.next`, outcome meanings and concrete test guidance. Keep legal lifecycle `nextActions` separate from `nextTest`, which supplies a frozen target procedure or an explicit wait/retry/done action. `unresolvedFailureId` preserves known failures through incomplete or skipped retests; only a passing retest on the same case/environment clears it.

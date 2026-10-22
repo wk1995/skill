@@ -1,6 +1,8 @@
+import {DEPENDENCIES, dependencyViews} from './dependencies.mjs';
 // JSON-compatible contract: shared by replay, UI action discovery and AI exports.
 export const CONTRACT = {
   id: 'ci-package-test/workflow', version: 1,
+  dependencies: DEPENDENCIES,
   identity: ['roundId', 'caseId', 'environmentId'],
   data: {
     archive: {schemaVersion:1, collections:['plans','environments','rounds','annotations'], revision:'optimistic concurrency counter'},
@@ -16,9 +18,9 @@ export const CONTRACT = {
     reopen: {from: ['completed'], to: 'running', guards: ['reason']}
   }},
   execution: {initial: 'untested', transitions: {
-    start: {from: ['untested', 'passed', 'failed', 'partial', 'blocked', 'skipped'], to: 'running', guards: ['round-running', 'attached-environment']},
+    start: {from: ['untested', 'passed', 'failed', 'partial', 'blocked', 'skipped'], to: 'running', guards: ['round-running', 'attached-environment', 'dependencies-passed']},
     defer: {from: ['untested'], to: ['blocked', 'skipped'], guards: ['round-running', 'attached-environment', 'matching-observation', 'no-execution-time']},
-    record: {from: ['running'], to: ['passed', 'failed', 'partial', 'blocked', 'skipped'], guards: ['round-running', 'matching-observation']}
+    record: {from: ['running'], to: ['passed', 'failed', 'partial', 'blocked', 'skipped'], guards: ['round-running', 'matching-observation', 'prerequisite-evidence-current-unless-blocked-or-skipped']}
   }},
   unresolvedFailure: 'Keep the same case/environment failure ID through start, partial, blocked and skipped; only an observed pass clears it. Current execution phase and overall result are separate.',
   summaryPriority: ['failed', 'blocked', 'partial', 'running', 'untested', 'skipped', 'passed'],
@@ -48,8 +50,9 @@ export function inspectWorkflow(round) {
   require(round.workflow && round.workflow.version === CONTRACT.version && Array.isArray(round.workflow.events), 'Invalid workflow contract');
   let state = CONTRACT.round.initial;
   const executions = new Map(), seen = new Set(), observed = new Set();
-  const current = (caseId, environmentId) => executions.get(key(caseId,environmentId)) ?? {state: CONTRACT.execution.initial, attemptId: null, observationId: null, unresolvedFailureId: null};
-  const unfinished = () => round.cases.some(item => round.environments.some(env => !RESULTS.includes(current(item.id,env.id).state)));
+  const current = (caseId, environmentId) => executions.get(key(caseId,environmentId)) ?? {state: CONTRACT.execution.initial, attemptId: null, observationId: null, unresolvedFailureId: null, dependencyEvidence: []};
+  const readiness=environmentId=>dependencyViews(round.cases,current,environmentId);
+  const unfinished = () => round.environments.some(env=>[...readiness(env.id).values()].some(item=>!RESULTS.includes(item.state)||(item.state==='passed'&&item.dependencyStale)));
   for (const event of round.workflow.events) {
     require(event && text(event.id) && !seen.has(event.id), 'Invalid/duplicate workflow event ID');seen.add(event.id);
     require(text(event.actor) && time(event.at) && typeof event.reason === 'string', 'Workflow actor, timezone timestamp and reason text required');
@@ -70,27 +73,32 @@ export function inspectWorkflow(round) {
       require(event.from === previous.state && transition.from.includes(previous.state), 'Invalid execution transition/from-state');
       if (event.action === 'start') {
         require(event.to === transition.to && event.observationId === '', 'Invalid start event');
-        executions.set(key(event.caseId,event.environmentId),{...previous,state: event.to, attemptId: event.id});
+        const dependencies=readiness(event.environmentId).get(event.caseId);
+        require(dependencies.dependenciesSatisfied,`Prerequisites not passed: ${dependencies.unmetDependencies.map(item=>item.caseId).join(', ')}`);
+        executions.set(key(event.caseId,event.environmentId),{...previous,state: event.to, attemptId: event.id,dependencyEvidence:dependencies.currentEvidence});
       } else {
         require(transition.to.includes(event.to), 'Invalid execution result');
         const observation = round.observations.find(item => item.id === event.observationId);
         require(observation && !observed.has(observation.id) && observation.caseId === event.caseId && observation.environmentId === event.environmentId && observation.status === event.to && observation.tester === event.actor && observation.recordedAt === event.at && observation.notes === event.reason, 'Workflow observation mismatch');
+        const dependencies=readiness(event.environmentId).get(event.caseId);
+        if(event.action==='record'&&!['blocked','skipped'].includes(event.to))require(!dependencies.dependencyStale,'Prerequisite evidence changed; record blocked and restart after prerequisites pass');
         if(event.action==='defer')require(observation.executedAt===null,'Deferred case requires executedAt=null; do not fabricate execution');
         const definition=round.cases.find(item=>item.id===event.caseId);
         const required=[...CONTRACT.resultRequirements[event.to],...(definition.next?CONTRACT.routing.resultRequirements[event.to]??[]:[])];
         for (const field of required) require(text(observation[field]), `${event.to} requires ${field}`);
         observed.add(observation.id);
-        executions.set(key(event.caseId,event.environmentId),{state:event.to, attemptId:previous.attemptId, observationId:observation.id,unresolvedFailureId:event.to==='passed'?null:event.to==='failed'?observation.id:previous.unresolvedFailureId});
+        executions.set(key(event.caseId,event.environmentId),{state:event.to, attemptId:previous.attemptId,dependencyEvidence:previous.dependencyEvidence, observationId:observation.id,unresolvedFailureId:event.to==='passed'?null:event.to==='failed'?observation.id:previous.unresolvedFailureId});
       }
     }
   }
   require(observed.size === round.observations.length, 'Every managed observation requires a workflow event');
-  return {state, executions: round.cases.flatMap(item => round.environments.map(env => ({caseId:item.id,environmentId:env.id,...current(item.id,env.id)})))};
+  const projected=new Map(round.environments.map(env=>[env.id,readiness(env.id)]));
+  return {state, executions: round.cases.flatMap(item => round.environments.map(env => ({caseId:item.id,environmentId:env.id,...projected.get(env.id).get(item.id)})))};
 }
 export function roundActions(round) {
   const view = inspectWorkflow(round);
   return Object.entries(CONTRACT.round.transitions).filter(([,transition]) => transition.from.includes(view.state)).map(([action,transition]) => {
-    const missing = transition.guards.filter(guard => guard === 'attached-environment' ? !round.environments.length : guard === 'all-executions-terminal' ? view.executions.some(item => !RESULTS.includes(item.state)) : false);
+    const missing = transition.guards.filter(guard => guard === 'attached-environment' ? !round.environments.length : guard === 'all-executions-terminal' ? view.executions.some(item => !RESULTS.includes(item.state)||(item.state==='passed'&&item.dependencyStale)) : false);
     return {action,from:view.state,to:transition.to,allowed:!missing.length,missing,requiresReason:transition.guards.includes('reason')};
   });
 }

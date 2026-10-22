@@ -100,7 +100,7 @@ function render() {
   detail.dataset.planId=planId;detail.dataset.roundId=roundId;detail.dataset.caseId=item.id;
   detail.append(el('span',`${item.id} · ${round?.name??'当前方案定义'}`,'eyebrow'),markTarget(el('h2',item.title),caseScope,'case'));
   for(const type of item.types) detail.append(pill(labels[type],type));
-  if(round) for(const reason of item.selectionReasons??[]) detail.append(pill(({'previous-failure':'失败复测',smoke:'每轮冒烟',change:'变更纳入',unfinished:'上轮未完成','conditional-next':'条件分支纳入'})[reason]??reason));
+  if(round) for(const reason of item.selectionReasons??[]) detail.append(pill(({'previous-failure':'失败复测',smoke:'每轮冒烟',change:'变更纳入',unfinished:'上轮未完成','conditional-next':'条件分支纳入',dependency:'前置依赖纳入'})[reason]??reason));
   for(const [label,value,field] of [['前置条件',item.preconditions,'preconditions'],['测试步骤',item.steps,'steps'],['预期结果',item.expected,'expected']]) detail.append(el('h3',label),markTarget(el('div',value||'','prose'),caseScope,field));
   const link=el('button','复制用例定位信息'); link.onclick=async()=>{try {await navigator.clipboard.writeText(`${plan.version} / ${plan.title} / ${round?.name??'方案定义'} / ${caseId}\n${location.href}`);message('定位信息已复制');}catch{message(location.href);}};detail.append(link);
   if(!round) renderEditor(detail,plan,item); else renderExecution(detail,round,item);
@@ -115,9 +115,11 @@ function renderEditor(detail,plan,item) {
   field(form,'标题','title',item.title).required=true;
   const types=el('div'); for(const type of model.TYPES) {const label=el('label',labels[type],'check'),input=el('input');input.type='checkbox';input.name='types';input.value=type;input.checked=item.types.includes(type);label.prepend(input);types.append(label);}form.append(types);
   field(form,'前置条件','preconditions',item.preconditions,'textarea');field(form,'步骤','steps',item.steps,'textarea').required=true;field(form,'预期','expected',item.expected,'textarea').required=true;
+  field(form,'前置用例 ID（逗号分隔）','dependsOn',(item.dependsOn??[]).join(', '));
   field(form,'结果分支 next（JSON，可留空）','next',item.next?JSON.stringify(item.next,null,2):'','textarea');
   form.append(el('button','保存定义（不改历史轮次）','primary'));
   form.onsubmit=event=>{event.preventDefault();try{const data=new FormData(form),edited={...item,title:data.get('title'),preconditions:data.get('preconditions'),steps:data.get('steps'),expected:data.get('expected'),types:data.getAll('types')};
+    edited.dependsOn=data.get('dependsOn').split(',').map(id=>id.trim()).filter(Boolean);
     if(data.get('next').trim())edited.next=JSON.parse(data.get('next'));else delete edited.next;
     save(state=>model.editCase(state,plan.id,edited));}catch(error){message(error.message,true);}};
   panel.append(form);detail.append(panel);
@@ -151,9 +153,12 @@ function renderExecution(detail,round,item) {
   const form=el('form');form.id='observation-form';const draft=drafts.get(draftKey())??{};
   const managed=Boolean(round.workflow),active=managed?model.inspectWorkflow(round).state==='running':true;
   if(managed) {
-    const current=env?model.executionState(round,item.id,env.id):'untested';
+    const readiness=env?model.inspectWorkflow(round).executions.find(entry=>entry.caseId===item.id&&entry.environmentId===env.id):null;
+    const current=readiness?.state??'untested';
+    if(readiness?.unmetDependencies.length)detail.append(el('p',`前置依赖未满足：${readiness.unmetDependencies.map(dep=>`${dep.caseId}（${labels[dep.state]}${dep.dependencyStale?'，结果已过期':''}）`).join('、')}。需在本轮、本环境通过。`,'context'));
+    if(readiness?.dependencyStale)detail.append(el('p','前置用例的执行证据已变化；历史结果保留，当前用例需要重新验证。','context'));
     detail.append(el('p',env?`当前环境执行状态：${labels[current]}。通过/失败/部分执行前须开始；待测可直接阻塞或跳过，保留历史。`:'请选择环境查看执行状态。','context'));
-    const begin=el('button',current==='untested'?'开始此用例':'重新执行此用例');begin.type='button';begin.id='start-execution';begin.disabled=!active||!env||current==='running';
+    const begin=el('button',current==='untested'?'开始此用例':'重新执行此用例');begin.type='button';begin.id='start-execution';begin.disabled=!active||!env||current==='running'||!readiness?.dependenciesSatisfied;
     begin.onclick=()=>{const tester=form.elements.tester.value;save(state=>model.startExecution(state,round.id,{id:uuid(),from:current,actor:tester,at:now(),caseId:item.id,environmentId:env.id}));};form.append(begin);
   }
   const meanings=el('details');meanings.append(el('summary','如何区分失败、部分执行、阻塞和跳过'));
@@ -181,8 +186,8 @@ function renderExecution(detail,round,item) {
 function renderNextTest(detail,round,item,env) {
   const advice=model.nextTest(round,item.id,env.id),panel=el('section');panel.id='next-test';
   panel.append(el('h3','下一步测什么'));
-  const actionLabels={current:'继续当前用例',test:'执行后续用例',retry:'重新验证当前用例',wait:'等待条件恢复',done:'此分支结束',unconfigured:'尚未配置下一步',unavailable:'当前流程不支持分支'};
-  panel.append(el('strong',actionLabels[advice.action]),el('p',({current:'请先执行或继续当前用例，再根据实际结果选择后续测试。',unconfigured:'该用例尚未配置结果分支，请完善定义，不能自动猜测下一项。',unavailable:'旧流程请准备新轮次后使用按环境分支。'})[advice.action]??advice.reason,'context'));
+  const actionLabels={current:'继续当前用例',test:'执行后续用例',retry:'重新验证当前用例',wait:'等待条件恢复',done:'此分支结束',unconfigured:'尚未配置下一步',unavailable:'当前流程不支持分支',prerequisite:'先完成前置用例',stale:'依赖已变化，先记录阻塞'};
+  panel.append(el('strong',actionLabels[advice.action]),el('p',({current:'请先执行或继续当前用例，再根据实际结果选择后续测试。',unconfigured:'该用例尚未配置结果分支，请完善定义，不能自动猜测下一项。',unavailable:'旧流程请准备新轮次后使用按环境分支。',prerequisite:'请先在本轮、本环境完成下方前置用例，再返回目标测试。',stale:'执行期间依赖证据已变化；请记录阻塞，确认前置条件后重新开始。'})[advice.action]??advice.reason,'context'));
   if(advice.resumeWhen)panel.append(el('p',`恢复条件：${advice.resumeWhen}`,'context'));
   if(advice.unresolvedFailureId)panel.append(el('p',`仍有未解决失败：${advice.unresolvedFailureId}。部分执行、阻塞或跳过均不会清除此失败；需在本环境重测通过。`,'error'));
   if(advice.basedOnObservationId)panel.append(el('small',`依据：${labels[advice.state]} · ${advice.basedOnObservationId} · ${env.label}`));

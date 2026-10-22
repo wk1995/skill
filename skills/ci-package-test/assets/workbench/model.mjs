@@ -1,3 +1,4 @@
+import {validateDependencies, orderCases} from './dependencies.mjs';
 import {validateNext, validateTargets, nextTest} from './routing.mjs';
 export {nextTest};
 import {CONTRACT, RESULTS, inspectWorkflow, roundActions} from './workflow.mjs';
@@ -35,13 +36,13 @@ function validateCase(item) {
   text(item.preconditions, 'case.preconditions', true);
   list(item.types, 'case.types');
   require(item.types.length && new Set(item.types).size === item.types.length && item.types.every(type => TYPES.includes(type)), 'case: invalid types');
-  validateNext(item);
+  validateNext(item);validateDependencies(item);
 }
 export function validatePlan(plan) {
   require(object(plan), 'plan: object required');
   for (const key of ['id', 'version', 'title', 'source', 'build', 'pr']) text(plan[key], `plan.${key}`, ['build', 'pr'].includes(key));
   require(Number.isSafeInteger(plan.revision) && plan.revision >= 0, 'plan: invalid revision');
-  unique(plan.cases, 'plan.cases'); plan.cases.forEach(validateCase); validateTargets(plan.cases);
+  unique(plan.cases, 'plan.cases'); plan.cases.forEach(validateCase); validateTargets(plan.cases);orderCases(plan.cases);
   return plan;
 }
 function validateEnvironment(env) {
@@ -57,7 +58,7 @@ export function validate(state) {
   for (const round of state.rounds) {
     for (const key of ['id', 'name', 'planId', 'version', 'source', 'build', 'pr']) text(round[key], `round.${key}`, ['build', 'pr'].includes(key));
     find(state.plans, round.planId, 'Plan'); timestamp(round.createdAt, 'round.createdAt');
-    unique(round.cases, 'round.cases'); round.cases.forEach(validateCase); validateTargets(round.cases);
+    unique(round.cases, 'round.cases'); round.cases.forEach(validateCase); validateTargets(round.cases);orderCases(round.cases);
     require(round.cases.some(item => item.types.includes('smoke')), 'Round requires smoke coverage');
     unique(round.environments, 'round.environments');
     for (const env of round.environments) {
@@ -188,7 +189,7 @@ export function statusOf(round, caseId) {
   const latest = new Map();
   const priority = CONTRACT.summaryPriority;
   if (round.workflow) {
-    const statuses = inspectWorkflow(round).executions.filter(item => item.caseId === caseId).map(item => item.unresolvedFailureId?'failed':item.state);
+    const statuses = inspectWorkflow(round).executions.filter(item => item.caseId === caseId).map(item => item.unresolvedFailureId?'failed':item.dependencyStale&&['passed','running'].includes(item.state)?'blocked':item.state);
     return priority.find(status => statuses.includes(status)) ?? 'untested';
   }
   for (const item of round.observations.filter(item => item.caseId === caseId)) {
@@ -219,15 +220,18 @@ export function createRound(state, input) {
   list(changedIds, 'changedIds'); changedIds.forEach(id => add(find(plan.cases, id, 'Changed case'), 'change'));
   if (input.includeUnfinished && previous) previous.cases.filter(item => statusOf(previous, item.id) !== 'passed').forEach(item => add(item, 'unfinished'));
   // Freeze the complete reachable branch graph; map iteration visits newly added targets once.
-  for(const item of selected.values())for(const status of RESULTS) {
-    const route=item.next?.[status];
-    if(route&&['test','retry'].includes(route.action)) {
-      const target=current.get(route.caseId)??previous?.cases.find(entry=>entry.id===route.caseId);
-      require(target,`Next case not found: ${route.caseId}`);add(target,'conditional-next');
+  for(const item of selected.values()) {
+    for(const id of item.dependsOn??[]){const target=current.get(id)??previous?.cases.find(entry=>entry.id===id);require(target,`Dependency case not found: ${id}`);add(target,'dependency');}
+    for(const status of RESULTS) {
+      const route=item.next?.[status];
+      if(route&&['test','retry'].includes(route.action)) {
+        const target=current.get(route.caseId)??previous?.cases.find(entry=>entry.id===route.caseId);
+        require(target,`Next case not found: ${route.caseId}`);add(target,'conditional-next');
+      }
     }
   }
   const round = {id: input.id, name: input.name, planId: plan.id, version: plan.version, source: plan.source,
-    build: plan.build, pr: plan.pr, createdAt: input.createdAt, cases: [...selected.values()], environments: [], observations: [], workflow: {version: CONTRACT.version, events: []}};
+    build: plan.build, pr: plan.pr, createdAt: input.createdAt, cases: orderCases([...selected.values()]), environments: [], observations: [], workflow: {version: CONTRACT.version, events: []}};
   return change(state, next => next.rounds.push(round));
 }
 export function record(state, roundId, observation) {
@@ -338,7 +342,7 @@ export function exportAI(state) {
       const view = inspectWorkflow(round);
       return {roundId:round.id,state:view.state,nextActions:roundActions(round),executions:view.executions.map(item => ({...item,
         nextTest:nextTest(round,item.caseId,item.environmentId),
-        nextActions:view.state !== 'running' ? [] : item.state === 'running' ? RESULTS.map(result=>({action:'record',to:result,required:[...CONTRACT.resultRequirements[result],...(round.cases.find(entry=>entry.id===item.caseId).next?CONTRACT.routing.resultRequirements[result]??[]:[])]})) : [{action:'start',from:item.state,to:'running'},...(item.state==='untested'?CONTRACT.execution.transitions.defer.to.map(to=>({action:'defer',from:item.state,to,required:[...CONTRACT.resultRequirements[to],'executedAt'],values:{executedAt:null}})):[])]
+        nextActions:view.state !== 'running' ? [] : item.state === 'running' ? RESULTS.filter(result=>!item.dependencyStale||['blocked','skipped'].includes(result)).map(result=>({action:'record',to:result,required:[...CONTRACT.resultRequirements[result],...(round.cases.find(entry=>entry.id===item.caseId).next?CONTRACT.routing.resultRequirements[result]??[]:[])]})) : [...(item.dependenciesSatisfied?[{action:'start',from:item.state,to:'running'}]:[]),...(item.state==='untested'?CONTRACT.execution.transitions.defer.to.map(to=>({action:'defer',from:item.state,to,required:[...CONTRACT.resultRequirements[to],'executedAt'],values:{executedAt:null}})):[])]
       }))};
     }),annotations:(state.annotations??[]).map(note=>({annotationId:note.id,state:annotationStatus(note)}))
   }};

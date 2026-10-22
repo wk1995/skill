@@ -48,6 +48,10 @@ Define exactly the five result keys when `next` is present. Each branch requires
 
 For multi-step work, split independently observable checks into stable case nodes when different outcomes require different next procedures. Do not add a universal diagnostics node to every project: define branches from actual changes, expected behavior and authorized scope. If partial completion needs a specific remaining subcase, route to that explicit node; notes must identify what was completed and what remains. Routed partial results require nonempty notes; old flat cases retain their previous archive contract.
 
+## Prerequisites versus branches
+
+Use [dependsOn](dependencies.md) for required upstream cases, separate from outcome-based `next`. A branch target with unmet prerequisites cannot start; guidance identifies an actionable ancestor instead. Explicit blocked/skipped branches may continue independent authorized work. Dependency cycles reject even though retry/routing cycles are permitted.
+
 ## Runtime and persistence
 
 The shared contract is `CONTRACT.routing` in `workflow.mjs`; `routing.mjs` validates branch shape/targets and derives `nextTest`. Direct plan import, case edit, archive import and round validation all enforce it before the IndexedDB put. Old cases without `next` remain valid and show `unconfigured`; never guess or fabricate branches. The current-definition editor accepts `next` JSON; edits affect subsequent rounds and leave historical branch snapshots intact.

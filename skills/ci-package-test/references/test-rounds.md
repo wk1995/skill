@@ -32,7 +32,7 @@ Prepare each round as an ordered union by stable case ID:
 3. Cases derived from the selected release PR diff.
 4. Optional unfinished cases when within the requested scope.
 
-Retain all selection reasons when deduplicating. If no smoke definition exists, define the core smoke set before starting a round. Never silently omit failures or smoke due to a stale library, inherited object keys, filtering, or a changed display category.
+Retain all selection reasons when deduplicating. Include recursive [case prerequisites](dependencies.md) and place them before dependents; this precedence may move prerequisites ahead of failed/smoke cases. Require current same-round/environment passes, preserving history and revalidating dependent results when upstream evidence changes. If no smoke definition exists, define the core smoke set before starting a round. Never silently omit failures or smoke due to a stale library, inherited object keys, filtering, or a changed display category.
 
 Resolve case content and classification independently: carry forward PR-updated steps and smoke promotions until a newer explicit edit supersedes them. A stale library must not revert them. An explicit current removal of a smoke label is authoritative. Preserve the previous library baseline or equivalent revision evidence to distinguish old data from intentional edits. Freeze the selected definition/classification in each round; later library edits affect future rounds and the current definition view, not old snapshots. Refresh stale preparation after relevant PR/library revisions change.
 
