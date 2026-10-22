@@ -30,6 +30,10 @@ Cases can define explicit outcome branches to another test, retry, wait (with a 
 
 Use `dependsOn` for required prerequisite cases and `next` for outcome branches. The workbench orders prerequisites, rejects cyclic dependencies, blocks ineligible starts and exposes exactly which cases are missing. Upstream retests make downstream evidence stale until revalidated; original records remain intact. See [dependencies](references/dependencies.md).
 
+The webpage shows an interactive flow graph: solid prerequisite edges, dashed outcome routes, current per-environment states, unresolved failures/stale evidence, and selected/next-case highlights. Click a node to open its test without starting or saving it; graph and detail environment selection stay aligned. The next-test panel includes concrete steps and expected results. Definitions and legacy rounds do not fabricate managed execution states.
+
+Optional `testLocation` hints show application/page, entry path and named control locators/actions. **Copy phone test hints** includes source/round/environment context and the actual procedure for a person or device controller. Hints require a live-screen check; they never prove a pass or trigger a phone command. Edit them in the current definition; historical rounds retain original hints. See [test location and device handoff](references/test-location.md).
+
 ### Routing And Prerequisite Flow
 
 Declare a required pass on the **target's `dependsOn`**, including when that target is reached through `next`. For example, LOGIN01's passed branch targets PAY01, while PAY01 requires both LOGIN01 and CART01. Until CART01 passes, guidance identifies CART01 first; it does not record a result or change the configured route. See the [combined definition example](references/dependencies.md#where-to-put-the-condition).

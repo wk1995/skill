@@ -16,6 +16,14 @@ The UI includes editable case prerequisites, guarded starts, unmet/stale depende
 
 The optional `?workspace=<name>` URL isolates another browser-local workspace on the same origin; keep that URL stable for reuse. Deep links also retain the cases/records view and update when changing rounds in either view.
 
+## Interactive flow and test positioning
+
+The flow panel uses native SVG paths and accessible HTML node buttons, with no external renderer/runtime dependency. `flow.mjs` projects the frozen definitions and environment workflow also used by AI; `flow-ui.mjs` renders it. Solid edges are required prerequisites; dashed edges are grouped outcome routes, with available routes highlighted separately. Nodes show phase, selected/next markers and unresolved-failure/staleness warnings. Relationship details expose outcome labels. Wide graphs scroll inside the panel on narrow displays; the full graph is independent of list filters.
+
+Select an attached environment in the graph or detail to see current states. Without a managed round/environment, show definition/legacy context or an environment prompt instead of fabricated results. Selecting a node opens its case, clears list filters and retains environment/history; it never starts execution. The next-test panel uses the same `nextTest`, frozen steps and expected result as detail/AI. Completed rounds retain evidence and disable executable route recommendations until reopened.
+
+Optional [testLocation](test-location.md) supplies page/path/control hints for direct device testing. Editor, archive/round validation, annotation snapshots and AI share its field validator. Rendering/copying are read-only. Match declared hints against the live device view before acting; hints are not observed results.
+
 ## Plan input
 
 Generate this shape from the actual PR/change set. All case types use the English enum keys exported by `model.mjs`; UI labels are Chinese and can be localized by the target project. Timestamps in archives include a timezone. Build/PR may be empty when unavailable; source must identify the tested revision.
@@ -57,6 +65,6 @@ For team use, keep these contracts while moving persistence behind the project's
 
 Run `node --test <skill-directory>/tests/*.test.mjs` (Node.js 18+). Exercise the actual copied/built app in a browser with isolated data: import, edit classification/steps, create a round, register/attach an environment, reject missing registration, mark ready/start, start individual/batch executions, reject invalid transitions or missing reasons/evidence, append results, end/reopen with a reason, export AI state, reload, export/import and prepare a subsequent no-diff smoke round. Verify another environment's pass cannot clear a failure, and old rounds remain unchanged. Check stale-tab saves preserve the newer state.
 
-For automated browser fixtures, serve the Skill directory and open `tests/browser-store.html`, `tests/browser-ui.html`, `tests/browser-annotations.html`, `tests/browser-workflow.html`, `tests/browser-routing.html` and `tests/browser-dependencies.html`. They create uniquely named disposable databases, test real transactions, deep-link context and annotation interaction, and report PASS/FAIL on the page. These browser checks complement the Node suite; they are not run by the shell gate.
+For automated browser fixtures, serve the Skill directory and open `tests/browser-store.html`, `tests/browser-ui.html`, `tests/browser-annotations.html`, `tests/browser-workflow.html`, `tests/browser-routing.html`, `tests/browser-dependencies.html` and `tests/browser-flow.html`. They create uniquely named disposable databases, test real transactions, deep links, annotations, graph/environment/navigation, locator validation and phone handoff, and report PASS/FAIL on the page. These checks complement the Node suite; they are not run by the shell gate.
 
 Deliver the functioning URL, where data is stored, backup/export instructions, and tested limits. Do not mark demonstration observations as real product-test results or claim multi-user/cloud persistence from this template.

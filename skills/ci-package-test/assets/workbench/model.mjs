@@ -1,5 +1,8 @@
 import {validateDependencies, orderCases} from './dependencies.mjs';
 import {validateNext, validateTargets, nextTest} from './routing.mjs';
+import {validateTestLocation, locationHint} from './test-location.mjs';
+import {projectFlow} from './flow.mjs';
+export {projectFlow};
 export {nextTest};
 import {CONTRACT, RESULTS, inspectWorkflow, roundActions} from './workflow.mjs';
 export {CONTRACT, RESULTS, inspectWorkflow, roundActions};
@@ -36,7 +39,7 @@ function validateCase(item) {
   text(item.preconditions, 'case.preconditions', true);
   list(item.types, 'case.types');
   require(item.types.length && new Set(item.types).size === item.types.length && item.types.every(type => TYPES.includes(type)), 'case: invalid types');
-  validateNext(item);validateDependencies(item);
+  validateNext(item);validateDependencies(item);validateTestLocation(item);
 }
 export function validatePlan(plan) {
   require(object(plan), 'plan: object required');
@@ -340,7 +343,8 @@ export function exportAI(state) {
     rounds:state.rounds.map(round => {
       if (!round.workflow) return {roundId:round.id,state:'legacy',nextActions:[],cases:round.cases.map(item=>({caseId:item.id,status:statusOf(round,item.id)}))};
       const view = inspectWorkflow(round);
-      return {roundId:round.id,state:view.state,nextActions:roundActions(round),executions:view.executions.map(item => ({...item,
+      return {roundId:round.id,state:view.state,nextActions:roundActions(round),flows:round.environments.map(env=>projectFlow(round,{environmentId:env.id})),executions:view.executions.map(item => ({...item,
+        testLocation:locationHint(round.cases.find(entry=>entry.id===item.caseId)),
         nextTest:nextTest(round,item.caseId,item.environmentId),
         nextActions:view.state !== 'running' ? [] : item.state === 'running' ? RESULTS.filter(result=>!item.dependencyStale||['blocked','skipped'].includes(result)).map(result=>({action:'record',to:result,required:[...CONTRACT.resultRequirements[result],...(round.cases.find(entry=>entry.id===item.caseId).next?CONTRACT.routing.resultRequirements[result]??[]:[])]})) : [...(item.dependenciesSatisfied?[{action:'start',from:item.state,to:'running'}]:[]),...(item.state==='untested'?CONTRACT.execution.transitions.defer.to.map(to=>({action:'defer',from:item.state,to,required:[...CONTRACT.resultRequirements[to],'executedAt'],values:{executedAt:null}})):[])]
       }))};

@@ -5,6 +5,7 @@ Read this when creating cases, executing or importing results, adapting the webp
 ## Data and identity
 
 - Plans and cases are definitions, with IDs, revision, source/build/PR, types, preconditions, steps and expected results. Do not put one mutable pass/fail flag on a case definition.
+- Optional [testLocation](test-location.md) is a declared navigation/control hint in the definition, frozen with the round. It remains unverified against the live screen and is not execution evidence. AI exports add per-environment `flows` using the same read-only graph projection as the webpage; graph phases, failure/stale markers and next-test advice do not introduce another state machine.
 - A round freezes its definitions and package context. An execution is identified by `(roundId, caseId, environmentId)`; two devices never share execution state just because their labels match.
 - Observations are immutable evidence with status, environment snapshot, executed/recorded timestamps, tester, notes and evidence. The owning round identifies plan/version/source/build and the case snapshot. Retests append observations and start events; they never erase previous results.
 - Annotations remain separate event streams with their existing `open`/`resolved` projection. Comments preserve status; resolve/reopen events change it. Annotating a failure cannot make it pass.

@@ -1,6 +1,7 @@
 import * as model from './model.mjs';
 import {openStore, read, update} from './store.mjs';
 import {markTarget, selectedTarget, renderComposer, renderThreads} from './annotation-ui.mjs';
+import {renderFlow, renderTestLocation} from './flow-ui.mjs';
 const $ = id => document.getElementById(id);
 const labels = {smoke:'冒烟',functional:'功能',performance:'性能',compatibility:'兼容性',stability:'稳定性',security:'安全',usability:'易用性','install-upgrade':'安装升级',integration:'集成',passed:'通过',failed:'失败',partial:'部分执行',blocked:'阻塞',untested:'待测',running:'测试中',skipped:'跳过',draft:'草稿',ready:'就绪',completed:'已结束',prepare:'标记就绪',begin:'开始本轮',complete:'结束本轮',reopen:'重新打开'};
 const el = (tag, text, className) => { const node = document.createElement(tag); if (text != null) node.textContent = text; if (className) node.className = className; return node; };
@@ -51,6 +52,7 @@ function navigateAnnotation(note) {
 function select(id, items, selected) { $(id).replaceChildren(...items.map(([value,label])=>option(value,label))); $(id).value=selected; }
 const pill=(text,type)=>el('span',text,`pill ${type??''}`);
 function render() {
+  $('flow').replaceChildren();
   const versions=[...new Set(state.plans.map(plan=>plan.version))];
   let plan=state.plans.find(plan=>plan.id===planId)??state.plans[0]; planId=plan?.id??'';
   select('version',versions.map(value=>[value,value]),plan?.version??'');
@@ -85,6 +87,9 @@ function render() {
   const scoped={planId,roundId};
   if(!(state.annotations??[]).some(note=>note.id===annotationId&&note.planId===planId&&note.roundId===roundId&&note.caseId===caseId))annotationId='';
   syncLocation();
+  renderFlow($('flow'),{context:round??plan,caseId:definitions.some(item=>item.id===caseId)?caseId:'',environmentId,labels,
+    navigate:id=>{linkError='';caseId=id;observationTarget='';annotationId='';view='cases';$('search').value='';$('type').value='';$('status').value='';render();},
+    selectEnvironment:id=>{environmentId=id;render();}});
   if(view==='annotations') {
     detail.append(el('h2','批注'),el('p','网页批注可回复、标记处理或重新打开；原生批注通过稳定定位与原文快照联调。','context'));
     renderThreads(detail,{state,scope:scoped,save,message,navigate:navigateAnnotation});return;
@@ -102,6 +107,9 @@ function render() {
   for(const type of item.types) detail.append(pill(labels[type],type));
   if(round) for(const reason of item.selectionReasons??[]) detail.append(pill(({'previous-failure':'失败复测',smoke:'每轮冒烟',change:'变更纳入',unfinished:'上轮未完成','conditional-next':'条件分支纳入',dependency:'前置依赖纳入'})[reason]??reason));
   for(const [label,value,field] of [['前置条件',item.preconditions,'preconditions'],['测试步骤',item.steps,'steps'],['预期结果',item.expected,'expected']]) detail.append(el('h3',label),markTarget(el('div',value||'','prose'),caseScope,field));
+  const locationEnv=round?.environments.find(env=>env.id===environmentId);
+  const locationExecution=locationEnv&&round.workflow?model.inspectWorkflow(round).executions.find(entry=>entry.caseId===item.id&&entry.environmentId===locationEnv.id):null;
+  renderTestLocation(detail,item,{version:round?.version??plan.version,source:round?.source??plan.source,build:round?.build??plan.build,planId,roundId,environmentId:locationEnv?.id??'',environment:locationEnv,...locationExecution,state:locationExecution?.state??(round?'未选择状态机环境':'定义')},message);
   const link=el('button','复制用例定位信息'); link.onclick=async()=>{try {await navigator.clipboard.writeText(`${plan.version} / ${plan.title} / ${round?.name??'方案定义'} / ${caseId}\n${location.href}`);message('定位信息已复制');}catch{message(location.href);}};detail.append(link);
   if(!round) renderEditor(detail,plan,item); else renderExecution(detail,round,item);
   renderComposer(detail,{state,scope:{...caseScope,observationId:observationTarget},save,message,navigate:navigateAnnotation});
@@ -117,10 +125,12 @@ function renderEditor(detail,plan,item) {
   field(form,'前置条件','preconditions',item.preconditions,'textarea');field(form,'步骤','steps',item.steps,'textarea').required=true;field(form,'预期','expected',item.expected,'textarea').required=true;
   field(form,'前置用例 ID（逗号分隔）','dependsOn',(item.dependsOn??[]).join(', '));
   field(form,'结果分支 next（JSON，可留空）','next',item.next?JSON.stringify(item.next,null,2):'','textarea');
+  field(form,'测试定位 testLocation（JSON，可留空）','testLocation',item.testLocation?JSON.stringify(item.testLocation,null,2):'','textarea');
   form.append(el('button','保存定义（不改历史轮次）','primary'));
   form.onsubmit=event=>{event.preventDefault();try{const data=new FormData(form),edited={...item,title:data.get('title'),preconditions:data.get('preconditions'),steps:data.get('steps'),expected:data.get('expected'),types:data.getAll('types')};
     edited.dependsOn=data.get('dependsOn').split(',').map(id=>id.trim()).filter(Boolean);
     if(data.get('next').trim())edited.next=JSON.parse(data.get('next'));else delete edited.next;
+    if(data.get('testLocation').trim())edited.testLocation=JSON.parse(data.get('testLocation'));else delete edited.testLocation;
     save(state=>model.editCase(state,plan.id,edited));}catch(error){message(error.message,true);}};
   panel.append(form);detail.append(panel);
 }

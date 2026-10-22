@@ -1,8 +1,11 @@
 import {DEPENDENCIES, dependencyViews} from './dependencies.mjs';
+import {TEST_LOCATION} from './test-location.mjs';
 // JSON-compatible contract: shared by replay, UI action discovery and AI exports.
 export const CONTRACT = {
   id: 'ci-package-test/workflow', version: 1,
   dependencies: DEPENDENCIES,
+  testLocation: TEST_LOCATION,
+  visualization:{projection:'projection.rounds[].flows',scope:'One frozen round and attached environment; null node states without a managed environment.',edges:{dependency:'Required upstream pass',next:'Outcome route; active only when the recommendation is available'},interaction:'Read-only navigation/copy. Use guarded start/result actions separately; graph never runs tests.'},
   identity: ['roundId', 'caseId', 'environmentId'],
   data: {
     archive: {schemaVersion:1, collections:['plans','environments','rounds','annotations'], revision:'optimistic concurrency counter'},
