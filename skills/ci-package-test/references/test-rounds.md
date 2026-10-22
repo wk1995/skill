@@ -15,6 +15,8 @@ For every case record:
 | Procedure | Reproducible steps, concrete expected results, evidence to collect |
 | Execution | Initially pending; results belong to separate observations |
 
+For each newly authored case, also define outcome-dependent next tests or explicit retry/wait/done actions using [conditional-tests.md](conditional-tests.md). Keep failed (expectation violated), partial (incomplete verification), blocked (missing prerequisite) and skipped (deliberate non-execution) distinct. A diagnosed downstream pass or skipped retest cannot resolve the original failure.
+
 Useful test types include smoke, functional, performance, compatibility, stability, security, usability, install/upgrade, and integration. Select applicable types rather than requiring all of them. A core start/pause/resume/end flow can be both smoke and functional. Test the observable result, such as remaining time continuing after resume, rather than only whether a control can be tapped.
 
 Keep build checks and environment tests separate. A static compatibility check does not cover the corresponding runtime environment. One distribution channel does not cover another channel's identity or login flows. A short session does not cover a 90-minute background or overnight test. Record the required environment and duration instead of claiming equivalent coverage.
@@ -52,7 +54,7 @@ Apply [state-machine.md](state-machine.md): keep definitions separate from per-r
 
 ## Observations, imports, and outcomes
 
-Each saved observation includes case/definition revision, round, package/source identity, registered environment/configuration snapshot, execution time with timezone, recorded time, tester, outcome, notes, and evidence links. Keep repeated results on the same environment and results from different environments independently.
+Each saved observation includes case/definition revision, round, package/source identity, registered environment/configuration snapshot, execution time with timezone, recorded time, tester, outcome, notes, and evidence links. Keep repeated results on the same environment and results from different environments independently. Pre-execution blocked/skipped deferrals have `executedAt: null`, an actual recording timestamp and a reason, without a fabricated start event.
 
 For a multi-environment case, summarize each environment's latest applicable result; another environment passing must not clear an unresolved failure. A later pass on the same confirmed environment/configuration can supersede its earlier failure in the summary while retaining both observations. Make the summary policy visible and distinguish unsupported or partial coverage from full success.
 
@@ -60,7 +62,7 @@ On cross-workbench import, preserve original observation and environment snapsho
 
 Bind unsaved drafts to round/case/environment, restore that binding when returning, and keep the displayed environment equal to the saved observation's environment. Batch saves require the same validations as single saves. Saving a library classification must update current definition displays, filters, and exports while leaving historical rounds unchanged. Use revision checks and supported persistence interfaces; do not bypass an existing server's concurrency controls with direct file writes.
 
-Keep results as passed, failed, partially executed, blocked or skipped; running and untested are execution states rather than new result records. Map explicitly to the workbench's supported statuses. In the bundled managed workflow, failures require notes and evidence; blocking/skipping require a reason, results require a started execution, and ending a round does not imply a pass. A product failure requires reproducible observed behavior and evidence. Describe nonfatal logs as follow-up observations unless a defect is confirmed. Do not invent a pass because the app opened, CI succeeded, or a crash was not seen.
+Keep results as passed, failed, partially executed, blocked or skipped; running and untested are execution states rather than new result records. Map explicitly to the workbench's supported statuses. In the bundled managed workflow, failures require notes and evidence; blocking/skipping require a reason, passed/failed/partial results require a started execution, while an unstarted case may be explicitly blocked/skipped with null execution time, and ending a round does not imply a pass. A product failure requires reproducible observed behavior and evidence. Describe nonfatal logs as follow-up observations unless a defect is confirmed. Do not invent a pass because the app opened, CI succeeded, or a crash was not seen.
 
 Stop or defer cases when the required account, hardware, OS, duration, permissions or reliable controls are unavailable; continue independent applicable cases. Confirm the requested duration before starting a long test if scope is unclear. A discovered defect authorizes a report, not an unrequested source fix or PR.
 

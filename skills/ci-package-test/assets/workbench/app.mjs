@@ -100,7 +100,7 @@ function render() {
   detail.dataset.planId=planId;detail.dataset.roundId=roundId;detail.dataset.caseId=item.id;
   detail.append(el('span',`${item.id} · ${round?.name??'当前方案定义'}`,'eyebrow'),markTarget(el('h2',item.title),caseScope,'case'));
   for(const type of item.types) detail.append(pill(labels[type],type));
-  if(round) for(const reason of item.selectionReasons??[]) detail.append(pill(({'previous-failure':'失败复测',smoke:'每轮冒烟',change:'变更纳入',unfinished:'上轮未完成'})[reason]??reason));
+  if(round) for(const reason of item.selectionReasons??[]) detail.append(pill(({'previous-failure':'失败复测',smoke:'每轮冒烟',change:'变更纳入',unfinished:'上轮未完成','conditional-next':'条件分支纳入'})[reason]??reason));
   for(const [label,value,field] of [['前置条件',item.preconditions,'preconditions'],['测试步骤',item.steps,'steps'],['预期结果',item.expected,'expected']]) detail.append(el('h3',label),markTarget(el('div',value||'','prose'),caseScope,field));
   const link=el('button','复制用例定位信息'); link.onclick=async()=>{try {await navigator.clipboard.writeText(`${plan.version} / ${plan.title} / ${round?.name??'方案定义'} / ${caseId}\n${location.href}`);message('定位信息已复制');}catch{message(location.href);}};detail.append(link);
   if(!round) renderEditor(detail,plan,item); else renderExecution(detail,round,item);
@@ -115,8 +115,11 @@ function renderEditor(detail,plan,item) {
   field(form,'标题','title',item.title).required=true;
   const types=el('div'); for(const type of model.TYPES) {const label=el('label',labels[type],'check'),input=el('input');input.type='checkbox';input.name='types';input.value=type;input.checked=item.types.includes(type);label.prepend(input);types.append(label);}form.append(types);
   field(form,'前置条件','preconditions',item.preconditions,'textarea');field(form,'步骤','steps',item.steps,'textarea').required=true;field(form,'预期','expected',item.expected,'textarea').required=true;
+  field(form,'结果分支 next（JSON，可留空）','next',item.next?JSON.stringify(item.next,null,2):'','textarea');
   form.append(el('button','保存定义（不改历史轮次）','primary'));
-  form.onsubmit=event=>{event.preventDefault();const data=new FormData(form);save(state=>model.editCase(state,plan.id,{...item,title:data.get('title'),preconditions:data.get('preconditions'),steps:data.get('steps'),expected:data.get('expected'),types:data.getAll('types')}));};
+  form.onsubmit=event=>{event.preventDefault();try{const data=new FormData(form),edited={...item,title:data.get('title'),preconditions:data.get('preconditions'),steps:data.get('steps'),expected:data.get('expected'),types:data.getAll('types')};
+    if(data.get('next').trim())edited.next=JSON.parse(data.get('next'));else delete edited.next;
+    save(state=>model.editCase(state,plan.id,edited));}catch(error){message(error.message,true);}};
   panel.append(form);detail.append(panel);
 }
 function renderWorkflow(round) {
@@ -149,12 +152,15 @@ function renderExecution(detail,round,item) {
   const managed=Boolean(round.workflow),active=managed?model.inspectWorkflow(round).state==='running':true;
   if(managed) {
     const current=env?model.executionState(round,item.id,env.id):'untested';
-    detail.append(el('p',env?`当前环境执行状态：${labels[current]}。保存结果前须开始执行；重测会保留旧记录。`:'请选择环境查看执行状态。','context'));
+    detail.append(el('p',env?`当前环境执行状态：${labels[current]}。通过/失败/部分执行前须开始；待测可直接阻塞或跳过，保留历史。`:'请选择环境查看执行状态。','context'));
     const begin=el('button',current==='untested'?'开始此用例':'重新执行此用例');begin.type='button';begin.id='start-execution';begin.disabled=!active||!env||current==='running';
     begin.onclick=()=>{const tester=form.elements.tester.value;save(state=>model.startExecution(state,round.id,{id:uuid(),from:current,actor:tester,at:now(),caseId:item.id,environmentId:env.id}));};form.append(begin);
   }
+  const meanings=el('details');meanings.append(el('summary','如何区分失败、部分执行、阻塞和跳过'));
+  for(const [status,description] of Object.entries(model.CONTRACT.routing.semantics))meanings.append(el('p',`${labels[status]}：${({passed:'本次要求的检查均符合预期。',failed:'已观察到实际行为不符合预期；其他检查通过不能掩盖失败。',partial:'只执行或验证了一部分；说明已完成及未验证内容。已发现问题应选失败。',blocked:'缺少账号、环境或外部依赖等前置条件，无法执行或继续。',skipped:'明确决定本轮不执行，填写范围或优先级原因；不计为通过。'})[status]??description}`,'context'));detail.append(meanings);
   const status=field(form,'结果','status','','select'); status.replaceChildren(...(managed?model.RESULTS:model.STATUSES.filter(status=>status!=='running')).map(value=>option(value,labels[value])));status.value=draft.status??'passed';
-  const time=field(form,'执行时间（本地时区）','executedAt',draft.executedAt??localTime());time.type='datetime-local';time.required=true;
+  const time=field(form,'执行时间（本地时区）','executedAt',draft.executedAt??localTime());time.type='datetime-local';
+  const timeRequirement=()=>{time.required=!(managed&&['blocked','skipped'].includes(status.value));};status.addEventListener('change',timeRequirement);timeRequirement();
   field(form,'执行人','tester',draft.tester??'').required=true;field(form,'备注 / 缺陷','notes',draft.notes??'','textarea');field(form,'证据路径或链接','evidence',draft.evidence??'','textarea');
   form.oninput=()=>drafts.set(draftKey(),Object.fromEntries(new FormData(form)));
   const single=el('button','新增执行记录','primary');single.disabled=!active;form.append(single);
@@ -165,15 +171,36 @@ function renderExecution(detail,round,item) {
     event.preventDefault();const data=Object.fromEntries(new FormData(form));
     if(!env) {message('请选择已加入本轮的登记环境。',true);return;}
     const ids=event.submitter===batch?[...(selections.get(bound.roundId)??[])]:[bound.caseId];
-    const observations=ids.map(id=>({id:uuid(),caseId:id,environmentId:bound.environmentId,environment:structuredClone(env),status:data.status,executedAt:new Date(data.executedAt).toISOString(),recordedAt:now(),tester:data.tester,notes:data.notes,evidence:data.evidence}));
+    const observations=ids.map(id=>({id:uuid(),caseId:id,environmentId:bound.environmentId,environment:structuredClone(env),status:data.status,executedAt:managed&&model.executionState(round,id,bound.environmentId)==='untested'&&['blocked','skipped'].includes(data.status)?null:data.executedAt?new Date(data.executedAt).toISOString():null,recordedAt:now(),tester:data.tester,notes:data.notes,evidence:data.evidence}));
     save(state=>model.recordBatch(state,bound.roundId,observations)).then(()=>{if(!$('message').classList.contains('error')){drafts.delete(bound.key);render();}});
-  };detail.append(form,el('h3','执行历史 · 逐条保留'));
+  };detail.append(form);
+  if(env&&managed)renderNextTest(detail,round,item,env);
+  detail.append(el('h3','执行历史 · 逐条保留'));
   for(const record of round.observations.filter(record=>record.caseId===item.id).reverse()) renderObservation(detail,record);
+}
+function renderNextTest(detail,round,item,env) {
+  const advice=model.nextTest(round,item.id,env.id),panel=el('section');panel.id='next-test';
+  panel.append(el('h3','下一步测什么'));
+  const actionLabels={current:'继续当前用例',test:'执行后续用例',retry:'重新验证当前用例',wait:'等待条件恢复',done:'此分支结束',unconfigured:'尚未配置下一步',unavailable:'当前流程不支持分支'};
+  panel.append(el('strong',actionLabels[advice.action]),el('p',({current:'请先执行或继续当前用例，再根据实际结果选择后续测试。',unconfigured:'该用例尚未配置结果分支，请完善定义，不能自动猜测下一项。',unavailable:'旧流程请准备新轮次后使用按环境分支。'})[advice.action]??advice.reason,'context'));
+  if(advice.resumeWhen)panel.append(el('p',`恢复条件：${advice.resumeWhen}`,'context'));
+  if(advice.unresolvedFailureId)panel.append(el('p',`仍有未解决失败：${advice.unresolvedFailureId}。部分执行、阻塞或跳过均不会清除此失败；需在本环境重测通过。`,'error'));
+  if(advice.basedOnObservationId)panel.append(el('small',`依据：${labels[advice.state]} · ${advice.basedOnObservationId} · ${env.label}`));
+  if(advice.target) {
+    panel.append(el('p',`${advice.target.id} · ${advice.target.title}`));
+    for(const [label,value] of [['前置条件',advice.target.preconditions],['步骤',advice.target.steps],['预期',advice.target.expected]])panel.append(el('p',`${label}：${value}`,'prose'));
+    if(advice.action!=='current') {
+      const button=el('button',`打开 ${advice.target.id}`);button.type='button';button.disabled=!advice.available;
+      button.onclick=()=>{linkError='';caseId=advice.targetCaseId;observationTarget='';annotationId='';view='cases';$('search').value='';$('type').value='';$('status').value='';render();};panel.append(button);
+      panel.append(el('small',`目标当前状态：${labels[advice.targetState]}。打开用例不会自动执行或修改结果。`));
+    }
+  }
+  detail.append(panel);
 }
 function renderObservation(detail,record) {
   const card=el('div',null,'record'),scope={planId,roundId,caseId:record.caseId,observationId:record.id};card.id=`observation-${record.id}`;
   card.dataset.caseId=record.caseId;card.dataset.observationId=record.id;
-  card.append(el('strong',`${record.caseId} · ${labels[record.status]} · ${record.environment.label} · ${record.tester}`),el('small',`执行：${record.executedAt} / 记录：${record.recordedAt}`),el('small',record.environment.configuration),markTarget(el('p',record.notes,'prose'),scope,'observation'),markTarget(el('div',record.evidence,'prose'),scope,'observation'));
+  card.append(el('strong',`${record.caseId} · ${labels[record.status]} · ${record.environment.label} · ${record.tester}`),el('small',`执行：${record.executedAt??'未执行'} / 记录：${record.recordedAt}`),el('small',record.environment.configuration),markTarget(el('p',record.notes,'prose'),scope,'observation'),markTarget(el('div',record.evidence,'prose'),scope,'observation'));
   const annotate=el('button','批注此记录');annotate.type='button';annotate.onclick=()=>{caseId=record.caseId;observationTarget=record.id;annotationId='';view='cases';$('search').value='';$('type').value='';$('status').value='';render();document.querySelector('.annotation-compose')?.scrollIntoView({block:'center'});};card.append(annotate);detail.append(card);
 }
 for(const mode of ['cases','records','annotations']) $(`${mode}-view`).onclick=()=>{view=mode;render();};
@@ -181,7 +208,7 @@ document.addEventListener('selectionchange',()=>{
   const selected=selectedTarget($('detail'));if(!selected||selected.planId!==planId||selected.roundId!==roundId)return;
   caseId=selected.caseId;observationTarget=selected.observationId;annotationId='';syncLocation(selected.field);
 });
-$('copy-results').onclick=async()=>{const round=state.rounds.find(item=>item.id===roundId);if(!round){message('请选择执行轮次。',true);return;}const report=[`${round.version} / ${round.name}\nSource: ${round.source}\nCI: ${round.build}`, ...round.cases.map(item=>`${item.id} ${item.title}: ${labels[model.statusOf(round,item.id)]}`), ...round.observations.map(item=>`${item.caseId} · ${item.environment.label} · ${item.executedAt} · ${labels[item.status]}\n${item.notes}\n${item.evidence}`)].join('\n');try{await navigator.clipboard.writeText(report);message('本轮结果已复制');}catch{message('剪贴板不可用，请导出 JSON 归档。',true);}};
+$('copy-results').onclick=async()=>{const round=state.rounds.find(item=>item.id===roundId);if(!round){message('请选择执行轮次。',true);return;}const report=[`${round.version} / ${round.name}\nSource: ${round.source}\nCI: ${round.build}`, ...round.cases.map(item=>`${item.id} ${item.title}: ${labels[model.statusOf(round,item.id)]}`), ...round.observations.map(item=>`${item.caseId} · ${item.environment.label} · ${item.executedAt??'未执行'} · ${labels[item.status]}\n${item.notes}\n${item.evidence}`)].join('\n');try{await navigator.clipboard.writeText(report);message('本轮结果已复制');}catch{message('剪贴板不可用，请导出 JSON 归档。',true);}};
 for(const [id,items] of [['type',model.TYPES],['status',model.STATUSES]]) select(id,[['','全部'+(id==='type'?'类型':'结果')],...items.map(value=>[value,labels[value]])],'');
 for(const id of ['search','type','status']) $(id).addEventListener('input',render);
 $('version').onchange=()=>{linkError='';planId=state.plans.find(plan=>plan.version===$('version').value)?.id??'';roundId='';render();};

@@ -29,9 +29,9 @@ test('round lifecycle guards, actor/time/from checks and exact retry are enforce
   assert.equal(m.attachEnvironment(state,'r','e'),state);
 });
 
-test('results require explicit execution start; every terminal result follows the shared contract',()=>{
+test('executed results require a start and every terminal result follows the shared contract',()=>{
   for(const result of m.RESULTS) {
-    let state=running();rejects(state,s=>m.record(s,'r',observation('early','A',result)),/transition/);
+    let state=running();rejects(state,s=>m.record(s,'r',observation('early','A',result)),/transition|executedAt=null/);
     state=start(state);assert.equal(m.statusOf(round(state),'A'),'running');
     rejects(state,s=>start(s),/Conflicting|transition/);
     state=m.record(state,'r',observation('result','A',result));assert.equal(m.executionState(round(state),'A','e'),result);

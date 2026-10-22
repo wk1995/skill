@@ -1,3 +1,5 @@
+import {validateNext, validateTargets, nextTest} from './routing.mjs';
+export {nextTest};
 import {CONTRACT, RESULTS, inspectWorkflow, roundActions} from './workflow.mjs';
 export {CONTRACT, RESULTS, inspectWorkflow, roundActions};
 export const TYPES = ['smoke', 'functional', 'performance', 'compatibility', 'stability', 'security', 'usability', 'install-upgrade', 'integration'];
@@ -33,12 +35,13 @@ function validateCase(item) {
   text(item.preconditions, 'case.preconditions', true);
   list(item.types, 'case.types');
   require(item.types.length && new Set(item.types).size === item.types.length && item.types.every(type => TYPES.includes(type)), 'case: invalid types');
+  validateNext(item);
 }
 export function validatePlan(plan) {
   require(object(plan), 'plan: object required');
   for (const key of ['id', 'version', 'title', 'source', 'build', 'pr']) text(plan[key], `plan.${key}`, ['build', 'pr'].includes(key));
   require(Number.isSafeInteger(plan.revision) && plan.revision >= 0, 'plan: invalid revision');
-  unique(plan.cases, 'plan.cases'); plan.cases.forEach(validateCase);
+  unique(plan.cases, 'plan.cases'); plan.cases.forEach(validateCase); validateTargets(plan.cases);
   return plan;
 }
 function validateEnvironment(env) {
@@ -54,7 +57,7 @@ export function validate(state) {
   for (const round of state.rounds) {
     for (const key of ['id', 'name', 'planId', 'version', 'source', 'build', 'pr']) text(round[key], `round.${key}`, ['build', 'pr'].includes(key));
     find(state.plans, round.planId, 'Plan'); timestamp(round.createdAt, 'round.createdAt');
-    unique(round.cases, 'round.cases'); round.cases.forEach(validateCase);
+    unique(round.cases, 'round.cases'); round.cases.forEach(validateCase); validateTargets(round.cases);
     require(round.cases.some(item => item.types.includes('smoke')), 'Round requires smoke coverage');
     unique(round.environments, 'round.environments');
     for (const env of round.environments) {
@@ -66,7 +69,9 @@ export function validate(state) {
       const env = find(round.environments, observation.environmentId, 'Round environment');
       require(same(env, observation.environment), 'Observation environment conflict');
       require(STATUSES.includes(observation.status), 'Invalid result status');
-      timestamp(observation.executedAt, 'executedAt'); timestamp(observation.recordedAt, 'recordedAt');
+      if(observation.executedAt===null)require(['blocked','skipped'].includes(observation.status)&&round.workflow?.events.some(event=>event.action==='defer'&&event.observationId===observation.id),'Missing execution time requires a deferred blocked/skipped event');
+      else timestamp(observation.executedAt, 'executedAt');
+      timestamp(observation.recordedAt, 'recordedAt');
       for (const key of ['tester', 'notes', 'evidence']) text(observation[key], `observation.${key}`, key !== 'tester');
     }
     if (round.workflow !== undefined) inspectWorkflow(round);
@@ -183,7 +188,7 @@ export function statusOf(round, caseId) {
   const latest = new Map();
   const priority = CONTRACT.summaryPriority;
   if (round.workflow) {
-    const statuses = inspectWorkflow(round).executions.filter(item => item.caseId === caseId).map(item => item.state);
+    const statuses = inspectWorkflow(round).executions.filter(item => item.caseId === caseId).map(item => item.unresolvedFailureId?'failed':item.state);
     return priority.find(status => statuses.includes(status)) ?? 'untested';
   }
   for (const item of round.observations.filter(item => item.caseId === caseId)) {
@@ -213,6 +218,14 @@ export function createRound(state, input) {
   const changedIds = input.changedIds ?? (previous ? [] : plan.cases.map(item => item.id));
   list(changedIds, 'changedIds'); changedIds.forEach(id => add(find(plan.cases, id, 'Changed case'), 'change'));
   if (input.includeUnfinished && previous) previous.cases.filter(item => statusOf(previous, item.id) !== 'passed').forEach(item => add(item, 'unfinished'));
+  // Freeze the complete reachable branch graph; map iteration visits newly added targets once.
+  for(const item of selected.values())for(const status of RESULTS) {
+    const route=item.next?.[status];
+    if(route&&['test','retry'].includes(route.action)) {
+      const target=current.get(route.caseId)??previous?.cases.find(entry=>entry.id===route.caseId);
+      require(target,`Next case not found: ${route.caseId}`);add(target,'conditional-next');
+    }
+  }
   const round = {id: input.id, name: input.name, planId: plan.id, version: plan.version, source: plan.source,
     build: plan.build, pr: plan.pr, createdAt: input.createdAt, cases: [...selected.values()], environments: [], observations: [], workflow: {version: CONTRACT.version, events: []}};
   return change(state, next => next.rounds.push(round));
@@ -228,12 +241,17 @@ export function recordBatch(state, roundId, observations) {
   // Full validation includes every new observation before the caller can persist.
   return change(state, next => {
     const target = find(next.rounds, roundId, 'Round');
+    const executions=target.workflow?inspectWorkflow(target).executions:[];
     target.observations.push(...copy(observations));
-    if (target.workflow) for (const observation of observations) target.workflow.events.push({
-      id:`result:${observation.id}`,scope:'execution',action:'record',from:'running',to:observation.status,
+    if (target.workflow) for (const observation of observations) {
+      const from=executions.find(entry=>entry.caseId===observation.caseId&&entry.environmentId===observation.environmentId)?.state;
+      const action=from==='untested'&&CONTRACT.execution.transitions.defer.to.includes(observation.status)?'defer':'record';
+      target.workflow.events.push({
+      id:`result:${observation.id}`,scope:'execution',action,from,to:observation.status,
       actor:observation.tester,at:observation.recordedAt,reason:observation.notes,
       caseId:observation.caseId,environmentId:observation.environmentId,observationId:observation.id
     });
+    }
   });
 }
 export function importArchive(state, incoming) {
@@ -319,7 +337,8 @@ export function exportAI(state) {
       if (!round.workflow) return {roundId:round.id,state:'legacy',nextActions:[],cases:round.cases.map(item=>({caseId:item.id,status:statusOf(round,item.id)}))};
       const view = inspectWorkflow(round);
       return {roundId:round.id,state:view.state,nextActions:roundActions(round),executions:view.executions.map(item => ({...item,
-        nextActions:view.state !== 'running' ? [] : item.state === 'running' ? RESULTS.map(result=>({action:'record',to:result,required:copy(CONTRACT.resultRequirements[result])})) : [{action:'start',from:item.state,to:'running'}]
+        nextTest:nextTest(round,item.caseId,item.environmentId),
+        nextActions:view.state !== 'running' ? [] : item.state === 'running' ? RESULTS.map(result=>({action:'record',to:result,required:[...CONTRACT.resultRequirements[result],...(round.cases.find(entry=>entry.id===item.caseId).next?CONTRACT.routing.resultRequirements[result]??[]:[])]})) : [{action:'start',from:item.state,to:'running'},...(item.state==='untested'?CONTRACT.execution.transitions.defer.to.map(to=>({action:'defer',from:item.state,to,required:[...CONTRACT.resultRequirements[to],'executedAt'],values:{executedAt:null}})):[])]
       }))};
     }),annotations:(state.annotations??[]).map(note=>({annotationId:note.id,state:annotationStatus(note)}))
   }};

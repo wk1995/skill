@@ -24,11 +24,15 @@ The executable, JSON-compatible [contract](../assets/workbench/workflow.mjs) is 
 
 ## Execution lifecycle
 
-`untested` is the stored key for pending. `start` moves it to `running`. `record` moves `running` to `passed`, `failed`, `partial`, `blocked` or `skipped`. Each terminal state can start another attempt through `start`; no direct failed → passed rewrite is allowed. Execution events require a running round and an attached environment. A failed result requires nonempty `notes` and `evidence`; blocked and skipped results require nonempty `notes` explaining the reason. Evidence must describe an actual observation, not a fabricated path to satisfy validation.
+`untested` is the stored key for pending. `start` moves it to `running`. `record` moves `running` to `passed`, `failed`, `partial`, `blocked` or `skipped`. Each terminal state can start another attempt through `start`; no direct failed → passed rewrite is allowed. Execution events require a running round and an attached environment. Before execution, `defer` may move `untested` directly to `blocked` or `skipped`, recording a reason, `executedAt: null` and no start event. After execution begins, a blocked/skipped result retains the actual execution timestamp. A failed result requires nonempty `notes` and `evidence`; blocked and skipped results require nonempty `notes` explaining the reason. Evidence must describe an actual observation, not a fabricated path to satisfy validation.
 
 Every event has an immutable ID, scope, action, expected `from`, computed `to`, actor, timestamp `at` and reason text. Execution events also identify case/environment and, for a result, the exact observation ID. `attemptId` in the projection is the corresponding start-event ID. Original attempt and result events stay in the archive.
 
 Event-array order is authoritative. Replay validates every transition and observation reference before persistence; wall-clock timestamps do not reorder workflow history. Summaries use each environment's current execution state. A failed environment takes priority over blocked, partial, running, untested, skipped, then passed, so another device passing cannot clear a failure. A new round begins untested and must rerun smoke.
+
+## Concrete next tests
+
+Read [conditional-tests.md](conditional-tests.md) for `case.next`, outcome meanings and concrete test guidance. Keep legal lifecycle `nextActions` separate from `nextTest`, which supplies a frozen target procedure or an explicit wait/retry/done action. `unresolvedFailureId` preserves known failures through incomplete or skipped retests; only a passing retest on the same case/environment clears it.
 
 ## Direct model use and AI handoff
 
@@ -52,7 +56,7 @@ projection.rounds[]: roundId, state, guarded nextActions, per-environment execut
 projection.annotations[]: annotationId, state
 ```
 
-Each managed execution includes `state`, `attemptId`, `observationId` and legal next actions with required result fields. A round action reports `allowed`, missing guards and whether a reason is required. This is a read-only handoff for AI; use **Export archive** for backup/import. The exported snapshot contains the same evidence as the archive, so share it only within the requested context. AI never needs to scrape translated status labels.
+Each managed execution includes `state`, `attemptId`, `observationId`, `unresolvedFailureId`, concrete `nextTest` guidance and legal next actions with required result fields. A round action reports `allowed`, missing guards and whether a reason is required. This is a read-only handoff for AI; use **Export archive** for backup/import. The exported snapshot contains the same evidence as the archive, so share it only within the requested context. AI never needs to scrape translated status labels.
 
 ## Legacy data and merge policy
 

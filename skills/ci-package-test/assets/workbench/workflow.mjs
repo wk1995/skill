@@ -5,7 +5,7 @@ export const CONTRACT = {
   data: {
     archive: {schemaVersion:1, collections:['plans','environments','rounds','annotations'], revision:'optimistic concurrency counter'},
     case: {role:'definition', required:['id','title','priority','types','preconditions','steps','expected'], outcome:'none; result belongs to execution'},
-    observation: {role:'immutable evidence', required:['id','caseId','environmentId','environment','status','executedAt','recordedAt','tester','notes','evidence'], context:'owning round pins plan/version/source/build and case definition'},
+    observation: {role:'immutable evidence', required:['id','caseId','environmentId','environment','status','executedAt','recordedAt','tester','notes','evidence'], context:'owning round pins plan/version/source/build and case definition',executedAt:'Timezone timestamp for execution; null only for pre-execution blocked/skipped defer' },
     workflow: {version:1, ordering:'events array; IDs immutable; divergent histories reject'},
     pending: 'untested is the machine key for pending; Chinese labels are presentation only'
   },
@@ -17,9 +17,19 @@ export const CONTRACT = {
   }},
   execution: {initial: 'untested', transitions: {
     start: {from: ['untested', 'passed', 'failed', 'partial', 'blocked', 'skipped'], to: 'running', guards: ['round-running', 'attached-environment']},
+    defer: {from: ['untested'], to: ['blocked', 'skipped'], guards: ['round-running', 'attached-environment', 'matching-observation', 'no-execution-time']},
     record: {from: ['running'], to: ['passed', 'failed', 'partial', 'blocked', 'skipped'], guards: ['round-running', 'matching-observation']}
   }},
+  unresolvedFailure: 'Keep the same case/environment failure ID through start, partial, blocked and skipped; only an observed pass clears it. Current execution phase and overall result are separate.',
   summaryPriority: ['failed', 'blocked', 'partial', 'running', 'untested', 'skipped', 'passed'],
+  routing: {
+    waitRequirement:'resumeWhen states the concrete condition that must be restored before retrying this case.',
+    field:'case.next', outcomes:['passed','failed','partial','blocked','skipped'], actions:['test','retry','wait','done'],
+    resultRequirements:{partial:['notes']}, requirementScope:'Cases with next branches; flat legacy cases keep their original contract.',
+    semantics:{passed:'All required checks in this attempt met expectations.',failed:'An observed behavior violates an expected result; a diagnostic pass cannot clear it.',partial:'Only part was executed/verified; explain completed and unverified work. Any observed failure is failed.',blocked:'A missing prerequisite, account, environment or dependency prevents execution/continuation.',skipped:'An explicit scope/priority decision not to execute; requires reason and is not coverage.'},
+    execution:'Guidance only: navigate to the explicit target; never auto-execute, auto-pass or infer skipped outcomes.',
+    closure:'Freeze all reachable target cases in the round. Unvisited branches remain untested until explicitly recorded/skipped.'
+  },
   resultRequirements: {passed: [], failed: ['notes', 'evidence'], partial: [], blocked: ['notes'], skipped: ['notes']},
   eventFields: ['id', 'scope', 'action', 'from', 'to', 'actor', 'at', 'reason'],
   executionEventFields: ['caseId', 'environmentId', 'observationId'],
@@ -38,7 +48,7 @@ export function inspectWorkflow(round) {
   require(round.workflow && round.workflow.version === CONTRACT.version && Array.isArray(round.workflow.events), 'Invalid workflow contract');
   let state = CONTRACT.round.initial;
   const executions = new Map(), seen = new Set(), observed = new Set();
-  const current = (caseId, environmentId) => executions.get(key(caseId,environmentId)) ?? {state: CONTRACT.execution.initial, attemptId: null, observationId: null};
+  const current = (caseId, environmentId) => executions.get(key(caseId,environmentId)) ?? {state: CONTRACT.execution.initial, attemptId: null, observationId: null, unresolvedFailureId: null};
   const unfinished = () => round.cases.some(item => round.environments.some(env => !RESULTS.includes(current(item.id,env.id).state)));
   for (const event of round.workflow.events) {
     require(event && text(event.id) && !seen.has(event.id), 'Invalid/duplicate workflow event ID');seen.add(event.id);
@@ -60,14 +70,17 @@ export function inspectWorkflow(round) {
       require(event.from === previous.state && transition.from.includes(previous.state), 'Invalid execution transition/from-state');
       if (event.action === 'start') {
         require(event.to === transition.to && event.observationId === '', 'Invalid start event');
-        executions.set(key(event.caseId,event.environmentId),{state: event.to, attemptId: event.id, observationId: previous.observationId});
+        executions.set(key(event.caseId,event.environmentId),{...previous,state: event.to, attemptId: event.id});
       } else {
         require(transition.to.includes(event.to), 'Invalid execution result');
         const observation = round.observations.find(item => item.id === event.observationId);
         require(observation && !observed.has(observation.id) && observation.caseId === event.caseId && observation.environmentId === event.environmentId && observation.status === event.to && observation.tester === event.actor && observation.recordedAt === event.at && observation.notes === event.reason, 'Workflow observation mismatch');
-        for (const field of CONTRACT.resultRequirements[event.to]) require(text(observation[field]), `${event.to} requires ${field}`);
+        if(event.action==='defer')require(observation.executedAt===null,'Deferred case requires executedAt=null; do not fabricate execution');
+        const definition=round.cases.find(item=>item.id===event.caseId);
+        const required=[...CONTRACT.resultRequirements[event.to],...(definition.next?CONTRACT.routing.resultRequirements[event.to]??[]:[])];
+        for (const field of required) require(text(observation[field]), `${event.to} requires ${field}`);
         observed.add(observation.id);
-        executions.set(key(event.caseId,event.environmentId),{state:event.to, attemptId:previous.attemptId, observationId:observation.id});
+        executions.set(key(event.caseId,event.environmentId),{state:event.to, attemptId:previous.attemptId, observationId:observation.id,unresolvedFailureId:event.to==='passed'?null:event.to==='failed'?observation.id:previous.unresolvedFailureId});
       }
     }
   }
