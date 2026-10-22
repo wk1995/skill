@@ -6,7 +6,7 @@
 </head>
 <body>
   <header><div><span class="eyebrow">CI PACKAGE TEST</span><h1>Testflow <span>测试工作台</span></h1></div>
-    <div class="actions"><label class="button">导入方案 / 归档<input id="import" type="file" accept=".json,application/json" hidden></label><button id="export">导出归档</button><button id="reload">刷新数据</button></div></header>
+    <div class="actions"><button id="import-button" type="button">导入方案 / 归档</button><input id="import" type="file" accept=".json,application/json" hidden><button id="export">导出归档</button><button id="reload">刷新数据</button></div></header>
   <p id="message" role="status" aria-live="polite"></p>
   <div class="layout"><aside>
     <label>版本<select id="version" aria-label="版本"></select></label><label>测试方案<select id="plan" aria-label="测试方案"></select></label><label>测试轮次<select id="round" aria-label="测试轮次"></select></label>

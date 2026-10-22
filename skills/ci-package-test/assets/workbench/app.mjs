@@ -113,7 +113,8 @@ for(const [id,items] of [['type',model.TYPES],['status',model.STATUSES]]) select
 for(const id of ['search','type','status']) $(id).addEventListener('input',render);
 $('version').onchange=()=>{planId=state.plans.find(plan=>plan.version===$('version').value)?.id??'';roundId='';render();};
 $('plan').onchange=()=>{planId=$('plan').value;roundId='';render();};$('round').onchange=()=>{roundId=$('round').value;render();};
-$('import').onchange=async event=>{try{const value=JSON.parse(await event.target.files[0].text());await save(state=>value.schemaVersion?model.importArchive(state,value):model.importPlan(state,value));}catch(error){message(error.message,true);}finally{event.target.value='';}};
+$('import-button').onclick=()=>$('import').click();
+$('import').onchange=async event=>{try{if(!event.target.files.length)return;const value=JSON.parse(await event.target.files[0].text());await save(state=>value.schemaVersion?model.importArchive(state,value):model.importPlan(state,value));}catch(error){message(error.message,true);}finally{event.target.value='';}};
 $('json-form').onsubmit=async event=>{event.preventDefault();try{const value=JSON.parse(new FormData(event.target).get('json'));await save(state=>value.schemaVersion?model.importArchive(state,value):model.importPlan(state,value));}catch(error){message(error.message,true);}};
 $('export').onclick=()=>download(state,'test-workbench-archive.json');
 $('reload').onclick=async()=>{try{state=await read(db);render();message('已读取最新数据；未保存的草稿保留。');}catch(error){message(error.message,true);}};
