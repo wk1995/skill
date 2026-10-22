@@ -1,5 +1,7 @@
+import {CONTRACT, RESULTS, inspectWorkflow, roundActions} from './workflow.mjs';
+export {CONTRACT, RESULTS, inspectWorkflow, roundActions};
 export const TYPES = ['smoke', 'functional', 'performance', 'compatibility', 'stability', 'security', 'usability', 'install-upgrade', 'integration'];
-export const STATUSES = ['passed', 'failed', 'partial', 'blocked', 'untested'];
+export const STATUSES = [...RESULTS, 'running', 'untested'];
 export const empty = () => ({schemaVersion: 1, revision: 0, plans: [], environments: [], rounds: [], annotations: []});
 const copy = value => structuredClone(value);
 const require = (ok, message) => { if (!ok) throw new Error(message); };
@@ -67,6 +69,7 @@ export function validate(state) {
       timestamp(observation.executedAt, 'executedAt'); timestamp(observation.recordedAt, 'recordedAt');
       for (const key of ['tester', 'notes', 'evidence']) text(observation[key], `observation.${key}`, key !== 'tester');
     }
+    if (round.workflow !== undefined) inspectWorkflow(round);
   }
   unique(state.annotations === undefined ? [] : state.annotations, 'annotations');
   for (const note of state.annotations ?? []) validateAnnotation(state, note);
@@ -173,11 +176,16 @@ export function attachEnvironment(state, roundId, environmentId) {
   validate(state);
   const round = find(state.rounds, roundId, 'Round'); const env = find(state.environments, environmentId, 'Environment');
   if (round.environments.some(item => item.id === environmentId)) return state;
+  if (round.workflow) require(['draft','ready'].includes(inspectWorkflow(round).state), 'Attach environments before beginning the round');
   return change(state, next => find(next.rounds, roundId, 'Round').environments.push(copy(env)));
 }
 export function statusOf(round, caseId) {
   const latest = new Map();
-  const priority = ['failed', 'blocked', 'partial', 'untested', 'passed'];
+  const priority = CONTRACT.summaryPriority;
+  if (round.workflow) {
+    const statuses = inspectWorkflow(round).executions.filter(item => item.caseId === caseId).map(item => item.state);
+    return priority.find(status => statuses.includes(status)) ?? 'untested';
+  }
   for (const item of round.observations.filter(item => item.caseId === caseId)) {
     const old = latest.get(item.environmentId);
     const order = old ? Date.parse(item.executedAt) - Date.parse(old.executedAt) || Date.parse(item.recordedAt) - Date.parse(old.recordedAt) : 1;
@@ -206,7 +214,7 @@ export function createRound(state, input) {
   list(changedIds, 'changedIds'); changedIds.forEach(id => add(find(plan.cases, id, 'Changed case'), 'change'));
   if (input.includeUnfinished && previous) previous.cases.filter(item => statusOf(previous, item.id) !== 'passed').forEach(item => add(item, 'unfinished'));
   const round = {id: input.id, name: input.name, planId: plan.id, version: plan.version, source: plan.source,
-    build: plan.build, pr: plan.pr, createdAt: input.createdAt, cases: [...selected.values()], environments: [], observations: []};
+    build: plan.build, pr: plan.pr, createdAt: input.createdAt, cases: [...selected.values()], environments: [], observations: [], workflow: {version: CONTRACT.version, events: []}};
   return change(state, next => next.rounds.push(round));
 }
 export function record(state, roundId, observation) {
@@ -218,7 +226,15 @@ export function recordBatch(state, roundId, observations) {
   const round = find(state.rounds, roundId, 'Round');
   for (const observation of observations) require(!round.observations.some(item => item.id === observation.id), 'Observation ID already exists');
   // Full validation includes every new observation before the caller can persist.
-  return change(state, next => find(next.rounds, roundId, 'Round').observations.push(...copy(observations)));
+  return change(state, next => {
+    const target = find(next.rounds, roundId, 'Round');
+    target.observations.push(...copy(observations));
+    if (target.workflow) for (const observation of observations) target.workflow.events.push({
+      id:`result:${observation.id}`,scope:'execution',action:'record',from:'running',to:observation.status,
+      actor:observation.tester,at:observation.recordedAt,reason:observation.notes,
+      caseId:observation.caseId,environmentId:observation.environmentId,observationId:observation.id
+    });
+  });
 }
 export function importArchive(state, incoming) {
   validate(state); validate(incoming);
@@ -239,8 +255,15 @@ export function importArchive(state, incoming) {
   for (const round of incoming.rounds) {
     const old = next.rounds.find(item => item.id === round.id);
     if (!old) { next.rounds.push(copy(round)); continue; }
-    const fixed = item => Object.fromEntries(Object.entries(item).filter(([key]) => !['environments', 'observations'].includes(key)));
+    const fixed = item => Object.fromEntries(Object.entries(item).filter(([key]) => !['environments', 'observations', 'workflow'].includes(key)));
     require(same(fixed(old), fixed(round)), 'Conflicting historical round definition');
+    require((old.workflow === undefined) === (round.workflow === undefined), 'Cannot upgrade/downgrade historical workflow');
+    if (old.workflow) {
+      require(old.workflow.version === round.workflow.version, 'Conflicting workflow version');
+      const left = old.workflow.events, right = round.workflow.events;
+      require(left.slice(0,Math.min(left.length,right.length)).every((event,index) => same(event,right[index])), 'Divergent workflow history');
+      if (right.length > left.length) old.workflow.events = copy(right);
+    }
     for (const env of round.environments) if (!old.environments.some(item => item.id === env.id)) old.environments.push(copy(env));
     for (const observation of round.observations) {
       const existing = old.observations.find(item => item.id === observation.id);
@@ -263,4 +286,49 @@ export function importArchive(state, incoming) {
   validate(next);
   if (same(next, state)) return state;
   next.revision++; return next;
+}
+
+export function transitionRound(state, roundId, input) {
+  validate(state);
+  const round = find(state.rounds,roundId,'Round');
+  require(round.workflow, 'Legacy round: create a new managed round');
+  const transition = Object.hasOwn(CONTRACT.round.transitions,input.action) ? CONTRACT.round.transitions[input.action] : null;
+  require(transition, 'Unknown round action');
+  const event = {id:input.id,scope:'round',action:input.action,from:input.from,to:transition.to,actor:input.actor,at:input.at,reason:input.reason??''};
+  return appendWorkflowEvent(state,roundId,event);
+}
+export function startExecution(state, roundId, input) {
+  validate(state);
+  return appendWorkflowEvent(state,roundId,{id:input.id,scope:'execution',action:'start',from:input.from,to:'running',
+    actor:input.actor,at:input.at,reason:input.reason??'',caseId:input.caseId,environmentId:input.environmentId,observationId:''});
+}
+function appendWorkflowEvent(state,roundId,event) {
+  const round = find(state.rounds,roundId,'Round');
+  require(round.workflow, 'Legacy round: create a new managed round');
+  const old = round.workflow.events.find(item => item.id === event.id);
+  if (old) { require(same(old,event), 'Conflicting workflow event');return state; }
+  return change(state,next => find(next.rounds,roundId,'Round').workflow.events.push(event));
+}
+export function executionState(round,caseId,environmentId) {
+  return inspectWorkflow(round).executions.find(item => item.caseId === caseId && item.environmentId === environmentId)?.state ?? 'untested';
+}
+export function exportAI(state) {
+  validate(state);
+  return {format:'ci-package-test/ai-snapshot',contract:copy(CONTRACT),archive:copy(state),projection:{
+    rounds:state.rounds.map(round => {
+      if (!round.workflow) return {roundId:round.id,state:'legacy',nextActions:[],cases:round.cases.map(item=>({caseId:item.id,status:statusOf(round,item.id)}))};
+      const view = inspectWorkflow(round);
+      return {roundId:round.id,state:view.state,nextActions:roundActions(round),executions:view.executions.map(item => ({...item,
+        nextActions:view.state !== 'running' ? [] : item.state === 'running' ? RESULTS.map(result=>({action:'record',to:result,required:copy(CONTRACT.resultRequirements[result])})) : [{action:'start',from:item.state,to:'running'}]
+      }))};
+    }),annotations:(state.annotations??[]).map(note=>({annotationId:note.id,state:annotationStatus(note)}))
+  }};
+}
+
+export function startExecutionBatch(state,roundId,inputs) {
+  validate(state);unique(inputs,'execution starts');require(inputs.length,'Select at least one case');
+  let next=state;
+  for(const input of inputs) next=startExecution(next,roundId,input);
+  if(next===state)return state;
+  next.revision=state.revision+1;return validate(next);
 }

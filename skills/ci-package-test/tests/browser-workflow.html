@@ -1,0 +1,53 @@
+<!doctype html><meta charset="utf-8"><title>Workflow state tests</title>
+<h1>Isolated state-machine UI and persistence checks</h1><pre id="result">Running…</pre><iframe id="app" title="Workflow fixture" style="width:100%;height:850px"></iframe>
+<script type="module">
+import {openStore,read,update} from '../assets/workbench/store.mjs';
+import * as m from '../assets/workbench/model.mjs';
+const workspace=`workflow-test-${crypto.randomUUID()}`,db=await openStore(`ci-package-test-workbench:${workspace}`);
+const frame=document.getElementById('app'),output=document.getElementById('result'),lines=[];
+const require=(value,message)=>{if(!value)throw new Error(message);};
+async function until(check){for(let i=0;i<250;i++){if(await check())return;await new Promise(resolve=>setTimeout(resolve,20));}throw new Error('Timed out');}
+const fill=(form,name,value)=>{const input=form.elements.namedItem(name);input.value=value;input.dispatchEvent(new Event('input',{bubbles:true}));};
+const submit=(form,value)=>{const button=[...form.querySelectorAll('button')].find(item=>item.value===value);require(button&&!button.disabled,`Action unavailable: ${value}`);button.click();};
+const current=async()=>(await read(db)).rounds[0];
+try {
+  const original=await read(db);
+  await update(db,original.revision,state=>{
+    let next=m.importPlan(state,{id:'p',revision:0,version:'fixture',title:'Workflow fixture only',source:'fixture-sha',build:'',pr:'',cases:[{id:'S',title:'Smoke fixture',priority:'P0',types:['smoke'],preconditions:'Fixture',steps:'Exercise',expected:'Observe'}]});
+    next=m.createRound(next,{id:'r',name:'State fixture',planId:'p',createdAt:'2026-10-22T01:00:00Z'});
+    next=m.registerEnvironment(next,{id:'e',label:'Fixture browser',kind:'browser',configuration:'Disposable'});next=m.attachEnvironment(next,'r','e');next.revision=state.revision+1;return next;
+  });
+  frame.src=`../assets/workbench/?workspace=${workspace}#plan=p&round=r&case=S`;
+  await until(()=>frame.contentDocument?.getElementById('workflow-form'));
+  let doc=frame.contentDocument,form=doc.getElementById('workflow-form');fill(form,'actor','Fixture operator');submit(form,'prepare');
+  await until(async()=>m.inspectWorkflow(await current()).state==='ready');
+  form=doc.getElementById('workflow-form');fill(form,'actor','Fixture operator');submit(form,'begin');
+  await until(async()=>m.inspectWorkflow(await current()).state==='running');lines.push('PASS UI performs guarded draft → ready → running transitions');
+  const choice=doc.getElementById('environment');choice.value='e';choice.dispatchEvent(new Event('change'));
+  form=doc.getElementById('observation-form');fill(form,'tester','Fixture tester');
+  form.querySelector('button.primary').click();await until(()=>doc.getElementById('message').classList.contains('error'));
+  require((await current()).observations.length===0,'Result bypassed execution start');lines.push('PASS rejected result before start preserves persisted state');
+  doc.getElementById('start-execution').click();await until(async()=>m.executionState(await current(),'S','e')==='running');
+  form=doc.getElementById('observation-form');fill(form,'status','failed');fill(form,'notes','Observed failure');
+  form.querySelector('button.primary').click();await until(()=>doc.getElementById('message').classList.contains('error'));
+  require((await current()).observations.length===0,'Missing evidence was persisted');
+  fill(form,'evidence','Fixture screenshot');form.querySelector('button.primary').click();await until(async()=>(await current()).observations.length===1);lines.push('PASS failure requires evidence and appends one started execution result');
+  form=doc.getElementById('workflow-form');fill(form,'actor','Fixture operator');submit(form,'complete');await until(async()=>m.inspectWorkflow(await current()).state==='completed');
+  require(m.statusOf(await current(),'S')==='failed','Completion cleared failure');lines.push('PASS ended round retains failure');
+  form=doc.getElementById('workflow-form');fill(form,'actor','Fixture operator');submit(form,'reopen');await until(()=>doc.getElementById('message').classList.contains('error'));
+  require(m.inspectWorkflow(await current()).state==='completed','Reopen omitted reason');fill(form,'reason','Check again');submit(form,'reopen');await until(async()=>m.inspectWorkflow(await current()).state==='running');
+  form=doc.getElementById('observation-form');fill(form,'tester','Fixture tester');doc.getElementById('start-execution').click();await until(async()=>m.executionState(await current(),'S','e')==='running');
+  form=doc.getElementById('observation-form');fill(form,'status','skipped');fill(form,'notes','Fixture-only skip');form.querySelector('button.primary').click();await until(async()=>(await current()).observations.length===2);lines.push('PASS reopen needs reason; retest retains previous evidence');
+  const before=await read(db),bad=structuredClone(before);bad.rounds[0].workflow.events.at(-1).from='passed';let rejected=false;
+  try{await update(db,before.revision,state=>m.importArchive(state,bad));}catch{rejected=true;}
+  require(rejected&&JSON.stringify(await read(db))===JSON.stringify(before),'Invalid transition changed stored data');lines.push('PASS invalid event import aborts before persistence');
+  let captured;const originalURL=frame.contentWindow.URL.createObjectURL.bind(frame.contentWindow.URL);
+  frame.contentWindow.URL.createObjectURL=blob=>{captured=blob;return originalURL(blob);};frame.contentWindow.HTMLAnchorElement.prototype.click=function(){};
+  doc.getElementById('export-ai').click();await until(()=>captured);
+  const packet=JSON.parse(await captured.text());require(packet.format==='ci-package-test/ai-snapshot'&&packet.contract.version===1&&packet.projection.rounds[0].state==='running'&&packet.projection.rounds[0].executions[0].state==='skipped','AI state export mismatch');
+  require(JSON.stringify(packet.archive)===JSON.stringify(before)&&JSON.stringify(await read(db))===JSON.stringify(before),'AI export modified evidence');lines.push('PASS actual AI export includes shared contract, state, next actions and unchanged evidence');
+  const loaded=new Promise(resolve=>frame.addEventListener('load',resolve,{once:true}));frame.contentWindow.location.reload();await loaded;await until(()=>frame.contentDocument?.getElementById('workflow-form'));
+  require(m.executionState(await current(),'S','e')==='skipped'&&frame.contentDocument.getElementById('workflow').textContent.includes('测试中'),'Reload lost workflow state');lines.push('PASS lifecycle and execution history survive reload');
+  output.textContent=lines.join('\n')+'\nALL 8 WORKFLOW CHECKS PASSED';
+}catch(error){output.textContent=lines.join('\n')+'\nFAIL '+error.stack;}finally{db.close();}
+</script>

@@ -6,7 +6,8 @@ const time='2026-10-22T04:00:00Z';
 const caseOf=(id,types=['functional'])=>({id,title:`Case ${id}`,priority:'P1',types,preconditions:'Ready',steps:'Exercise behavior',expected:'Expected behavior'});
 const plan=()=>({id:'plan',revision:0,version:'1.2.3',title:'Regression',source:'exact-source-sha',build:'https://example.invalid/run/1',pr:'https://example.invalid/pr/1',cases:[caseOf('constructor',['smoke','functional']),caseOf('FAIL'),caseOf('CHANGE')]});
 const environment=id=>({id,label:'Same model',kind:'browser',configuration:'Same OS/browser; distinct physical instance'});
-const round=(state,id='r1',extra={})=>m.createRound(state,{id,name:id,planId:'plan',createdAt:time,...extra});
+// Preserve schema-1 legacy fixtures; workflow.test.mjs covers managed defaults.
+const round=(state,id='r1',extra={})=>{const next=m.createRound(state,{id,name:id,planId:'plan',createdAt:time,...extra});delete next.rounds.at(-1).workflow;return next;};
 function fixture() {
   let state=m.importPlan(m.empty(),plan()); state=round(state);
   state=m.registerEnvironment(state,environment('a'));state=m.attachEnvironment(state,'r1','a');return state;

@@ -2,7 +2,7 @@ import * as model from './model.mjs';
 import {openStore, read, update} from './store.mjs';
 import {markTarget, selectedTarget, renderComposer, renderThreads} from './annotation-ui.mjs';
 const $ = id => document.getElementById(id);
-const labels = {smoke:'冒烟',functional:'功能',performance:'性能',compatibility:'兼容性',stability:'稳定性',security:'安全',usability:'易用性','install-upgrade':'安装升级',integration:'集成',passed:'通过',failed:'失败',partial:'部分执行',blocked:'阻塞',untested:'未测试'};
+const labels = {smoke:'冒烟',functional:'功能',performance:'性能',compatibility:'兼容性',stability:'稳定性',security:'安全',usability:'易用性','install-upgrade':'安装升级',integration:'集成',passed:'通过',failed:'失败',partial:'部分执行',blocked:'阻塞',untested:'待测',running:'测试中',skipped:'跳过',draft:'草稿',ready:'就绪',completed:'已结束',prepare:'标记就绪',begin:'开始本轮',complete:'结束本轮',reopen:'重新打开'};
 const el = (tag, text, className) => { const node = document.createElement(tag); if (text != null) node.textContent = text; if (className) node.className = className; return node; };
 const option = (value, text) => { const node = el('option', text); node.value = value; return node; };
 const uuid = () => crypto.randomUUID();
@@ -64,6 +64,7 @@ function render() {
     if(/^https?:\/\//i.test(value)) {const a=el('a',value);a.href=value;a.target='_blank';a.rel='noopener noreferrer';p.append(a);} else p.append(document.createTextNode(value||'未提供'));
     $('identity').append(p);
   }
+  renderWorkflow(round);
   const counts=Object.fromEntries(model.STATUSES.map(status=>[status,definitions.filter(item=>(round?model.statusOf(round,item.id):'untested')===status).length]));
   $('stats').replaceChildren(...[['用例总数',definitions.length],...model.STATUSES.map(status=>[labels[status],counts[status]])].map(([label,count])=>{const div=el('div',null,'stat');div.append(el('strong',count),el('span',label));return div;}));
   const query=$('search').value.toLowerCase();
@@ -118,6 +119,25 @@ function renderEditor(detail,plan,item) {
   form.onsubmit=event=>{event.preventDefault();const data=new FormData(form);save(state=>model.editCase(state,plan.id,{...item,title:data.get('title'),preconditions:data.get('preconditions'),steps:data.get('steps'),expected:data.get('expected'),types:data.getAll('types')}));};
   panel.append(form);detail.append(panel);
 }
+function renderWorkflow(round) {
+  const panel=$('workflow');panel.replaceChildren();
+  if(!round)return;
+  if(!round.workflow){panel.append(el('p','旧流程：保留原始结果，未补造开始或轮次事件。新建下一轮可启用状态机。','context'));return;}
+  const current=model.inspectWorkflow(round);
+  panel.append(el('h3',`轮次状态：${labels[current.state]}`));
+  const form=el('form');form.id='workflow-form';
+  field(form,'操作人','actor').required=true;field(form,'原因（重新打开必填）','reason');
+  for(const action of model.roundActions(round)) {
+    const button=el('button',labels[action.action]);button.value=action.action;button.disabled=!action.allowed;
+    if(!action.allowed)button.title=action.missing.includes('attached-environment')?'请先加入登记环境':'仍有待测或测试中的执行';
+    form.append(button);
+  }
+  form.onsubmit=event=>{event.preventDefault();if(!event.submitter)return;const data=new FormData(form);save(state=>model.transitionRound(state,round.id,{id:uuid(),action:event.submitter.value,from:current.state,actor:data.get('actor'),at:now(),reason:data.get('reason')}));};
+  panel.append(form,el('small','结束代表记录已完成，失败、阻塞和跳过仍会保留。'));
+  const history=el('details');history.append(el('summary',`状态事件 · ${round.workflow.events.length}`));
+  for(const event of round.workflow.events)history.append(el('p',`${event.scope==='round'?'轮次':`${event.caseId} / ${event.environmentId}`} · ${event.from} → ${event.to} · ${event.actor} · ${event.at}${event.reason?` · ${event.reason}`:''}`,'context'));
+  panel.append(history);
+}
 function renderExecution(detail,round,item) {
   detail.append(el('h3','本轮环境 / 设备'));
   const row=el('div',null,'row'),label=el('label','选择已登记环境'),choice=el('select');choice.id='environment';choice.setAttribute('aria-label','选择已登记环境');choice.append(option('','请选择'),...state.environments.map(env=>option(env.id,`${env.label} · ${env.kind}`)));choice.value=environmentId;environmentId=choice.value;
@@ -126,12 +146,20 @@ function renderExecution(detail,round,item) {
   const env=round.environments.find(env=>env.id===environmentId);
   detail.append(el('p',env?`${env.label} · ${env.configuration}`:'保存前须登记环境，并加入本轮。','context'));
   const form=el('form');form.id='observation-form';const draft=drafts.get(draftKey())??{};
-  const status=field(form,'结果','status','','select'); status.replaceChildren(...model.STATUSES.map(value=>option(value,labels[value])));status.value=draft.status??'passed';
+  const managed=Boolean(round.workflow),active=managed?model.inspectWorkflow(round).state==='running':true;
+  if(managed) {
+    const current=env?model.executionState(round,item.id,env.id):'untested';
+    detail.append(el('p',env?`当前环境执行状态：${labels[current]}。保存结果前须开始执行；重测会保留旧记录。`:'请选择环境查看执行状态。','context'));
+    const begin=el('button',current==='untested'?'开始此用例':'重新执行此用例');begin.type='button';begin.id='start-execution';begin.disabled=!active||!env||current==='running';
+    begin.onclick=()=>{const tester=form.elements.tester.value;save(state=>model.startExecution(state,round.id,{id:uuid(),from:current,actor:tester,at:now(),caseId:item.id,environmentId:env.id}));};form.append(begin);
+  }
+  const status=field(form,'结果','status','','select'); status.replaceChildren(...(managed?model.RESULTS:model.STATUSES.filter(status=>status!=='running')).map(value=>option(value,labels[value])));status.value=draft.status??'passed';
   const time=field(form,'执行时间（本地时区）','executedAt',draft.executedAt??localTime());time.type='datetime-local';time.required=true;
   field(form,'执行人','tester',draft.tester??'').required=true;field(form,'备注 / 缺陷','notes',draft.notes??'','textarea');field(form,'证据路径或链接','evidence',draft.evidence??'','textarea');
   form.oninput=()=>drafts.set(draftKey(),Object.fromEntries(new FormData(form)));
-  const single=el('button','新增执行记录','primary');form.append(single);
-  const batch=el('button','批量记录到所选用例');batch.type='submit';batch.value='batch';form.append(batch);
+  const single=el('button','新增执行记录','primary');single.disabled=!active;form.append(single);
+  const batch=el('button','批量记录到所选用例');batch.type='submit';batch.value='batch';batch.disabled=!active;form.append(batch);
+  if(managed){const startBatch=el('button','开始所选用例');startBatch.type='button';startBatch.id='start-batch';startBatch.disabled=!active||!env;startBatch.onclick=()=>{const actor=form.elements.tester.value;save(state=>model.startExecutionBatch(state,round.id,[...(selections.get(round.id)??[])].map(id=>({id:uuid(),from:model.executionState(round,id,env.id),actor,at:now(),caseId:id,environmentId:env.id}))));};form.append(startBatch);}
   const bound={roundId:round.id,caseId:item.id,environmentId,key:draftKey()};
   form.onsubmit=event=>{
     event.preventDefault();const data=Object.fromEntries(new FormData(form));
@@ -162,6 +190,7 @@ $('import-button').onclick=()=>$('import').click();
 $('import').onchange=async event=>{try{if(!event.target.files.length)return;const value=JSON.parse(await event.target.files[0].text());await save(state=>value.schemaVersion?model.importArchive(state,value):model.importPlan(state,value));}catch(error){message(error.message,true);}finally{event.target.value='';}};
 $('json-form').onsubmit=async event=>{event.preventDefault();try{const value=JSON.parse(new FormData(event.target).get('json'));await save(state=>value.schemaVersion?model.importArchive(state,value):model.importPlan(state,value));}catch(error){message(error.message,true);}};
 $('export').onclick=()=>download(state,'test-workbench-archive.json');
+$('export-ai').onclick=()=>{try{download(model.exportAI(state),'test-workbench-ai-state.json');message('AI 快照包含状态机契约、原始归档、当前状态及允许的下一步；恢复数据请使用归档。');}catch(error){message(error.message,true);}};
 $('reload').onclick=async()=>{try{state=await read(db);if(linkError)readLocation();render();message('已读取最新数据；未保存的草稿保留。');}catch(error){message(error.message,true);}};
 $('round-form').onsubmit=event=>{event.preventDefault();const data=new FormData(event.target),id=uuid(),changed=data.get('changed').trim();save(state=>model.createRound(state,{id,name:data.get('name'),planId,createdAt:now(),changedIds:changed?changed.split(',').map(value=>value.trim()).filter(Boolean):undefined,includeUnfinished:data.has('unfinished')})).then(()=>{if(!$('message').classList.contains('error')){roundId=id;render();}});};
 $('environment-form').onsubmit=event=>{event.preventDefault();const data=Object.fromEntries(new FormData(event.target)),id=uuid();save(state=>model.registerEnvironment(state,{id,...data})).then(()=>{if(!$('message').classList.contains('error')){environmentId=id;render();}});};

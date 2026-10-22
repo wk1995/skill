@@ -46,6 +46,10 @@ Prepare or install the exact verified package only for the requested stage. Pres
 
 If automation can capture the screen but cannot reliably activate controls, verify the control method before judging the feature. Request manual cooperation or an explicitly approved environment setting change; do not mark failed input injection as a product defect. Avoid concurrent user and automated control during an operation, and restore temporary test settings afterward.
 
+## State and machine-readable outcomes
+
+Apply [state-machine.md](state-machine.md): keep definitions separate from per-round/case/environment execution state. New rounds use explicit lifecycle events; execution starts, outcomes and retests are append-only. The webpage and AI use one contract and expose guarded next actions. Preserve older observation-only rounds as legacy instead of fabricating transitions.
+
 ## Observations, imports, and outcomes
 
 Each saved observation includes case/definition revision, round, package/source identity, registered environment/configuration snapshot, execution time with timezone, recorded time, tester, outcome, notes, and evidence links. Keep repeated results on the same environment and results from different environments independently.
@@ -56,7 +60,7 @@ On cross-workbench import, preserve original observation and environment snapsho
 
 Bind unsaved drafts to round/case/environment, restore that binding when returning, and keep the displayed environment equal to the saved observation's environment. Batch saves require the same validations as single saves. Saving a library classification must update current definition displays, filters, and exports while leaving historical rounds unchanged. Use revision checks and supported persistence interfaces; do not bypass an existing server's concurrency controls with direct file writes.
 
-Keep results as passed, failed, partially executed, blocked, or untested (map explicitly to the workbench's supported statuses). A product failure requires reproducible observed behavior and evidence. Describe nonfatal logs as follow-up observations unless a defect is confirmed. Do not invent a pass because the app opened, CI succeeded, or a crash was not seen.
+Keep results as passed, failed, partially executed, blocked or skipped; running and untested are execution states rather than new result records. Map explicitly to the workbench's supported statuses. In the bundled managed workflow, failures require notes and evidence; blocking/skipping require a reason, results require a started execution, and ending a round does not imply a pass. A product failure requires reproducible observed behavior and evidence. Describe nonfatal logs as follow-up observations unless a defect is confirmed. Do not invent a pass because the app opened, CI succeeded, or a crash was not seen.
 
 Stop or defer cases when the required account, hardware, OS, duration, permissions or reliable controls are unavailable; continue independent applicable cases. Confirm the requested duration before starting a long test if scope is unclear. A discovered defect authorizes a report, not an unrequested source fix or PR.
 

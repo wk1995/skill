@@ -4,7 +4,7 @@ import * as m from '../assets/workbench/model.mjs';
 const time='2026-10-22T06:00:00Z';
 const caseOf=id=>({id,title:id,priority:'P0',types:['smoke','functional'],preconditions:'Ready',steps:'Select this exact sentence.',expected:'Expected result'});
 const plan=()=>({id:'p',revision:0,version:'v1',title:'Plan',source:'sha',build:'',pr:'',cases:[caseOf('A'),caseOf('B')]});
-function fixture(){let state=m.importPlan(m.empty(),plan());return m.createRound(state,{id:'r',name:'Round',planId:'p',createdAt:time});}
+function fixture(){let state=m.importPlan(m.empty(),plan());state=m.createRound(state,{id:'r',name:'Round',planId:'p',createdAt:time});delete state.rounds[0].workflow;return state;}
 const event=(id,kind='comment',extra={})=>({id,kind,author:'Tester',body:kind==='comment'?'A review comment':'',createdAt:time,...extra});
 const note=(extra={})=>({id:'n',planId:'p',roundId:'r',caseId:'A',origin:'web',target:{field:'steps',quote:'exact sentence'},event:event('e1'),...extra});
 function rejects(state,action,pattern){const before=structuredClone(state);assert.throws(()=>action(state),pattern);assert.deepEqual(state,before);}
