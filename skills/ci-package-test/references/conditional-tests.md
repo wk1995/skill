@@ -52,6 +52,8 @@ For multi-step work, split independently observable checks into stable case node
 
 Use [dependsOn](dependencies.md) for required upstream cases, separate from outcome-based `next`. A branch target with unmet prerequisites cannot start; guidance identifies an actionable ancestor instead. Explicit blocked/skipped branches may continue independent authorized work. Dependency cycles reject even though retry/routing cycles are permitted.
 
+Put "this target needs another case to pass" on the target's `dependsOn`, so incoming routes and direct starts share one rule. `next` selects by the current case's five outcomes; it does not evaluate arbitrary conditions on other cases or accept `when` expressions. Choosing different targets based on another case's result would require a separately specified routing extension. See the [combined example and placement table](dependencies.md#where-to-put-the-condition), and the [routing/readiness flowchart](../README.md#routing-and-prerequisite-flow).
+
 ## Runtime and persistence
 
 The shared contract is `CONTRACT.routing` in `workflow.mjs`; `routing.mjs` validates branch shape/targets and derives `nextTest`. Direct plan import, case edit, archive import and round validation all enforce it before the IndexedDB put. Old cases without `next` remain valid and show `unconfigured`; never guess or fabricate branches. The current-definition editor accepts `next` JSON; edits affect subsequent rounds and leave historical branch snapshots intact.

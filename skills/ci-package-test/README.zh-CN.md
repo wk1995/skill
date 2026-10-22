@@ -30,6 +30,26 @@
 
 `dependsOn` 声明必须先通过的前置用例，`next` 声明结果后的分支。工作台按依赖顺序准备，拒绝循环依赖，拦截条件未满足的开始操作，并明确显示缺少哪些前置用例。上游重测会使下游证据过期，需重新验证，原始记录完整保留。详见[用例依赖](references/dependencies.md)。
 
+### 路由与依赖流程
+
+把必须通过的条件放在**目标用例的 `dependsOn`**，通过 `next` 到达目标时也遵循同一规则。例如，LOGIN01 通过后指向 PAY01，而 PAY01 要求 LOGIN01 和 CART01 都通过。CART01 未通过时，先提示完成 CART01，不会自动记录结果或修改已配置的路由。详见[组合定义示例](references/dependencies.md#where-to-put-the-condition)。
+
+```mermaid
+flowchart TD
+  Result["当前用例：实际结果"] --> Route{"next[结果]"}
+  Route -->|test / retry| Check{"目标 dependsOn：<br/>在本轮、本环境均有<br/>当前有效的通过证据？"}
+  Route -->|wait| Wait["展示恢复条件；<br/>显式重测前重新检查依赖"]
+  Route -->|done| Done["结束当前分支；<br/>轮次仍需检查结束条件"]
+  Check -->|否| Missing["提示缺失的前置用例；<br/>禁止开始目标用例"]
+  Missing -->|显式补测前置用例后，<br/>从原路由重新计算| Check
+  Missing --> Decision["若暂缓，明确记录阻塞或跳过及原因；<br/>可继续独立测试"]
+  Check -->|是| Run["确认实际前置条件；<br/>显式开始或重测，记录实际证据"]
+  Run --> Continue["按目标用例的 next 继续"]
+  Upstream["上游重测：<br/>下游旧证据过期"] -.-> Check
+```
+
+打开目标仅切换页面；开始和保存结果时会再次校验。若执行期间前置证据发生变化，应记录阻塞或停止原因，恢复后重新开始。没有 `next` 时仍明确标为未配置。根据另一条用例的结果选择不同目标属于另一种路由能力，当前格式不支持跨用例条件表达式。
+
 详细说明见 [SKILL.md](SKILL.md)、[网页交付](references/web-workbench.md)、[CI 与发布](references/ci-and-publication.md)和[测试轮次](references/test-rounds.md)。仓库中运行 `node --test skills/ci-package-test/tests/*.test.mjs` 验证模板，需要 Node.js 18+。改名时保留原来的不可变同步 ID。
 
 ## 何时触发

@@ -2,6 +2,33 @@
 
 Use `dependsOn` when a test needs successful evidence or prepared state from another case. This is separate from `next`: prerequisites control whether a case can start; outcome branches describe what to test afterward.
 
+## Where to put the condition
+
+| Requirement | Definition |
+| --- | --- |
+| After LOGIN01 passes, continue with PAY01 | `LOGIN01.next.passed` targets PAY01 |
+| PAY01 requires both LOGIN01 and CART01 to pass before execution | `PAY01.dependsOn` lists both IDs |
+| Select different targets according to another case's result | A separate routing-condition capability would be needed; the current `next` format has no cross-case predicates |
+
+Keep each prerequisite on the target, so every path to that target and direct starts use the same guard. Do not duplicate it in every incoming `next` branch or add unsupported `when` fields. A failed prerequisite does not implicitly choose another route, skip the target or mark it failed. The configured route still identifies the requested target; guidance first identifies the missing prerequisite. Explicit independent branches remain available through their declared outcomes.
+
+The [English](../README.md#routing-and-prerequisite-flow) and [Chinese](../README.zh-CN.md#路由与依赖流程) flowcharts show the same routing and readiness checks.
+
+For example, use these definition excerpts together (complete the normal case fields, and define CART01 with concrete steps and an expected result in the same plan):
+
+```json
+{
+  "id": "LOGIN01",
+  "next": {
+    "passed": {"action": "test", "caseId": "PAY01", "reason": "Verify payment after login"},
+    "failed": {"action": "retry", "caseId": "LOGIN01", "reason": "Retain defect evidence and explicitly retest login when ready"},
+    "partial": {"action": "retry", "caseId": "LOGIN01", "reason": "Complete the unverified login checks"},
+    "blocked": {"action": "wait", "reason": "Restore login prerequisites", "resumeWhen": "The test account and required external service are available"},
+    "skipped": {"action": "done", "reason": "No further test on this login branch; other selected cases still need explicit outcomes"}
+  }
+}
+```
+
 ```json
 {
   "id": "PAY01",
@@ -16,6 +43,8 @@ Use `dependsOn` when a test needs successful evidence or prepared state from ano
 ```
 
 LOGIN01 and CART01 must be defined in the same plan. All listed prerequisites must currently pass in the same round and environment. Empty/omitted `dependsOn` means no case dependency. Other devices, previous rounds, partial results, skipped cases, blocked cases, unresolved failures and stale passes do not satisfy a prerequisite. Passing a prerequisite supplies recorded evidence; it does not transfer session data or credentials between environments. Check the target case's actual preconditions too.
+
+After a valid LOGIN01 pass, the declared route requests PAY01. If CART01 is untested, running, failed, partial, blocked, skipped or stale, `nextTest` recommends CART01 (or its first unmet ancestor) instead, and starting PAY01 rejects. Once CART01 has a current valid pass, recomputing the recommendation from LOGIN01 points to PAY01. Merely opening CART01 or PAY01 changes navigation only. If CART01 has no `next` definition, its own recommendation remains explicitly unconfigured; return to LOGIN01's route or open PAY01 rather than inventing a new branch. The blocked start does not itself append a blocked observation.
 
 ## Graph and selection
 

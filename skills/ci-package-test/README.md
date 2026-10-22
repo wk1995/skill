@@ -30,6 +30,26 @@ Cases can define explicit outcome branches to another test, retry, wait (with a 
 
 Use `dependsOn` for required prerequisite cases and `next` for outcome branches. The workbench orders prerequisites, rejects cyclic dependencies, blocks ineligible starts and exposes exactly which cases are missing. Upstream retests make downstream evidence stale until revalidated; original records remain intact. See [dependencies](references/dependencies.md).
 
+### Routing And Prerequisite Flow
+
+Declare a required pass on the **target's `dependsOn`**, including when that target is reached through `next`. For example, LOGIN01's passed branch targets PAY01, while PAY01 requires both LOGIN01 and CART01. Until CART01 passes, guidance identifies CART01 first; it does not record a result or change the configured route. See the [combined definition example](references/dependencies.md#where-to-put-the-condition).
+
+```mermaid
+flowchart TD
+  Result["Current case: actual result"] --> Route{"next[result]"}
+  Route -->|test / retry| Check{"Target dependsOn:<br/>all current valid passes<br/>in this round/environment?"}
+  Route -->|wait| Wait["Show recovery condition;<br/>check dependencies before explicit retry"]
+  Route -->|done| Done["End this branch;<br/>round still needs completion checks"]
+  Check -->|No| Missing["Show unmet prerequisite;<br/>target cannot start"]
+  Missing -->|After explicit prerequisite testing,<br/>recompute the original route| Check
+  Missing --> Decision["If deferred, record blocked/skipped<br/>with a reason; continue independent work"]
+  Check -->|Yes| Run["Confirm actual preconditions;<br/>explicit start/retest and actual evidence"]
+  Run --> Continue["Continue via the target's next"]
+  Upstream["Upstream retest:<br/>old descendant evidence becomes stale"] -.-> Check
+```
+
+Opening a target only navigates. Start and result saves validate again; if prerequisite evidence changes during execution, record why execution was blocked/stopped and restart after recovery. A missing `next` remains unconfigured. Selecting different targets based on another case's result is a separate routing capability; the current format has no cross-case predicates.
+
 See [SKILL.md](SKILL.md), [web delivery](references/web-workbench.md), [CI and publication](references/ci-and-publication.md) and [test rounds](references/test-rounds.md). Template tests: `node --test skills/ci-package-test/tests/*.test.mjs` from this repository (Node.js 18+). The immutable sync ID retains its original value across the rename.
 
 ## When It Triggers
