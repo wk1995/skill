@@ -92,6 +92,7 @@ Agent Skills 规范只要求 `SKILL.md`，但本仓库额外要求双语使用�
 <!-- skills-catalog:start -->
 | Skill | 用途 | 文档 |
 | --- | --- | --- |
+| `android-ci-fir-test` | `android-ci-fir-test` 串联 Android FIR 渠道 CI 打包、基于 PR 的回归用例，以及按需执行的真机测试和可复用测试轮次。普通 CI 只归档产物，上传 FIR 必须明确要求发布。Skill 初始版本为 `0.0.1`。 | [README](skills/android-ci-fir-test/README.zh-CN.md) |
 | `android-code-release-train` | `android-code-release-train` 约束 Android 需求从功能分支、版本集成和发布提升，到形成已评审源码提交及不可变 Tag 的完整代码链路。它不构建、签名、打包或上传发布产物。 | [README](skills/android-code-release-train/README.zh-CN.md) |
 | `build-pipeline-engineering` | `build-pipeline-engineering` 用于配置和执行可复现的可分发构建流水线：从一个确定源码引用完成 build variant 选择、环境配置、签名、打包、校验与输出上传。对于支持 variant 的目标，未指定时默认使用 `release`；在 GitHub Actions 中，构建输出默认上传到 GitHub Actions Artifacts。 | [README](skills/build-pipeline-engineering/README.zh-CN.md) |
 | `choose-project-doc-location` | `choose-project-doc-location` 为项目文档选择路径，并整理指定文件夹或项目下的文档位置。适用于 PRD、技术文档和机器可读状态机规格文件，不管理它们的业务关联或内容 Schema。 | [README](skills/choose-project-doc-location/README.zh-CN.md) |
