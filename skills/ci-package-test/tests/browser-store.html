@@ -1,0 +1,23 @@
+<!doctype html><meta charset="utf-8"><title>Workbench persistence tests</title>
+<h1>Isolated IndexedDB transaction checks</h1><pre id="result">Running…</pre>
+<script type="module">
+import {openStore,read,update} from '../assets/workbench/store.mjs';
+import * as m from '../assets/workbench/model.mjs';
+const output=document.getElementById('result'),lines=[];
+const require=(condition,message)=>{if(!condition)throw new Error(message);};
+const eq=(a,b)=>JSON.stringify(a)===JSON.stringify(b);
+const db=await openStore(`ci-package-test-disposable-${crypto.randomUUID()}`);
+try {
+  const a=await read(db),b=await read(db);
+  const env={id:'a',label:'Isolated browser fixture',kind:'browser',configuration:'Test only'};
+  const current=await update(db,a.revision,state=>m.registerEnvironment(state,env));
+  let rejected=false;try{await update(db,b.revision,state=>m.registerEnvironment(state,{...env,id:'b'}));}catch(error){rejected=/Another tab/.test(error.message);}
+  require(rejected&&eq(await read(db),current),'Stale revision lost newer data');lines.push('PASS stale-tab rejection preserves newer state');
+  rejected=false;try{await update(db,current.revision,state=>m.importArchive(state,{...state,schemaVersion:99}));}catch{rejected=true;}
+  require(rejected&&eq(await read(db),current),'Invalid import changed persistence');lines.push('PASS invalid import aborts before persistence');
+  const repeat=await update(db,current.revision,state=>m.importArchive(state,structuredClone(state)));
+  require(eq(repeat,current)&&eq(await read(db),current),'Idempotent import changed revision');lines.push('PASS identical import preserves revision');
+  const reader=await openStore(db.name);require(eq(await read(reader),current),'Reopened connection lost data');reader.close();lines.push('PASS separate database connection retains data');
+  output.textContent=lines.join('\n')+'\nALL 4 PERSISTENCE CHECKS PASSED';
+}catch(error){output.textContent=lines.join('\n')+'\nFAIL '+error.stack;}finally{db.close();}
+</script>
