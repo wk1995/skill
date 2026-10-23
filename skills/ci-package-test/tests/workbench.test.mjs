@@ -126,3 +126,23 @@ test('one invalid batch observation cannot partially append good observations',(
   assert.equal(result.rounds[0].observations.length,2);assert.equal(state.rounds[0].observations.length,0);
   rejectsUnchanged(result,s=>m.record(s,'r1',observation('one')),/already exists/);
 });
+
+test('round version must match its owning plan across direct calls, imports and legacy history',()=>{
+  for(const managed of [false,true]) {
+    let state=fixture();
+    if(managed)state.rounds[0].workflow={version:1,events:[]};
+    const valid=structuredClone(state);
+    const mismatch=structuredClone(state);mismatch.rounds[0].version='9.9.9';
+    rejectsUnchanged(mismatch,s=>m.validate(s),/Round version/);
+    rejectsUnchanged(m.empty(),s=>m.importArchive(s,mismatch),/Round version/);
+    rejectsUnchanged(valid,s=>m.importArchive(s,mismatch),/Round version/);
+    rejectsUnchanged(mismatch,s=>m.attachEnvironment(s,'r1','a'),/Round version/);
+    rejectsUnchanged(mismatch,s=>m.importPlan(s,s.plans[0]),/Round version/);
+    rejectsUnchanged(mismatch,s=>m.exportAI(s),/Round version/);
+    assert.equal(m.importArchive(valid,structuredClone(valid)),valid);
+    // The library may advance its source/revision within the same version;
+    // that must not rewrite or invalidate the historical round snapshot.
+    const advanced=m.importPlan(valid,{...plan(),revision:1,source:'new-source-sha'});
+    assert.deepEqual(advanced.rounds,valid.rounds);assert.equal(m.validate(advanced),advanced);
+  }
+});

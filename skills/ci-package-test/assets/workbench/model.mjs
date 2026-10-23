@@ -60,7 +60,9 @@ export function validate(state) {
   unique(state.rounds, 'rounds');
   for (const round of state.rounds) {
     for (const key of ['id', 'name', 'planId', 'version', 'source', 'build', 'pr']) text(round[key], `round.${key}`, ['build', 'pr'].includes(key));
-    find(state.plans, round.planId, 'Plan'); timestamp(round.createdAt, 'round.createdAt');
+    const plan = find(state.plans, round.planId, 'Plan');
+    require(round.version === plan.version, 'Round version must match its owning plan');
+    timestamp(round.createdAt, 'round.createdAt');
     unique(round.cases, 'round.cases'); round.cases.forEach(validateCase); validateTargets(round.cases);orderCases(round.cases);
     require(round.cases.some(item => item.types.includes('smoke')), 'Round requires smoke coverage');
     unique(round.environments, 'round.environments');

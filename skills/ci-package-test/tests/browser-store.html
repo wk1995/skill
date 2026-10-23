@@ -18,6 +18,17 @@ try {
   const repeat=await update(db,current.revision,state=>m.importArchive(state,structuredClone(state)));
   require(eq(repeat,current)&&eq(await read(db),current),'Idempotent import changed revision');lines.push('PASS identical import preserves revision');
   const reader=await openStore(db.name);require(eq(await read(reader),current),'Reopened connection lost data');reader.close();lines.push('PASS separate database connection retains data');
-  output.textContent=lines.join('\n')+'\nALL 4 PERSISTENCE CHECKS PASSED';
+  let archive=m.importPlan(m.empty(),{id:'p',revision:0,version:'1.0.0',title:'Version fixture',source:'fixture-sha',build:'',pr:'',cases:[{id:'S',title:'Smoke',priority:'P0',types:['smoke'],preconditions:'',steps:'Run',expected:'Observe'}]});
+  archive=m.createRound(archive,{id:'r',name:'Version fixture',planId:'p',createdAt:'2026-10-23T08:00:00Z'});
+  for(const managed of [true,false]) {
+    const mismatch=structuredClone(archive);mismatch.rounds[0].version='9.9.9';if(!managed)delete mismatch.rounds[0].workflow;
+    rejected=false;try{await update(db,current.revision,state=>m.importArchive(state,mismatch));}catch(error){rejected=/Round version/.test(error.message);}
+    require(rejected&&eq(await read(db),current),'Cross-version round import changed persistence');
+  }
+  const valid=await update(db,current.revision,state=>m.importArchive(state,archive));
+  require(valid.rounds[0].version==='1.0.0'&&eq(await read(db),valid),'Valid same-version round failed to persist');
+  const identical=await update(db,valid.revision,state=>m.importArchive(state,archive));require(eq(identical,valid),'Same-version repeated import changed state');
+  lines.push('PASS managed/legacy cross-version rounds reject before writes; valid imports persist idempotently');
+  output.textContent=lines.join('\n')+'\nALL 5 PERSISTENCE CHECKS PASSED';
 }catch(error){output.textContent=lines.join('\n')+'\nFAIL '+error.stack;}finally{db.close();}
 </script>
