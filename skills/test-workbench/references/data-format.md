@@ -1,5 +1,7 @@
 # Unified test-data format, version 1
 
+The Skill is now named `test-workbench`. Its existing `ci-package-test/*` protocol identifiers, schema versions and browser database keys are retained for compatibility; renaming the Skill does not require renaming or migrating stored data.
+
 Use this format for **both GitHub Issues and repository files**. The storage adapter decodes its source into one normalized archive; the webpage and AI consume that archive and the same deterministic conclusion projection. Do not author a second format for Issues, scrape titles/labels/Markdown to infer results, or introduce field aliases such as `result` for an observation's `status`.
 
 The executable field contract is `CONTRACT.data` in [workflow.mjs](../assets/workbench/workflow.mjs), included in every AI snapshot. [model.mjs](../assets/workbench/model.mjs) validates field values, identities and references; workflow replay validates legal event sequences; [conclusions.mjs](../assets/workbench/conclusions.mjs) computes the summary. The reference below describes those existing supported formats. Optional extensions must update their validators, producers and consumers together before the webpage can use them.

@@ -1,8 +1,8 @@
-# CI Package Test
+# Test Workbench（测试工作台）
 
 语言：[English](README.md) | **简体中文**
 
-`ci-package-test` 串联 CI 测试包、基于 PR 的用例和可复用网页测试工作台，适用于不同平台和分发渠道。工作台组织版本、方案、轮次、环境/设备、执行记录及批注。普通 CI 只归档产物，对外发布须明确要求。初始版本仍为 `0.0.1`。
+`test-workbench` 管理可复用的网页测试流程，统一测试用例、执行记录与绑定数据版本的测试总结。工作台组织版本、方案、轮次、环境/设备、用例依赖、下一步测试、Issue 证据及批注，并在需要时衔接不同平台的 CI 测试包和 PR 变更。普通 CI 只归档产物，对外发布须明确要求。初始版本仍为 `0.0.1`。
 
 ## 如何使用
 
@@ -63,7 +63,7 @@ flowchart TD
 
 打开目标仅切换页面；开始和保存结果时会再次校验。若执行期间前置证据发生变化，应记录阻塞或停止原因，恢复后重新开始。没有 `next` 时仍明确标为未配置。根据另一条用例的结果选择不同目标属于另一种路由能力，当前格式不支持跨用例条件表达式。
 
-详细说明见 [SKILL.md](SKILL.md)、[网页交付](references/web-workbench.md)、[CI 与发布](references/ci-and-publication.md)和[测试轮次](references/test-rounds.md)。仓库中运行 `node --test skills/ci-package-test/tests/*.test.mjs` 验证模板，需要 Node.js 18+。改名时保留原来的不可变同步 ID。
+详细说明见 [SKILL.md](SKILL.md)、[网页交付](references/web-workbench.md)、[CI 与发布](references/ci-and-publication.md)和[测试轮次](references/test-rounds.md)。仓库中运行 `node --test skills/test-workbench/tests/*.test.mjs` 验证模板，需要 Node.js 18+。由 `ci-package-test` 改名而来；不可变同步 ID `android-ci-fir-test`、已有 `ci-package-test/*` 协议标识和浏览器数据库名称均保留，原有数据无需迁移。
 
 ## 何时触发
 

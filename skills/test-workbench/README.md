@@ -1,8 +1,8 @@
-# CI Package Test
+# Test Workbench
 
 Language: **English** | [简体中文](README.zh-CN.md)
 
-`ci-package-test` connects CI packages, PR-derived cases and a reusable web test workbench across platforms and distribution channels. The workbench organizes versions, plans, rounds, environments/devices, execution records and annotations. Ordinary CI archives artifacts; external publication requires an explicit request. The initial version remains `0.0.1`.
+`test-workbench` manages a reusable web testing process with standardized cases, execution records and revision-bound summaries. It organizes versions, plans, rounds, environments/devices, dependencies, next-test guidance, Issue evidence and annotations, and connects CI packages and PR changes across platforms when requested. Ordinary CI archives artifacts; external publication requires an explicit request. The initial version remains `0.0.1`.
 
 ## How To Use It
 
@@ -63,7 +63,7 @@ flowchart TD
 
 Opening a target only navigates. Start and result saves validate again; if prerequisite evidence changes during execution, record why execution was blocked/stopped and restart after recovery. A missing `next` remains unconfigured. Selecting different targets based on another case's result is a separate routing capability; the current format has no cross-case predicates.
 
-See [SKILL.md](SKILL.md), [web delivery](references/web-workbench.md), [CI and publication](references/ci-and-publication.md) and [test rounds](references/test-rounds.md). Template tests: `node --test skills/ci-package-test/tests/*.test.mjs` from this repository (Node.js 18+). The immutable sync ID retains its original value across the rename.
+See [SKILL.md](SKILL.md), [web delivery](references/web-workbench.md), [CI and publication](references/ci-and-publication.md) and [test rounds](references/test-rounds.md). Template tests: `node --test skills/test-workbench/tests/*.test.mjs` from this repository (Node.js 18+). Renamed from `ci-package-test`; the immutable sync ID `android-ci-fir-test`, existing `ci-package-test/*` protocol identifiers and browser database keys stay unchanged, so existing data needs no migration.
 
 ## When It Triggers
 

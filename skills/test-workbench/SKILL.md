@@ -1,6 +1,6 @@
 ---
-name: ci-package-test
-description: Connect CI packages with PR-derived regression cases and a reusable web test workbench across platforms and distribution channels. Improve and visualize plans, rounds, environments, execution records, web/native annotation context and repeat testing. Ordinary CI archives artifacts; external publication requires an explicit request.
+name: test-workbench
+description: Manage a reusable web testing workbench with standardized cases, execution records and revision-bound summaries. Coordinate dependencies, next-test guidance, environments, Issue evidence, web/native annotations and repeat testing, using GitHub Issues by default or repository files. Connect exact CI packages and PR changes across platforms when requested; external publication requires an explicit request.
 metadata:
   sync_id: "android-ci-fir-test"
   version: "0.0.1"
@@ -19,9 +19,9 @@ metadata:
       - Unrequested source version changes, branch promotion, code fixes, PR creation, merging or tagging.
 ---
 
-# CI Package Test
+# Test Workbench
 
-Turn CI artifacts and actual code changes into an executable, visible testing process. The reusable web workbench is a core capability: manage version → plan → round, separate case definitions from observations, and preserve results across packages, environments and rounds. Support mobile, desktop, web, service and library projects using their existing toolchains.
+Manage an executable, visible testing process with standardized case definitions, execution history and revision-bound summaries; connect actual code changes and CI artifacts when part of the task. The reusable web workbench is a core capability: manage version → plan → round, separate case definitions from observations, and preserve results across packages, environments and rounds. Support mobile, desktop, web, service and library projects using their existing toolchains.
 
 ## Establish scope
 
