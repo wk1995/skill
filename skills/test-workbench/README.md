@@ -2,7 +2,7 @@
 
 Language: **English** | [简体中文](README.zh-CN.md)
 
-`test-workbench` manages a reusable web testing process with standardized cases, execution records and revision-bound summaries. It organizes versions, plans, rounds, environments/devices, dependencies, next-test guidance, Issue evidence and annotations, and connects CI packages and PR changes across platforms when requested. Ordinary CI archives artifacts; external publication requires an explicit request. The initial version remains `0.0.1`.
+`test-workbench` manages a reusable web testing process with standardized cases, execution records and revision-bound summaries. It organizes versions, plans, rounds, environments/devices, dependencies, next-test guidance, Issue evidence and annotations, and connects CI packages and PR changes across platforms when requested. Ordinary CI archives artifacts; external publication requires an explicit request. Current Skill version: `0.0.2`.
 
 ## How To Use It
 
@@ -17,9 +17,13 @@ Use machine-readable state machines for cases/executions and export current stat
 Use the existing workbench for the next round: failures first, all smoke cases, then cases from the release PR diff.
 Prepare the web build in the specified test environment and record browser/configuration with each result.
 Publish the verified artifact from CI run <run-id> to the specified distribution channel.
+Preserve our ADB device picker, historical-device associations, WebMCP tools and PR-diff preparation when improving the existing workbench.
+Keep our selected screenshot storage, one-file-per-round/current-result policy and conclusion-tab behavior instead of replacing them with starter defaults.
 ```
 
 Complete test-process or web-display requests deliver a working web workbench, reusing an existing implementation or adapting the bundled [template](assets/workbench/). Build-only requests produce artifacts. Installation, execution, environment deployment and external publication follow the requested scope. For variant-based builds, Release is the default when supported.
+
+Version 0.0.2 adds [project integration procedures](references/project-integrations.md) for ADB device discovery, explicit imported-device identity associations, live AI/WebMCP operations, real GitHub PR comparison, selected local screenshot upload/preview and project storage/conclusion presentation. These procedures preserve existing project capabilities; the starter does not implement those adapters. Each requested adapter needs shared validation and actual verification before being reported available. Existing custom formats require an explicit migration adapter. One file per round is distinct from history retained inside it; an explicitly selected current-results-only policy must not be described as managed append-only history. Issue attachments remain the default for new integrations; existing local screenshot workflows are retained until a migration is requested.
 
 The template supports version/plan/round navigation, multi-type cases, failure/smoke selection, environment registration, timestamped observations, immutable round definitions, JSON import/export and deep links. Run `node scripts/workbench-server.mjs --repo OWNER/REPO` from the Skill directory (Node18+ and authenticated gh). For files use `node scripts/workbench-server.mjs --mode repository-files --repo-root /absolute/project --data-dir testing/testflow`. Open the printed URL, verify the target and initialize a new workspace before saving. Copy both scripts and workbench assets together when adapting the template. It starts empty: import a plan based on actual changes, not demonstration results.
 

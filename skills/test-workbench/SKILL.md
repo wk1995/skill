@@ -3,7 +3,7 @@ name: test-workbench
 description: Manage a reusable web testing workbench with standardized cases, execution records and revision-bound summaries. Coordinate dependencies, next-test guidance, environments, Issue evidence, web/native annotations and repeat testing, using GitHub Issues by default or repository files. Connect exact CI packages and PR changes across platforms when requested; external publication requires an explicit request.
 metadata:
   sync_id: "android-ci-fir-test"
-  version: "0.0.1"
+  version: "0.0.2"
   triggering:
     include:
       - Build a test package through CI from a selected source ref for any platform or distribution channel.
@@ -32,6 +32,19 @@ For a test-data/workbench task, select one authoritative source using [reference
 A build-only request produces CI artifacts. A channel name, release variant or successful CI does not authorize external distribution. Publish only when explicitly requested or already authorized in a release flow. Installation, test-environment deployment, execution, source fixes and external website hosting follow the requested scope.
 
 For “完善测试流程”, “以网页展示测试”, or a complete package-to-regression workflow, include the web workbench as a deliverable. Reuse and improve the current workbench; when absent, adapt [assets/workbench/](assets/workbench/) using [references/web-workbench.md](references/web-workbench.md). Do not stop at a prose checklist or generate a new app for every round.
+
+## Preserve project integrations
+
+Read [references/project-integrations.md](references/project-integrations.md) when adopting or extending an existing workbench. Inventory the actual UI, service, data readers/writers and host tools before replacing anything. Preserve useful project capabilities even when absent from the bundled template:
+
+- Android device discovery and registration through ADB, including USB/wireless identity deduplication and revalidation before selection.
+- Explicit association of imported historical device records with a registered environment, preserving original snapshots and configuration boundaries.
+- Live AI/WebMCP tools for reading context, navigating, preparing rounds and recording authorized observations through the same guarded operations as the webpage.
+- Actual GitHub PR comparison and revision-bound change analysis before failure/smoke/change-based next-round selection.
+- Existing local screenshot upload, preview and agent upload when selected by the project; keep Issue attachments as the default for new integrations.
+- Project-selected per-round single-file/current-result storage and conditional conclusion tabs. Preserve the selected history policy; do not silently compact managed event history or add historical snapshots against the user's instruction.
+
+These are integration procedures, not claims that the starter implements each adapter. Report implemented, verified and pending capabilities separately. Existing custom archives need an explicit format adapter; never rename their schema version or discard fields to make them pass the bundled validator. User-selected current-result archives retain their actual scope and must not be presented as managed append-only history.
 
 ## Package and verify
 
@@ -63,7 +76,7 @@ Read [references/test-rounds.md](references/test-rounds.md) for cases, environme
 - Keep the current library authoritative. Preserve PR-updated steps and classifications until a newer explicit edit supersedes them; distinguish stale imports from intentional edits. Freeze each round's selected definitions.
 - Register and select an environment before saving results. For mobile this includes physical device details; for web, desktop, services or libraries it includes browser, OS, runtime, deployment or consumer configuration. A shared model name does not establish identical environments.
 - Reuse one workbench and import/update its data for later packages. Validate single/batch saves, imports, stale revisions and round/environment context before persistence. Preserve historical snapshots and observations.
-- Store screenshots and logs directly in the linked GitHub Issue, including in file mode; provide Issue association controls and clickable links instead of a separate attachment entry. Persist append-only `round.issueLinks` associations with the records, include references in conclusions/AI exports, and allow linking an existing record without rewriting its outcome. Saving an association does not upload attachments, verify access, create/comment/close an Issue or synchronize its status. See [references/data-sources.md](references/data-sources.md#record-to-issue-associations).
+- Default new integrations to screenshots/logs stored directly in the linked GitHub Issue, including in file mode, with Issue association controls and clickable links. Preserve an existing project's explicitly selected local attachment workflow using [project-integrations.md](references/project-integrations.md#local-screenshot-adapter); do not remove a working upload/preview entry without a requested migration. Persist append-only `round.issueLinks` associations in managed archives, include references in conclusions/AI exports, and allow linking an existing record without rewriting its outcome. Saving an association does not upload attachments, verify access, create/comment/close an Issue or synchronize its status. See [references/data-sources.md](references/data-sources.md#record-to-issue-associations).
 - Persist and display per-round, environment-bound test conclusions with their archive revision and supporting records; include known failures, skipped/incomplete coverage and stale dependency evidence. A computed test conclusion is not release approval. In file mode include conclusions in the same explicit Git commit as definitions and records.
 - Test the workbench with disposable data, then deliver its local URL, primary-source location and export location. Report confirmed Issue writes versus file saves and Git commits separately. The bundled service is local and single-operator; never claim distributed collaboration.
 - In the default GitHub Issues mode, read [references/github-issues.md](references/github-issues.md). Use the bundled loopback service and webpage adapters from [references/data-sources.md](references/data-sources.md). GitHub mode uses local gh credentials and verified Issue/comment writes; file mode saves validated snapshots and offers a separate data-only Git commit button. Explicit browser preview remains separate from primary persistence. The initial remote plan defers multi-user concurrency and strict remote audit protection, retaining existing local guards. Before an authorized CLI media upload, require gh 2.99.0+ and `--attach` in the exact command's help; older/missing support needs an authorized installation-channel upgrade or browser-upload fallback. Newer CLI versions still do not make log files supported media attachments.

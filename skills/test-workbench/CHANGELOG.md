@@ -4,6 +4,14 @@
 
 - No unreleased changes.
 
+## [0.0.2] - 2026-10-23
+
+- Change-Type: fix
+- Summary: Preserve existing project integrations when applying the workbench workflow: ADB discovery/registration, historical environment associations, live AI/WebMCP operations, actual PR-diff preparation, selected local screenshot workflows, per-round single-file/current-result storage and conditional conclusion tabs.
+- Compatibility: User-requested version 0.0.2. Clarifies project adoption and adapter verification without changing triggers, bundled runtime, persisted schemas, source modes or the managed append-only workflow. Existing project policies remain explicit; unsupported custom archives need a reviewed adapter, not a schema-number rewrite. No data migration is performed by this release.
+- Add a focused integration guide with shared UI/AI/service guards, evidence migration/cleanup boundaries and disposable verification scenarios. Distinguish documented integration procedures from working starter capabilities; preserve Issue attachments as the new-project default.
+- Keep English/Chinese usage documentation and reference routing aligned. Local screenshot and current-results-only exceptions do not claim Issue uploads or managed workflow history.
+
 ## [0.0.1] - 2026-10-22
 
 - Change-Type: initial

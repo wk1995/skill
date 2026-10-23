@@ -4,6 +4,8 @@ Use the [unified case/record/summary format](data-format.md) for required fields
 
 Web delivery is part of complete test-process and visualization requests. Inspect the project's current tool first; retain its database and history. When none exists, copy `assets/workbench/` and `scripts/` together into a project-owned tools directory, preserving relative paths, and adapt the provided application. Keep one reusable app; later packages, versions, plans and rounds are data.
 
+For an existing tool, use [project-integrations.md](project-integrations.md) before replacing adapters or UI. Retain verified ADB, identity-association, WebMCP, PR-diff and selected screenshot capabilities. Respect the project's explicit storage/history policy and conditional conclusion presentation. These capabilities are integration procedures, not extra implemented starter features; the acceptance checks below apply after any requested adapter work.
+
 ## Included working template
 
 Start the included [primary-source service](data-sources.md#included-webpage-adapters), for example from the Skill directory:

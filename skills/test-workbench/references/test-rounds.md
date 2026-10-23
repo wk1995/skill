@@ -42,6 +42,8 @@ Separate definitions from append-only observations. Do not reset old results whe
 
 Register reusable test environments before execution: physical devices for mobile, browser/OS combinations for web, hosts for desktop, deployment/runtime for services, and consumer/toolchain combinations for libraries. Record identity and relevant configuration independently of the human-readable label. Similar model names do not establish identity.
 
+Reuse existing automated device discovery and explicit imported-identity association through the [project integration procedures](project-integrations.md). Apply their shared identity/configuration checks to the webpage and any live AI tools. Preserve an explicitly selected current-result file layout without claiming absent workflow history; do not retrofit invented start events into old rounds.
+
 Add the chosen environment to the current round and select it before saving any observation. Snapshot its profile/configuration in single and batch records. Reject missing/unknown profiles, environments outside the round and mismatched configuration before persistence. Manual registration remains possible without environment-discovery tools.
 
 Prepare or install the exact verified package only for the requested stage. Preserve current data and settings. Compare identity/version/signature or runtime configuration as applicable; do not uninstall, clear state, force a downgrade or replace an environment to bypass a conflict without authorization. Verify the resulting package/deployment identity after success. Android-specific discovery and installation are optional examples in [android-example.md](android-example.md).
