@@ -1,3 +1,5 @@
+import {validateIssueLinks} from './issue-links.mjs';
+export {issueURL, parseIssueURLs, recordIssues} from './issue-links.mjs';
 import {validateDependencies, orderCases} from './dependencies.mjs';
 import {validateNext, validateTargets, nextTest} from './routing.mjs';
 import {validateTestLocation, locationHint} from './test-location.mjs';
@@ -81,6 +83,7 @@ export function validate(state) {
       timestamp(observation.recordedAt, 'recordedAt');
       for (const key of ['tester', 'notes', 'evidence']) text(observation[key], `observation.${key}`, key !== 'tester');
     }
+    validateIssueLinks(round);
     if (round.workflow !== undefined) inspectWorkflow(round);
   }
   unique(state.annotations === undefined ? [] : state.annotations, 'annotations');
@@ -243,8 +246,9 @@ export function createRound(state, input) {
 export function record(state, roundId, observation) {
   return recordBatch(state, roundId, [observation]);
 }
-export function recordBatch(state, roundId, observations) {
+export function recordBatch(state, roundId, observations, issueLinks = []) {
   validate(state);
+  list(issueLinks, 'Issue associations');
   unique(observations, 'new observations'); require(observations.length, 'Select at least one case');
   const round = find(state.rounds, roundId, 'Round');
   for (const observation of observations) require(!round.observations.some(item => item.id === observation.id), 'Observation ID already exists');
@@ -253,6 +257,7 @@ export function recordBatch(state, roundId, observations) {
     const target = find(next.rounds, roundId, 'Round');
     const executions=target.workflow?inspectWorkflow(target).executions:[];
     target.observations.push(...copy(observations));
+    if(issueLinks.length){target.issueLinks ??= [];target.issueLinks.push(...copy(issueLinks));}
     if (target.workflow) for (const observation of observations) {
       const from=executions.find(entry=>entry.caseId===observation.caseId&&entry.environmentId===observation.environmentId)?.state;
       const action=from==='untested'&&CONTRACT.execution.transitions.defer.to.includes(observation.status)?'defer':'record';
@@ -263,6 +268,15 @@ export function recordBatch(state, roundId, observations) {
     });
     }
   });
+}
+// Append associations even after a round is completed; original observations stay immutable.
+export function linkRecordIssues(state, roundId, links) {
+  validate(state);list(links, 'Issue associations');require(links.length,'Select at least one Issue');
+  const round=find(state.rounds,roundId,'Round'),candidate=copy(round);candidate.issueLinks ??= [];
+  for(const link of links){const old=candidate.issueLinks.find(item=>item.id===link.id);require(!old||same(old,link),'Conflicting Issue association');if(!old)candidate.issueLinks.push(copy(link));}
+  validateIssueLinks(candidate);
+  if(same(candidate.issueLinks,round.issueLinks))return state;
+  return change(state,next=>{find(next.rounds,roundId,'Round').issueLinks=candidate.issueLinks;});
 }
 export function importArchive(state, incoming) {
   validate(state); validate(incoming);
@@ -283,7 +297,7 @@ export function importArchive(state, incoming) {
   for (const round of incoming.rounds) {
     const old = next.rounds.find(item => item.id === round.id);
     if (!old) { next.rounds.push(copy(round)); continue; }
-    const fixed = item => Object.fromEntries(Object.entries(item).filter(([key]) => !['environments', 'observations', 'workflow'].includes(key)));
+    const fixed = item => Object.fromEntries(Object.entries(item).filter(([key]) => !['environments', 'observations', 'workflow', 'issueLinks'].includes(key)));
     require(same(fixed(old), fixed(round)), 'Conflicting historical round definition');
     require((old.workflow === undefined) === (round.workflow === undefined), 'Cannot upgrade/downgrade historical workflow');
     if (old.workflow) {
@@ -297,6 +311,11 @@ export function importArchive(state, incoming) {
       const existing = old.observations.find(item => item.id === observation.id);
       require(!existing || same(existing, observation), 'Conflicting historical observation');
       if (!existing) old.observations.push(copy(observation));
+    }
+    if(round.issueLinks!==undefined)old.issueLinks ??= [];
+    for(const link of round.issueLinks??[]){
+      old.issueLinks ??= [];const existing=old.issueLinks.find(item=>item.id===link.id);
+      require(!existing||same(existing,link),'Conflicting Issue association');if(!existing)old.issueLinks.push(copy(link));
     }
   }
   for (const note of incoming.annotations ?? []) {

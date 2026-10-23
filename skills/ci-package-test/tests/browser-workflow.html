@@ -31,7 +31,7 @@ try {
   form=doc.getElementById('observation-form');fill(form,'status','failed');fill(form,'notes','Observed failure');
   form.querySelector('button.primary').click();await until(()=>doc.getElementById('message').classList.contains('error'));
   require((await current()).observations.length===0,'Missing evidence was persisted');
-  fill(form,'evidence','Fixture screenshot');form.querySelector('button.primary').click();await until(async()=>(await current()).observations.length===1);lines.push('PASS failure requires evidence and appends one started execution result');
+  fill(form,'issues','https://github.com/fixture/project/issues/12');form.querySelector('button.primary').click();await until(async()=>(await current()).observations.length===1);lines.push('PASS failure requires evidence and appends one started execution result');
   form=doc.getElementById('workflow-form');fill(form,'actor','Fixture operator');submit(form,'complete');await until(async()=>m.inspectWorkflow(await current()).state==='completed');
   require(m.statusOf(await current(),'S')==='failed','Completion cleared failure');lines.push('PASS ended round retains failure');
   form=doc.getElementById('workflow-form');fill(form,'actor','Fixture operator');submit(form,'reopen');await until(()=>doc.getElementById('message').classList.contains('error'));

@@ -1,3 +1,4 @@
+import {validateIssueLinks, recordIssues} from './issue-links.mjs';
 import {DEPENDENCIES, dependencyViews} from './dependencies.mjs';
 import {TEST_LOCATION} from './test-location.mjs';
 // JSON-compatible contract: shared by replay, UI action discovery and AI exports.
@@ -12,6 +13,7 @@ export const CONTRACT = {
     archive: {schemaVersion:1, collections:['plans','environments','rounds','annotations'], revision:'optimistic concurrency counter'},
     case: {role:'definition', required:['id','title','priority','types','preconditions','steps','expected'], outcome:'none; result belongs to execution'},
     observation: {role:'immutable evidence', required:['id','caseId','environmentId','environment','status','executedAt','recordedAt','tester','notes','evidence'], context:'owning round pins plan/version/source/build and case definition',executedAt:'Timezone timestamp for execution; null only for pre-execution blocked/skipped defer' },
+    issueLinks: {field:'round.issueLinks', optional:true, required:['id','observationId','url','actor','createdAt'], semantics:'Append-only associations to HTTPS Issue URLs. Attach screenshots/logs in the Issue; no webpage attachment entry or inferred Issue synchronization. Legacy observation.evidence remains readable.'},
     workflow: {version:1, ordering:'events array; IDs immutable; divergent histories reject'},
     pending: 'untested is the machine key for pending; Chinese labels are presentation only'
   },
@@ -36,6 +38,7 @@ export const CONTRACT = {
     execution:'Guidance only: navigate to the explicit target; never auto-execute, auto-pass or infer skipped outcomes.',
     closure:'Freeze all reachable target cases in the round. Unvisited branches remain untested until explicitly recorded/skipped.'
   },
+  evidenceAlternatives: {field:'observation.evidence',alternative:'Validated round.issueLinks entry for that observation; new webpage records use Issue associations.'},
   resultRequirements: {passed: [], failed: ['notes', 'evidence'], partial: [], blocked: ['notes'], skipped: ['notes']},
   eventFields: ['id', 'scope', 'action', 'from', 'to', 'actor', 'at', 'reason'],
   executionEventFields: ['caseId', 'environmentId', 'observationId'],
@@ -52,6 +55,7 @@ const key = (caseId, environmentId) => JSON.stringify([caseId, environmentId]);
 const time = value => typeof value === 'string' && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,3})?(?:Z|[+-]\d{2}:\d{2})$/.test(value) && Number.isFinite(Date.parse(value)) && new Date(`${value.slice(0,10)}T00:00:00Z`).toISOString().slice(0,10) === value.slice(0,10);
 export function inspectWorkflow(round) {
   require(round.workflow && round.workflow.version === CONTRACT.version && Array.isArray(round.workflow.events), 'Invalid workflow contract');
+  validateIssueLinks(round);
   let state = CONTRACT.round.initial;
   const executions = new Map(), seen = new Set(), observed = new Set();
   const current = (caseId, environmentId) => executions.get(key(caseId,environmentId)) ?? {state: CONTRACT.execution.initial, attemptId: null, observationId: null, unresolvedFailureId: null, dependencyEvidence: []};
@@ -89,7 +93,7 @@ export function inspectWorkflow(round) {
         if(event.action==='defer')require(observation.executedAt===null,'Deferred case requires executedAt=null; do not fabricate execution');
         const definition=round.cases.find(item=>item.id===event.caseId);
         const required=[...CONTRACT.resultRequirements[event.to],...(definition.next?CONTRACT.routing.resultRequirements[event.to]??[]:[])];
-        for (const field of required) require(text(observation[field]), `${event.to} requires ${field}`);
+        for (const field of required) require(text(observation[field]) || (field==='evidence'&&recordIssues(round,observation.id).length>0), `${event.to} requires ${field}${field==='evidence'?' (an associated Issue also qualifies)':''}`);
         observed.add(observation.id);
         executions.set(key(event.caseId,event.environmentId),{state:event.to, attemptId:previous.attemptId,dependencyEvidence:previous.dependencyEvidence, observationId:observation.id,unresolvedFailureId:event.to==='passed'?null:event.to==='failed'?observation.id:previous.unresolvedFailureId});
       }

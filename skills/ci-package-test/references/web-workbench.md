@@ -75,3 +75,7 @@ For automated browser fixtures, serve the Skill directory and open `tests/browse
 Deliver the functioning URL, where data is stored, backup/export instructions, and tested limits. Do not mark demonstration observations as real product-test results or claim distributed collaboration from this local service.
 
 For the optional end-to-end primary-adapter browser runner, install/provide Playwright in a test environment and run `node tests/browser-primary.mjs` from the Skill directory. `TESTFLOW_PLAYWRIGHT_MODULE` may point to an existing package directory and `TESTFLOW_CHROME` to a Chrome executable; neither is needed by the workbench runtime. The runner starts isolated loopback services, uses only an in-memory fake GitHub API plus disposable Git repositories, exercises both default URLs without browser-preview flags, and verifies real UI writes, failure retention, conclusions, reload and separate file commits. It creates no live Issues or product-test evidence.
+
+## Issue evidence links
+
+The result form accepts full Issue URLs (one per line); existing record cards support append-only associations even after round completion. Open those links to add screenshots/logs in GitHub. The workbench has no separate attachment entry; original evidence fields remain readable. File mode saves associations inside records and commits them with conclusions through the separate commit control. See [format, validation and API boundaries](data-sources.md#record-to-issue-associations).

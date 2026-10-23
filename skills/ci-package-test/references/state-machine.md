@@ -12,6 +12,8 @@ Read this when creating cases, executing or importing results, adapting the webp
 
 The executable, JSON-compatible [contract](../assets/workbench/workflow.mjs) is shared by the model, UI action discovery and AI export. It declares states, transitions, guards, result requirements, identities and required fields. For another project, adapt this contract and its validator together; document explicit mappings for unsupported statuses instead of inferring them from prose. Do not create an unrelated second state machine just for AI.
 
+Issue references use optional append-only `round.issueLinks` entries identifying observation, canonical HTTPS Issue URL, actor and timezone timestamp. New observations and links can be recorded atomically; existing records can gain associations without changing observations or workflow outcomes. Screenshots/logs belong in the Issue, with no separate webpage attachment entry. See [association format and direct commands](data-sources.md#record-to-issue-associations).
+
 ## Round lifecycle
 
 | Action | From | To | Guard |
@@ -25,7 +27,7 @@ The executable, JSON-compatible [contract](../assets/workbench/workflow.mjs) is 
 
 ## Execution lifecycle
 
-`untested` is the stored key for pending. `start` moves it to `running`. `record` moves `running` to `passed`, `failed`, `partial`, `blocked` or `skipped`. Each terminal state can start another attempt through `start`; no direct failed → passed rewrite is allowed. Execution events require a running round and an attached environment. Before execution, `defer` may move `untested` directly to `blocked` or `skipped`, recording a reason, `executedAt: null` and no start event. After execution begins, a blocked/skipped result retains the actual execution timestamp. A failed result requires nonempty `notes` and `evidence`; blocked and skipped results require nonempty `notes` explaining the reason. Evidence must describe an actual observation, not a fabricated path to satisfy validation.
+`untested` is the stored key for pending. `start` moves it to `running`. `record` moves `running` to `passed`, `failed`, `partial`, `blocked` or `skipped`. Each terminal state can start another attempt through `start`; no direct failed → passed rewrite is allowed. Execution events require a running round and an attached environment. Before execution, `defer` may move `untested` directly to `blocked` or `skipped`, recording a reason, `executedAt: null` and no start event. After execution begins, a blocked/skipped result retains the actual execution timestamp. A failed result requires nonempty `notes` and either legacy nonempty `evidence` or a validated association in `round.issueLinks`; blocked and skipped results require nonempty `notes` explaining the reason. Evidence must describe an actual observation, not a fabricated path to satisfy validation.
 
 Every event has an immutable ID, scope, action, expected `from`, computed `to`, actor, timestamp `at` and reason text. Execution events also identify case/environment and, for a result, the exact observation ID. `attemptId` in the projection is the corresponding start-event ID. Original attempt and result events stay in the archive.
 
@@ -41,7 +43,7 @@ Read [conditional-tests.md](conditional-tests.md) for `case.next`, outcome meani
 
 ## Direct model use and AI handoff
 
-`model.mjs` exports `createRound`, `transitionRound`, `startExecution`, `startExecutionBatch`, `record`, `recordBatch`, `validate` and `exportAI`. They validate direct invocation; UI-only guards are insufficient. Model functions return a new archive without writing. Persist through `store.update` or the project's authenticated revision-checked API. Batch transitions/results validate atomically.
+`model.mjs` exports `createRound`, `transitionRound`, `startExecution`, `startExecutionBatch`, `record`, `recordBatch`, `validate`, `linkRecordIssues` and `exportAI`. They validate direct invocation; UI-only guards are insufficient. Model functions return a new archive without writing. Persist through `store.update` or the project's authenticated revision-checked API. Batch transitions/results validate atomically.
 
 An example round event input to `transitionRound(state, roundId, input)`:
 

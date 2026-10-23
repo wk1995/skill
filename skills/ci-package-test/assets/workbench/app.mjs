@@ -185,7 +185,7 @@ function renderExecution(detail,round,item) {
   const status=field(form,'结果','status','','select'); status.replaceChildren(...(managed?model.RESULTS:model.STATUSES.filter(status=>status!=='running')).map(value=>option(value,labels[value])));status.value=draft.status??'passed';
   const time=field(form,'执行时间（本地时区）','executedAt',draft.executedAt??localTime());time.type='datetime-local';
   const timeRequirement=()=>{time.required=!(managed&&['blocked','skipped'].includes(status.value));};status.addEventListener('change',timeRequirement);timeRequirement();
-  field(form,'执行人','tester',draft.tester??'').required=true;field(form,'备注 / 缺陷','notes',draft.notes??'','textarea');field(form,'证据路径或链接','evidence',draft.evidence??'','textarea');
+  field(form,'执行人','tester',draft.tester??'').required=true;field(form,'备注 / 缺陷','notes',draft.notes??'','textarea');field(form,'关联 Issue（每行一个完整链接，可留空）','issues',draft.issues??'','textarea');form.append(el('small','截图和日志直接放在关联 Issue 中；此处仅保存链接，不校验 Issue 是否存在或有权访问。失败须填写备注并关联 Issue。'));
   form.oninput=()=>drafts.set(draftKey(),Object.fromEntries(new FormData(form)));
   const single=el('button','新增执行记录','primary');single.disabled=!active;form.append(single);
   const batch=el('button','批量记录到所选用例');batch.type='submit';batch.value='batch';batch.disabled=!active;form.append(batch);
@@ -195,8 +195,9 @@ function renderExecution(detail,round,item) {
     event.preventDefault();const data=Object.fromEntries(new FormData(form));
     if(!env) {message('请选择已加入本轮的登记环境。',true);return;}
     const ids=event.submitter===batch?[...(selections.get(bound.roundId)??[])]:[bound.caseId];
-    const observations=ids.map(id=>({id:uuid(),caseId:id,environmentId:bound.environmentId,environment:structuredClone(env),status:data.status,executedAt:managed&&model.executionState(round,id,bound.environmentId)==='untested'&&['blocked','skipped'].includes(data.status)?null:data.executedAt?new Date(data.executedAt).toISOString():null,recordedAt:now(),tester:data.tester,notes:data.notes,evidence:data.evidence}));
-    save(state=>model.recordBatch(state,bound.roundId,observations)).then(()=>{if(!$('message').classList.contains('error')){drafts.delete(bound.key);render();}});
+    let urls;try{urls=model.parseIssueURLs(data.issues);}catch(error){message(error.message,true);return;}
+    const observations=ids.map(id=>({id:uuid(),caseId:id,environmentId:bound.environmentId,environment:structuredClone(env),status:data.status,executedAt:managed&&model.executionState(round,id,bound.environmentId)==='untested'&&['blocked','skipped'].includes(data.status)?null:data.executedAt?new Date(data.executedAt).toISOString():null,recordedAt:now(),tester:data.tester,notes:data.notes,evidence:''}));
+    save(state=>model.recordBatch(state,bound.roundId,observations,observations.flatMap(record=>urls.map(url=>({id:uuid(),observationId:record.id,url,actor:data.tester,createdAt:record.recordedAt}))))).then(()=>{if(!$('message').classList.contains('error')){drafts.delete(bound.key);render();}});
   };detail.append(form);
   if(env&&managed)renderNextTest(detail,round,item,env);
   detail.append(el('h3','执行历史 · 逐条保留'));
@@ -225,6 +226,15 @@ function renderObservation(detail,record) {
   const card=el('div',null,'record'),scope={planId,roundId,caseId:record.caseId,observationId:record.id};card.id=`observation-${record.id}`;
   card.dataset.caseId=record.caseId;card.dataset.observationId=record.id;
   card.append(el('strong',`${record.caseId} · ${labels[record.status]} · ${record.environment.label} · ${record.tester}`),el('small',`执行：${record.executedAt??'未执行'} / 记录：${record.recordedAt}`),el('small',record.environment.configuration),markTarget(el('p',record.notes,'prose'),scope,'observation'),markTarget(el('div',record.evidence,'prose'),scope,'observation'));
+  const round=state.rounds.find(item=>item.id===roundId);
+  for(const url of model.recordIssues(round,record.id)){const link=el('a',`打开 Issue · ${url}`);link.href=url;link.target='_blank';link.rel='noopener noreferrer';card.append(link,el('br'));}
+  const panel=el('details');panel.append(el('summary','关联 Issue（截图、日志放在 Issue 中）'));
+  const form=el('form');form.className='issue-link-form';const key=JSON.stringify(['issue',round.id,record.id]),draft=drafts.get(key)??{};
+  field(form,'关联操作人','actor',draft.actor??'').required=true;field(form,'Issue 链接（每行一个）','issues',draft.issues??'','textarea').required=true;
+  const submit=el('button','保存 Issue 关联');form.append(submit);form.oninput=()=>drafts.set(key,Object.fromEntries(new FormData(form)));
+  form.onsubmit=event=>{event.preventDefault();const data=Object.fromEntries(new FormData(form));let urls;try{urls=model.parseIssueURLs(data.issues);}catch(error){message(error.message,true);return;}
+    save(state=>model.linkRecordIssues(state,round.id,urls.map(url=>({id:uuid(),observationId:record.id,url,actor:data.actor,createdAt:now()})))).then(()=>{if(!$('message').classList.contains('error')){drafts.delete(key);render();}});};
+  panel.append(form,el('small','只追加关联，保留原始记录。Issue 的存在、权限及附件内容需在 GitHub 中确认。'));card.append(panel);
   const annotate=el('button','批注此记录');annotate.type='button';annotate.onclick=()=>{caseId=record.caseId;observationTarget=record.id;annotationId='';view='cases';$('search').value='';$('type').value='';$('status').value='';render();document.querySelector('.annotation-compose')?.scrollIntoView({block:'center'});};card.append(annotate);detail.append(card);
 }
 for(const mode of ['cases','records','annotations']) $(`${mode}-view`).onclick=()=>{view=mode;render();};
@@ -232,7 +242,7 @@ document.addEventListener('selectionchange',()=>{
   const selected=selectedTarget($('detail'));if(!selected||selected.planId!==planId||selected.roundId!==roundId)return;
   caseId=selected.caseId;observationTarget=selected.observationId;annotationId='';syncLocation(selected.field);
 });
-$('copy-results').onclick=async()=>{const round=state.rounds.find(item=>item.id===roundId);if(!round){message('请选择执行轮次。',true);return;}const report=[`${round.version} / ${round.name}\nSource: ${round.source}\nCI: ${round.build}`, ...round.cases.map(item=>`${item.id} ${item.title}: ${labels[model.statusOf(round,item.id)]}`), ...round.observations.map(item=>`${item.caseId} · ${item.environment.label} · ${item.executedAt??'未执行'} · ${labels[item.status]}\n${item.notes}\n${item.evidence}`)].join('\n');try{await navigator.clipboard.writeText(report);message('本轮结果已复制');}catch{message('剪贴板不可用，请导出 JSON 归档。',true);}};
+$('copy-results').onclick=async()=>{const round=state.rounds.find(item=>item.id===roundId);if(!round){message('请选择执行轮次。',true);return;}const report=[`${round.version} / ${round.name}\nSource: ${round.source}\nCI: ${round.build}`, ...round.cases.map(item=>`${item.id} ${item.title}: ${labels[model.statusOf(round,item.id)]}`), ...round.observations.map(item=>`${item.caseId} · ${item.environment.label} · ${item.executedAt??'未执行'} · ${labels[item.status]}\n${item.notes}\n${item.evidence}\n${model.recordIssues(round,item.id).join('\n')}`)].join('\n');try{await navigator.clipboard.writeText(report);message('本轮结果已复制');}catch{message('剪贴板不可用，请导出 JSON 归档。',true);}};
 for(const [id,items] of [['type',model.TYPES],['status',model.STATUSES]]) select(id,[['','全部'+(id==='type'?'类型':'结果')],...items.map(value=>[value,labels[value]])],'');
 for(const id of ['search','type','status']) $(id).addEventListener('input',render);
 $('version').onchange=()=>{linkError='';planId=state.plans.find(plan=>plan.version===$('version').value)?.id??'';roundId='';render();};
@@ -262,6 +272,7 @@ function renderConclusion(round){
  const report=testConclusions(state).rounds.find(item=>item.roundId===round.id),names={passed:'通过',failed:'未通过',blocked:'阻塞',partial:'部分执行',incomplete:'尚未完成',legacy:'旧流程，未推断结论'};
  panel.append(el('h2',`本轮测试结论：${names[report.verdict]}`),el('p',`${round.version} / ${round.name} · ${round.source}`,'context'));
  panel.append(el('p','根据本轮、各环境的实际记录计算。结论与执行记录一同保存；文件模式需提交后才算入库。结论不代表发布批准。','muted'));
+ for(const url of [...new Set(report.executions.flatMap(item=>item.issues??[]))]){const link=el('a',`关联 Issue · ${url}`);link.href=url;link.target='_blank';link.rel='noopener noreferrer';panel.append(link,el('br'));}
  if(report.counts)panel.append(el('p',Object.entries(report.counts).map(([status,count])=>`${labels[status]} ${count}`).join(' · ')));
  for(const item of report.executions.filter(item=>item.result!=='passed'))panel.append(el('p',`${item.caseId} / ${round.environments.find(env=>env.id===item.environmentId)?.label??item.environmentId}：${labels[item.result]}${item.unresolvedFailureId?' · 未解决失败 '+item.unresolvedFailureId:''}${item.dependencyStale?' · 前置证据已过期':''}`,'muted'));
 }

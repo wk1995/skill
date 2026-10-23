@@ -12,7 +12,7 @@ function go(id){const button=[...doc.querySelectorAll('.case-row button')].find(
 async function record(status,notes='Fixture actual outcome; completed input and unverified session') {
   let form=doc.getElementById('observation-form');fill(form,'tester','Fixture tester');doc.getElementById('start-execution').click();
   await until(()=>doc.getElementById('start-execution').disabled);
-  form=doc.getElementById('observation-form');fill(form,'status',status);fill(form,'notes',notes);fill(form,'evidence','Fixture evidence');form.querySelector('.primary').click();
+  form=doc.getElementById('observation-form');fill(form,'status',status);fill(form,'notes',notes);fill(form,'issues','https://github.com/fixture/project/issues/12');form.querySelector('.primary').click();
   await until(async()=>m.executionState((await read(db)).rounds[0],new URLSearchParams(frame.contentWindow.location.hash.slice(1)).get('case'),'e')===status);
 }
 try {

@@ -7,7 +7,7 @@ Select the source before creating or updating test data. For a new project witho
 | Authority | Selected GitHub host/repository and mapped Issues/comments | Selected repository and Git-tracked test files |
 | Case library | Case-definition Issues with stable case IDs and structured definitions | Definition files, separate from execution records |
 | Execution history | Round Issues with frozen definitions, source/build, environments, and structured event/observation comments | Round/record files with the same frozen context and append-only events/observations |
-| Evidence | Attach screenshots/logs to the relevant Issue/comment and store the returned URLs | Store evidence URLs with records; attachments need not be committed to Git |
+| Evidence | Attach screenshots/logs to the relevant Issue/comment and store the returned URLs | Append Issue associations to records; screenshots/logs live in the linked Issue, outside Git |
 | Webpage | Read/project Issues; send validated mutations through a project adapter, then verify the result | Read/project repository files; write validated changes through a project adapter or explicit export/apply/commit workflow |
 | Browser database / JSON exports | Cache or backup/transfer only; not a second primary copy | Cache or backup/transfer only; export alone does not update tracked files |
 
@@ -59,7 +59,19 @@ Definitions and execution records are separate files. Each save validates the en
 
 A successful **Save** creates working-tree changes only. **Commit test data** explicitly stages/commits the owned data files, including definitions, records and conclusions, using the repository's configured Git identity and current branch. Other staged or working-tree files stay outside that commit. Git diagnostics disable optional index writes; literal pathspecs and cleared Git-location environment variables keep operations bound to the selected repository. Missing identity, detached HEAD, ignored files, stale state or Git failure is reported with the pending data retained; no force-add or push is performed. Check the displayed commit/head separately from a working-tree save. Do not describe ignored/untracked data as committed.
 
-Screenshots/logs may remain GitHub attachments or links to the project's evidence service. File mode commits the structured evidence URLs, not those binary attachments by default.
+Screenshots and logs live directly in the linked Issue. File mode commits structured associations and test conclusions; the webpage has no separate attachment entry. Existing evidence paths/URLs remain readable for compatibility.
+
+## Record-to-Issue associations
+
+Both source modes support the optional, append-only `round.issueLinks` collection; file mode persists it inside `records.json`. Each association targets one immutable observation in its owning round, so the record supplies exact case/environment/package context. One record can link several Issues, and one Issue can be shared across records. Repository/host are included in each full HTTPS Issue URL, including cross-repository or Enterprise links. URLs are normalized; PR URLs, unsafe schemes, credentials, queries and malformed Issue paths reject. Fragment links normalize to the parent Issue. These are declared references, not verified Issue identities or attachment content.
+
+```json
+{"id":"link-unique-id","observationId":"observation-id","url":"https://github.com/OWNER/REPO/issues/123","actor":"actual-operator","createdAt":"2026-10-23T09:00:00Z"}
+```
+
+For new records, the webpage saves observations and associations atomically through `recordBatch(state, roundId, observations, issueLinks)`. Failed results need actual notes plus a linked Issue or legacy nonempty `observation.evidence`. New UI records keep that legacy field empty and use associations. Other outcomes may omit Issues. Adding an association to an existing or completed record uses `linkRecordIssues(state, roundId, links)`: validate all IDs/URLs/operator/times before persistence, retain original observations/events, and treat exact event-ID retries as no-ops. Import unions associations by immutable ID; rewrites conflict, and source updates reject removal. Older archives without the optional collection remain valid and their saved conclusion representation remains unchanged.
+
+Open the linked Issue to attach screenshots and logs directly through GitHub's supported UI/CLI route. There is no webpage attachment upload entry or media copy into Git. Record cards, copied results and current/unresolved-failure conclusion references expose the Issue URLs; conclusions retain the original test verdict. File saves and explicit commits include these associations along with records/conclusions. Linking alone does not call an Issue API, create/comment/close an Issue or change its status; in Issues-primary mode the usual workspace save still writes its structured source documents. Creation, attachment upload or remote comments require their own authorized action. Do not infer that a linked Issue exists, is accessible, contains evidence or is closed from this reference.
 
 ## Test conclusions and legacy browser data
 

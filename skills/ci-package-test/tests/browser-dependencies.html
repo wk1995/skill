@@ -12,7 +12,7 @@ const current=async()=>(await read(db)).rounds[0];
 const go=id=>{const button=[...doc.querySelectorAll('.case-row button')].find(button=>button.querySelector('.case-id')?.textContent.startsWith(`${id} ·`));require(button,`Missing ${id}`);button.click();};
 async function start(){fill(doc.getElementById('observation-form'),'tester','Fixture tester');require(!doc.getElementById('start-execution').disabled,'Start disabled');doc.getElementById('start-execution').click();await until(()=>doc.getElementById('start-execution').disabled);}
 async function finish(status='passed'){
-  const form=doc.getElementById('observation-form');fill(form,'tester','Fixture tester');fill(form,'status',status);fill(form,'notes','Actual fixture observation');fill(form,'evidence','Fixture evidence');form.querySelector('.primary').click();
+  const form=doc.getElementById('observation-form');fill(form,'tester','Fixture tester');fill(form,'status',status);fill(form,'notes','Actual fixture observation');fill(form,'issues','https://github.com/fixture/project/issues/12');form.querySelector('.primary').click();
   const id=new URLSearchParams(frame.contentWindow.location.hash.slice(1)).get('case');await until(async()=>m.executionState(await current(),id,'e')===status);
 }
 try {
