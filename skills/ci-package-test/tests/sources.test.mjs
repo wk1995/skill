@@ -141,3 +141,7 @@ test('server CLI remains executable through a linked Skill and rejects inherited
 test('Git diagnostics do not refresh or lock the index while testing data is being read',async t=>{
  const root=await fixture(t),file=path.join(root,'README.md'),index=path.join(root,'.git/index'),before=await fs.readFile(index);const later=new Date(Date.now()+10000);await fs.utimes(file,later,later);await command('git',['-C',root,'status','--porcelain'],{env:{...process.env,GIT_OPTIONAL_LOCKS:'1'}});assert.deepEqual(await fs.readFile(index),before);
 });
+
+test('unborn repositories reject initialization before creating any test data',async t=>{
+ const root=await fs.mkdtemp(path.join(os.tmpdir(),'testflow-unborn-'));t.after(()=>fs.rm(root,{recursive:true,force:true}));await command('git',['init','-q',root]);await assert.rejects(new FileSource({repoRoot:root}).initialize(),/revision|HEAD/);assert.deepEqual(await fs.readdir(root),['.git']);
+});
