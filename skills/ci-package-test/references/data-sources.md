@@ -1,5 +1,7 @@
 # Two authoritative data-source modes
 
+Use the [unified case/record/summary format](data-format.md) for required fields, references, source mappings and validated examples; both sources reconstruct the same archive.
+
 Select the source before creating or updating test data. For a new project without a recorded choice, use **`github-issues` (default)**. Use **`repository-files`** when explicitly selected by the user or the existing project configuration. Preserve an existing source until an explicit switch; a connection failure never selects the other mode automatically. Record the choice and source location in the project's existing workbench configuration or test documentation. These names describe the workflow contract; they are not new fields supported by the bundled archive parser.
 
 | Contract | `github-issues` — default | `repository-files` — explicit alternative |

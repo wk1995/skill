@@ -10,11 +10,15 @@ export const CONTRACT = {
   conclusions:{format:'ci-package-test/conclusions',version:1,projection:'projection.conclusions',verdicts:['passed','failed','blocked','partial','incomplete','legacy'],persistence:'Saved with the archive revision in source documents or snapshots/<generation>/conclusions.json; file mode requires explicit Git commit.',approval:'A recorded-test conclusion is not release approval.'},
   identity: ['roundId', 'caseId', 'environmentId'],
   data: {
-    archive: {schemaVersion:1, collections:['plans','environments','rounds','annotations'], revision:'optimistic concurrency counter'},
-    case: {role:'definition', required:['id','title','priority','types','preconditions','steps','expected'], outcome:'none; result belongs to execution'},
+    archive: {schemaVersion:1, required:['schemaVersion','revision','plans','environments','rounds'], collections:['plans','environments','rounds','annotations'], revision:'optimistic concurrency counter',annotations:'optional for older archives'},
+    plan: {required:['id','revision','version','title','source','build','pr','cases'],identity:'id; version is an opaque product version, revision is a nonnegative integer',emptyText:['build','pr']},
+    round: {required:['id','name','planId','version','source','build','pr','createdAt','cases','environments','observations'],newRequired:['workflow'],optional:['issueLinks'],identity:'id; planId references its plan and version must match; cases/source/build are frozen'},
+    environment: {required:['id','label','kind','configuration'],identity:'id; attached and observed snapshots must match the registered profile'},
+    case: {role:'definition', required:['id','title','priority','types','preconditions','steps','expected'],optional:['dependsOn','next','testLocation'],emptyText:['preconditions'],identity:'id within a plan/frozen round; priority is nonempty project text; types use model.TYPES', outcome:'none; result belongs to execution'},
     observation: {role:'immutable evidence', required:['id','caseId','environmentId','environment','status','executedAt','recordedAt','tester','notes','evidence'], context:'owning round pins plan/version/source/build and case definition',executedAt:'Timezone timestamp for execution; null only for pre-execution blocked/skipped defer' },
     issueLinks: {field:'round.issueLinks', optional:true, required:['id','observationId','url','actor','createdAt'], semantics:'Append-only associations to HTTPS Issue URLs. Attach screenshots/logs in the Issue; no webpage attachment entry or inferred Issue synchronization. Legacy observation.evidence remains readable.'},
-    workflow: {version:1, ordering:'events array; IDs immutable; divergent histories reject'},
+    conclusions: {format:'ci-package-test/conclusions',version:1,required:['format','version','archiveRevision','rounds'],roundRequired:['roundId','planId','version','source','build','pr','lifecycle','verdict','counts','executions','meaning'],executionRequired:['caseId','environmentId','phase','result','observationId','unresolvedFailureId','dependencyStale'],executionOptional:['issues'],authority:'Recompute exactly from the validated archive; archiveRevision must match. No free-text/Issue-status verdict override.'},
+    workflow: {version:1, required:['version','events'], ordering:'events array; IDs immutable; divergent histories reject'},
     pending: 'untested is the machine key for pending; Chinese labels are presentation only'
   },
   round: {initial: 'draft', transitions: {

@@ -1,5 +1,7 @@
 # Machine-readable testing state
 
+Use the [unified case/record/summary format](data-format.md) for required fields, references, source mappings and validated examples; both sources reconstruct the same archive.
+
 Read this when creating cases, executing or importing results, adapting the webpage, or asking AI to continue testing. Use structured JSON with stable IDs and a versioned state-machine contract. Chinese/localized labels are presentation, not stored enum values. Keep `metadata.version` (Skill), `schemaVersion` (archive), and `workflow.version` (event contract) separate.
 
 ## Data and identity

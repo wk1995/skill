@@ -1,5 +1,7 @@
 # GitHub Issues data and evidence plan
 
+Use the [unified case/record/summary format](data-format.md) for required fields, references, source mappings and validated examples; both sources reconstruct the same archive.
+
 This is the **default authoritative source for new projects**. The bundled [source service and webpage adapters](data-sources.md#included-webpage-adapters) use local `gh` to read/write workspace, case and round Issues with verified structured comments. The explicitly selected repository-file alternative uses the same model and conclusion projection. Preserve an existing project's recorded choice; browser preview is not a primary-source fallback.
 
 ## Data ownership and deferred work

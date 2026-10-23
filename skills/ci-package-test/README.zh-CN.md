@@ -23,6 +23,8 @@
 
 模板支持版本/方案/轮次导航、多选测试类型、失败及冒烟项纳入、环境登记、带时间的观察记录、冻结轮次定义、JSON 导入导出及用例定位链接。在 Skill 目录运行 `node scripts/workbench-server.mjs --repo OWNER/REPO`（Node18+，gh 已登录）。文件模式运行 `node scripts/workbench-server.mjs --mode repository-files --repo-root /项目绝对路径 --data-dir testing/testflow`。打开输出的本机地址，核对目标后初始化新工作台。移植时需一起复制脚本和网页资源，保留相对目录。初始工作台为空，应导入实际变更生成的方案，不能把演示结果当成测试证据。
 
+测试用例、测试记录和测试总结统一遵循[数据格式规范](references/data-format.md)，文件与 Issue 共用同一套字段、状态枚举和 ID 引用。两种适配器还原为同一份经过校验的归档，网页按状态机投影展示，不从 Issue 自由文本或标签推断结果。规范包含必填字段、存储映射及可运行的完整示例。可用 `node scripts/validate-test-data.mjs --archive archive.json --conclusions conclusions.json` 只读校验导出数据（Node.js18+，无需 Git、gh 或网络）。
+
 批注可以关联用例、具体字段或执行记录，保留引用文字及当时的原文快照，支持回复、标记已处理、重新打开，并随归档保存。浏览器原生批注通过稳定链接、DOM 上下文及“复制原生批注上下文”联调；发送到聊天由宿主提供，核对后可按“原生批注录入”存入工作台，不会自动发送聊天或回写。详见[批注说明](references/annotations.md)。
 
 新轮次遵循“草稿 → 就绪 → 执行中 → 已结束”，每个用例/环境独立记录执行状态，开始、重测和结果保存都校验转换条件。事件保留操作者、时间及原始证据，轮次结束不代表全部通过。“导出 AI 状态快照”包含共享契约、原始归档、当前状态和允许的下一步。旧归档明确标为旧流程，不补造历史。详见[状态机说明](references/state-machine.md)。
