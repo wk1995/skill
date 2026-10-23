@@ -2,6 +2,7 @@ import {validateDependencies, orderCases} from './dependencies.mjs';
 import {validateNext, validateTargets, nextTest} from './routing.mjs';
 import {validateTestLocation, locationHint} from './test-location.mjs';
 import {projectFlow} from './flow.mjs';
+import {testConclusions} from './conclusions.mjs';
 export {projectFlow};
 export {nextTest};
 import {CONTRACT, RESULTS, inspectWorkflow, roundActions} from './workflow.mjs';
@@ -342,6 +343,7 @@ export function executionState(round,caseId,environmentId) {
 export function exportAI(state) {
   validate(state);
   return {format:'ci-package-test/ai-snapshot',contract:copy(CONTRACT),archive:copy(state),projection:{
+    conclusions:testConclusions(state),
     rounds:state.rounds.map(round => {
       if (!round.workflow) return {roundId:round.id,state:'legacy',nextActions:[],cases:round.cases.map(item=>({caseId:item.id,status:statusOf(round,item.id)}))};
       const view = inspectWorkflow(round);

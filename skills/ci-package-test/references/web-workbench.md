@@ -1,16 +1,19 @@
 # Deliver the testing process as a reusable web workbench
 
-Web delivery is part of complete test-process and visualization requests. Inspect the project's current tool first; retain its database and history. When none exists, copy `assets/workbench/` into a project-owned tools directory and adapt the provided application. Keep one reusable app; later packages, versions, plans and rounds are data.
+Web delivery is part of complete test-process and visualization requests. Inspect the project's current tool first; retain its database and history. When none exists, copy `assets/workbench/` and `scripts/` together into a project-owned tools directory, preserving relative paths, and adapt the provided application. Keep one reusable app; later packages, versions, plans and rounds are data.
 
 ## Included working template
 
-Serve the copied directory over loopback HTTP, for example:
+Start the included [primary-source service](data-sources.md#included-webpage-adapters), for example from the Skill directory:
 
 ```bash
-python3 -m http.server 4317 --bind 127.0.0.1 --directory <workbench-directory>
+node scripts/workbench-server.mjs --repo OWNER/REPO
+node scripts/workbench-server.mjs --mode repository-files --repo-root /absolute/project --data-dir testing/testflow
 ```
 
-First establish the authoritative source using [data-sources.md](data-sources.md): GitHub Issues by default for new projects, or explicitly selected repository-tracked files. The starter has neither source adapter built in; importing/saving here updates only a browser cache/prototype until an explicit validated apply workflow or project bridge confirms the chosen source write. Open the local URL and import a plan JSON file. The template starts empty and uses plain browser modules with no npm runtime dependencies. Browser-local IndexedDB persists the archive on that origin; keep the same host/port for reuse and a different port/origin for another project's workspace. Export backups and distinguish this local prototype from a shared service. A private browsing session or clearing site storage is not a backup. No hosting or external publication is implied.
+GitHub Issues is the default; file mode is explicit. Open the printed loopback URL, verify its source banner, initialize only a new workspace, and import an actual plan. Normal UI actions write through the connected adapter; success is shown only after source read-back. File mode saves working-tree data first and exposes a separate data-only Git commit button. Both modes persist and display revision-bound test conclusions. The starter uses plain browser modules and a Node18+ local service with no npm runtime dependencies; GitHub credentials stay in local gh. No external hosting or multi-user service is implied.
+
+For legacy browser data or an isolated preview only, use a static HTTP server for `assets/workbench/` and explicitly open `?local=1` or the existing named `?workspace=<name>`. This preserves the original IndexedDB origin/name and allows export. Keep host/port stable when retrieving old data; a private session or cleared browser storage is not a backup. A plain static URL without a preview flag will not silently replace the default primary source with browser storage.
 
 The UI includes editable case prerequisites, guarded starts, unmet/stale dependency evidence, concrete per-outcome next-test guidance with frozen target procedures, editable `next` branches and outcome help, enforced round/execution state machines, guarded lifecycle and start/retest controls, AI state-snapshot export, version/plan/round navigation, case search/type/result filters, current definition editing, frozen round definitions, environment registration and attachment, observations with execution/recording time, web annotations and JSON import/export. Annotations support excerpts, snapshots, replies, resolution and reopen events. Deep links and field/observation DOM markers support native browser annotation context; the template does not implement an agent-specific send-to-chat transport. See [annotations.md](annotations.md). Preserve unsaved form/environment binding when changing case or round.
 
@@ -57,11 +60,11 @@ Managed summaries use validated workflow replay for each case/environment; anoth
 
 ## Persistence boundary and extensions
 
-`dependencies.mjs` owns prerequisite validation/order/readiness; `workflow.mjs` owns the JSON-compatible contract and event replay; `model.mjs` owns archive validation and pure state transitions. `store.mjs` rechecks the expected revision inside one IndexedDB readwrite transaction before committing. An outdated tab must refresh and review before saving; a rejected operation leaves persisted state intact. Do not bypass this boundary with UI-only validation. Use the same model validation for single/batch operations and imports.
+`dependencies.mjs` owns prerequisite validation/order/readiness; `workflow.mjs` owns the JSON-compatible contract and event replay; `model.mjs` owns archive validation and pure state transitions. `store.mjs` uses the connected HTTP adapter by default; `remote-store.mjs` validates the proposed archive and sends its expected revision. The service revalidates the whole state and retained history before writes. Explicit browser previews retain the original expected-revision IndexedDB transaction. An outdated tab must refresh and review before saving; a rejected operation leaves persisted state intact. Do not bypass this boundary with UI-only validation. Use the same model validation for single/batch operations and imports.
 
-For a project source adapter, keep these contracts while moving persistence behind the project's authenticated API or explicit validated file-apply workflow, with authorization, append-only observations and backups. File-mode exports must be applied and committed before being described as in-repository records. Do not expose a local write service publicly to simulate collaboration. Add project-specific automated-test ingestion, coverage mapping or annotation integration only when useful to the requested workflow.
+The included adapters implement the source contract in [data-sources.md](data-sources.md). Preserve the shared validation when adapting them; working-tree saves and commits are separate. Do not expose a local write service publicly to simulate collaboration. Add project-specific automated-test ingestion, coverage mapping or annotation integration only when useful to the requested workflow.
 
-For the default [GitHub Issues mode](github-issues.md), multi-user concurrency coordination and strict remote history/audit protection are explicitly deferred for the initial single-operator phase. That scope decision does not disable the current local revision/model guards or claim that an Issues store already exists. Use the same reference for the gh 2.99.0+ media gate, old-version upgrade/fallback handling and separate log-file upload path.
+For the default [GitHub Issues mode](github-issues.md), multi-user concurrency coordination and strict remote history/audit protection are explicitly deferred for the initial single-operator phase. That scope decision does not disable the current local revision/model guards or claim distributed consistency from a local service. Use the same reference for the gh 2.99.0+ media gate, old-version upgrade/fallback handling and separate log-file upload path.
 
 ## Acceptance
 
@@ -69,4 +72,6 @@ Run `node --test <skill-directory>/tests/*.test.mjs` (Node.js 18+). Exercise the
 
 For automated browser fixtures, serve the Skill directory and open `tests/browser-store.html`, `tests/browser-ui.html`, `tests/browser-annotations.html`, `tests/browser-workflow.html`, `tests/browser-routing.html`, `tests/browser-dependencies.html` and `tests/browser-flow.html`. They create uniquely named disposable databases, test real transactions, deep links, annotations, graph/environment/navigation, locator validation and phone handoff, and report PASS/FAIL on the page. These checks complement the Node suite; they are not run by the shell gate.
 
-Deliver the functioning URL, where data is stored, backup/export instructions, and tested limits. Do not mark demonstration observations as real product-test results or claim multi-user/cloud persistence from this template.
+Deliver the functioning URL, where data is stored, backup/export instructions, and tested limits. Do not mark demonstration observations as real product-test results or claim distributed collaboration from this local service.
+
+For the optional end-to-end primary-adapter browser runner, install/provide Playwright in a test environment and run `node tests/browser-primary.mjs` from the Skill directory. `TESTFLOW_PLAYWRIGHT_MODULE` may point to an existing package directory and `TESTFLOW_CHROME` to a Chrome executable; neither is needed by the workbench runtime. The runner starts isolated loopback services, uses only an in-memory fake GitHub API plus disposable Git repositories, exercises both default URLs without browser-preview flags, and verifies real UI writes, failure retention, conclusions, reload and separate file commits. It creates no live Issues or product-test evidence.

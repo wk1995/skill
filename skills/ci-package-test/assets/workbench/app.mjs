@@ -1,5 +1,6 @@
 import * as model from './model.mjs';
-import {openStore, read, update} from './store.mjs';
+import {testConclusions} from './conclusions.mjs';
+import {openWorkspace,read,update,initializeSource,commitSource} from './store.mjs';
 import {markTarget, selectedTarget, renderComposer, renderThreads} from './annotation-ui.mjs';
 import {renderFlow, renderTestLocation} from './flow-ui.mjs';
 const $ = id => document.getElementById(id);
@@ -20,8 +21,14 @@ function download(value, name) {
   const url = URL.createObjectURL(new Blob([JSON.stringify(value,null,2)],{type:'application/json'}));
   const anchor=el('a'); anchor.href=url; anchor.download=name; anchor.click(); setTimeout(()=>URL.revokeObjectURL(url),1000);
 }
+let pendingAction=false,queuedHash=null;
+async function busy(action){
+  if(pendingAction)throw new Error('正在处理上一次操作，请等待结果');pendingAction=true;document.documentElement.dataset.busy='true';
+  const controls=[...document.querySelectorAll('button,input,select,textarea')].map(node=>[node,node.disabled]);for(const [node] of controls)node.disabled=true;
+  try{return await action();}finally{for(const [node,disabled] of controls)if(node.isConnected)node.disabled=disabled;pendingAction=false;document.documentElement.dataset.busy='false';if(queuedHash!==null){const target=queuedHash;queuedHash=null;queueMicrotask(()=>{if(location.hash!==target)location.hash=target;else window.dispatchEvent(new HashChangeEvent('hashchange'));});}}
+}
 async function save(action,onSuccess=()=>{}) {
-  try { state=await update(db,state.revision,action);onSuccess();if(linkError)readLocation();render();message('已保存 · 历史记录保留');return true; }
+  try {return await busy(async()=>{message('正在保存，请等待主数据源确认…');state=await update(db,state.revision,action);onSuccess();if(linkError)readLocation();render();message(db.info?.mode==='github-issues'?'已核验保存到 GitHub Issues':db.info?.mode==='repository-files'?'已保存到仓库工作区 · 尚未提交 Git':'已保存至浏览器预览 · 尚未同步主数据源');return true;}); }
   catch(error) { message(error.message,true);return false; }
 }
 function syncLocation(field='') {
@@ -52,6 +59,7 @@ function navigateAnnotation(note) {
 function select(id, items, selected) { $(id).replaceChildren(...items.map(([value,label])=>option(value,label))); $(id).value=selected; }
 const pill=(text,type)=>el('span',text,`pill ${type??''}`);
 function render() {
+  renderSource();
   $('flow').replaceChildren();
   const versions=[...new Set(state.plans.map(plan=>plan.version))];
   let plan=state.plans.find(plan=>plan.id===planId)??state.plans[0]; planId=plan?.id??'';
@@ -67,6 +75,7 @@ function render() {
     $('identity').append(p);
   }
   renderWorkflow(round);
+  renderConclusion(round);
   const counts=Object.fromEntries(model.STATUSES.map(status=>[status,definitions.filter(item=>(round?model.statusOf(round,item.id):'untested')===status).length]));
   $('stats').replaceChildren(...[['用例总数',definitions.length],...model.STATUSES.map(status=>[labels[status],counts[status]])].map(([label,count])=>{const div=el('div',null,'stat');div.append(el('strong',count),el('span',label));return div;}));
   const query=$('search').value.toLowerCase();
@@ -234,7 +243,25 @@ $('json-form').onsubmit=async event=>{event.preventDefault();try{const value=JSO
 $('export').onclick=()=>download(state,'test-workbench-archive.json');
 $('export-ai').onclick=()=>{try{download(model.exportAI(state),'test-workbench-ai-state.json');message('AI 快照包含状态机契约、原始归档、当前状态及允许的下一步；恢复数据请使用归档。');}catch(error){message(error.message,true);}};
 $('reload').onclick=async()=>{try{state=await read(db);if(linkError)readLocation();render();message('已读取最新数据；未保存的草稿保留。');}catch(error){message(error.message,true);}};
-$('round-form').onsubmit=event=>{event.preventDefault();const data=new FormData(event.target),id=uuid(),changed=data.get('changed').trim();save(state=>model.createRound(state,{id,name:data.get('name'),planId,createdAt:now(),changedIds:changed?changed.split(',').map(value=>value.trim()).filter(Boolean):undefined,includeUnfinished:data.has('unfinished')})).then(()=>{if(!$('message').classList.contains('error')){roundId=id;render();}});};
+$('round-form').onsubmit=event=>{event.preventDefault();const data=new FormData(event.target),id=uuid(),targetPlanId=planId,changed=data.get('changed').trim();save(state=>model.createRound(state,{id,name:data.get('name'),planId:targetPlanId,createdAt:now(),changedIds:changed?changed.split(',').map(value=>value.trim()).filter(Boolean):undefined,includeUnfinished:data.has('unfinished')})).then(()=>{if(!$('message').classList.contains('error')){roundId=id;render();}});};
 $('environment-form').onsubmit=event=>{event.preventDefault();const data=Object.fromEntries(new FormData(event.target)),id=uuid();save(state=>model.registerEnvironment(state,{id,...data})).then(()=>{if(!$('message').classList.contains('error')){environmentId=id;render();}});};
-window.addEventListener('hashchange',async()=>{if(!db)return;try{state=await read(db);readLocation();$('search').value='';$('type').value='';$('status').value='';render();}catch(error){message(error.message,true);}});
-try { const workspace=new URLSearchParams(location.search).get('workspace');db=await openStore(workspace?`ci-package-test-workbench:${workspace}`:undefined);state=await read(db);readLocation();render(); } catch(error) {message(`无法载入数据：${error.message}。请保留原数据库并导出可用备份，不要清空。`,true);}
+window.addEventListener('hashchange',async()=>{if(pendingAction){queuedHash=location.hash;return;}if(!db)return;try{state=await read(db);readLocation();$('search').value='';$('type').value='';$('status').value='';render();}catch(error){message(error.message,true);}});
+try {db=await openWorkspace();state=await read(db);readLocation();render(); } catch(error) {message(`无法载入数据：${error.message}。请保留原数据库并导出可用备份，不要清空。`,true);}
+
+function renderSource(){
+  const info=db?.info??{},local=info.mode==='local-preview';
+  $('source-status').textContent=local?'浏览器预览 / 旧数据 · 尚未连接主数据源':`${info.mode==='repository-files'?'仓库文件':'GitHub Issues（默认）'} · ${info.repository??''}${info.path?' / '+info.path:''}${info.actor?' · '+info.actor:''} · ${!info.initialized?'等待初始化':info.mode==='github-issues'?'已连接':info.dirty?'工作区有未提交数据':'数据已入库'}${info.head?' · '+info.head.slice(0,8):''}`;
+  $('initialize-source').hidden=local||Boolean(info.initialized);$('commit-source').hidden=info.mode!=='repository-files';$('commit-source').disabled=!info.initialized||!info.dirty||!info.branch;
+  const link=$('source-link');link.hidden=!info.url;if(info.url){link.href=info.url;link.textContent='打开工作台 Issue';}
+}
+$('initialize-source').onclick=async()=>{try{await busy(async()=>{state=await initializeSource(db);readLocation();render();message('主数据源已初始化；后续保存将写入此目标。');});}catch(error){message(error.message,true);}};
+$('commit-source').onclick=async()=>{try{await busy(async()=>{message('正在提交测试数据…');state=await commitSource(db,state.revision);render();message('当前测试数据已提交 Git；其他文件未纳入此次提交。');});}catch(error){message(error.message,true);}};
+
+function renderConclusion(round){
+ const panel=$('test-conclusion');panel.replaceChildren();if(!round)return;
+ const report=testConclusions(state).rounds.find(item=>item.roundId===round.id),names={passed:'通过',failed:'未通过',blocked:'阻塞',partial:'部分执行',incomplete:'尚未完成',legacy:'旧流程，未推断结论'};
+ panel.append(el('h2',`本轮测试结论：${names[report.verdict]}`),el('p',`${round.version} / ${round.name} · ${round.source}`,'context'));
+ panel.append(el('p','根据本轮、各环境的实际记录计算。结论与执行记录一同保存；文件模式需提交后才算入库。结论不代表发布批准。','muted'));
+ if(report.counts)panel.append(el('p',Object.entries(report.counts).map(([status,count])=>`${labels[status]} ${count}`).join(' · ')));
+ for(const item of report.executions.filter(item=>item.result!=='passed'))panel.append(el('p',`${item.caseId} / ${round.environments.find(env=>env.id===item.environmentId)?.label??item.environmentId}：${labels[item.result]}${item.unresolvedFailureId?' · 未解决失败 '+item.unresolvedFailureId:''}${item.dependencyStale?' · 前置证据已过期':''}`,'muted'));
+}

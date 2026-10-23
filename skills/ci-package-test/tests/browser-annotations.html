@@ -6,7 +6,7 @@ import * as m from '../assets/workbench/model.mjs';
 const workspace=`annotations-test-${crypto.randomUUID()}`,db=await openStore(`ci-package-test-workbench:${workspace}`);
 const frame=document.getElementById('app'),output=document.getElementById('result'),lines=[];
 const require=(condition,message)=>{if(!condition)throw new Error(message);};
-async function until(check) {for(let i=0;i<200;i++){if(await check())return;await new Promise(resolve=>setTimeout(resolve,20));}throw new Error('Timed out waiting for annotation state');}
+async function until(check) {for(let i=0;i<200;i++){if(await check()&&frame.contentDocument?.documentElement.dataset.busy!=='true')return;await new Promise(resolve=>setTimeout(resolve,20));}throw new Error('Timed out waiting for annotation state');}
 const fill=(form,name,value)=>{const input=form.elements.namedItem(name);input.value=value;input.dispatchEvent(new Event('input',{bubbles:true}));};
 try {
   const original=await read(db);

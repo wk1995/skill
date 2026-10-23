@@ -5,7 +5,7 @@ import {openStore,read,update} from '../assets/workbench/store.mjs';
 import * as m from '../assets/workbench/model.mjs';
 const workspace=`routing-test-${crypto.randomUUID()}`,db=await openStore(`ci-package-test-workbench:${workspace}`),frame=document.getElementById('app'),output=document.getElementById('result'),lines=[];
 const require=(value,message)=>{if(!value)throw new Error(message);};
-async function until(check){for(let i=0;i<250;i++){if(await check())return;await new Promise(resolve=>setTimeout(resolve,20));}throw new Error('Timed out');}
+async function until(check){for(let i=0;i<250;i++){if(await check()&&frame.contentDocument?.documentElement.dataset.busy!=='true')return;await new Promise(resolve=>setTimeout(resolve,20));}throw new Error('Timed out');}
 const fill=(form,name,value)=>{const input=form.elements.namedItem(name);input.value=value;input.dispatchEvent(new Event('input',{bubbles:true}));};
 let doc;
 function go(id){const button=[...doc.querySelectorAll('.case-row button')].find(button=>button.querySelector('.case-id')?.textContent.startsWith(`${id} ·`));require(button,`Case ${id} missing`);button.click();}

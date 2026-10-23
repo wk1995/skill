@@ -59,7 +59,10 @@ contract: the shared JSON-compatible state machine and field contract
 archive: unchanged source data, snapshots, observations and events
 projection.rounds[]: roundId, state, guarded nextActions, per-environment executions
 projection.annotations[]: annotationId, state
+projection.conclusions: revision-bound test conclusions with round/version/source, verdicts and case/environment evidence
 ```
+
+The shared `ci-package-test/conclusions` projection is also persisted by both primary-source adapters and displayed in the webpage. File-mode snapshots and commits include `conclusions.json`; it is verified against the exact supporting archive revision. Incomplete/skipped coverage is not passed, and legacy rounds do not acquire a fabricated managed conclusion. See [data-sources.md](data-sources.md#test-conclusions-and-legacy-browser-data).
 
 Each managed execution includes `state`, `attemptId`, `observationId`, `unresolvedFailureId`, concrete `nextTest` guidance and legal next actions with required result fields. A round action reports `allowed`, missing guards and whether a reason is required. This is a read-only handoff for AI; use **Export archive** for backup/import. The exported snapshot contains the same evidence as the archive, so share it only within the requested context. AI never needs to scrape translated status labels.
 

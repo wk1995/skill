@@ -1,4 +1,11 @@
 import {empty, validate} from './model.mjs';
+import {openRemote,readRemote,updateRemote} from './remote-store.mjs';
+export {initializeSource,commitSource} from './remote-store.mjs';
+export async function openWorkspace(){
+  const params=new URLSearchParams(location.search);
+  if(params.has('workspace')||params.get('local')==='1'){const name=params.get('workspace');const db=await openStore(name?`ci-package-test-workbench:${name}`:undefined);db.info={mode:'local-preview',initialized:true};return db;}
+  return openRemote();
+}
 
 export function openStore(name = 'ci-package-test-workbench') {
   return new Promise((resolve, reject) => {
@@ -10,6 +17,7 @@ export function openStore(name = 'ci-package-test-workbench') {
   });
 }
 export function read(db) {
+  if(db.remote)return readRemote(db);
   return new Promise((resolve, reject) => {
     const tx = db.transaction('state', 'readonly'); const request = tx.objectStore('state').get('workspace');
     let state;
@@ -19,6 +27,7 @@ export function read(db) {
   });
 }
 export function update(db, expectedRevision, action) {
+  if(db.remote)return updateRemote(db,expectedRevision,action);
   return new Promise((resolve, reject) => {
     const tx = db.transaction('state', 'readwrite'); const store = tx.objectStore('state');
     const request = store.get('workspace'); let result; let failure;

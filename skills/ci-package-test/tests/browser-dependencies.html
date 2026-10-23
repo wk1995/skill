@@ -5,7 +5,7 @@ import {openStore,read,update} from '../assets/workbench/store.mjs';
 import * as m from '../assets/workbench/model.mjs';
 const workspace=`dependencies-${crypto.randomUUID()}`,db=await openStore(`ci-package-test-workbench:${workspace}`),frame=document.getElementById('app'),output=document.getElementById('result'),lines=[];
 const require=(ok,message)=>{if(!ok)throw new Error(message);};
-async function until(fn){for(let i=0;i<300;i++){if(await fn())return;await new Promise(resolve=>setTimeout(resolve,20));}throw new Error('Timed out');}
+async function until(fn){for(let i=0;i<300;i++){if(await fn()&&frame.contentDocument?.documentElement.dataset.busy!=='true')return;await new Promise(resolve=>setTimeout(resolve,20));}throw new Error('Timed out');}
 const fill=(form,name,value)=>{const input=form.elements.namedItem(name);input.value=value;input.dispatchEvent(new Event('input',{bubbles:true}));};
 let doc;
 const current=async()=>(await read(db)).rounds[0];

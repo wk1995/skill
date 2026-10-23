@@ -6,6 +6,7 @@ export const CONTRACT = {
   dependencies: DEPENDENCIES,
   testLocation: TEST_LOCATION,
   visualization:{projection:'projection.rounds[].flows',scope:'One frozen round and attached environment; null node states without a managed environment.',edges:{dependency:'Required upstream pass',next:'Outcome route; active only when the recommendation is available'},interaction:'Read-only navigation/copy. Use guarded start/result actions separately; graph never runs tests.'},
+  conclusions:{format:'ci-package-test/conclusions',version:1,projection:'projection.conclusions',verdicts:['passed','failed','blocked','partial','incomplete','legacy'],persistence:'Saved with the archive revision in source documents or snapshots/<generation>/conclusions.json; file mode requires explicit Git commit.',approval:'A recorded-test conclusion is not release approval.'},
   identity: ['roundId', 'caseId', 'environmentId'],
   data: {
     archive: {schemaVersion:1, collections:['plans','environments','rounds','annotations'], revision:'optimistic concurrency counter'},

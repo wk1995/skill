@@ -5,7 +5,7 @@ import {openStore,read,update} from '../assets/workbench/store.mjs';
 import * as m from '../assets/workbench/model.mjs';
 const workspace=`flow-test-${crypto.randomUUID()}`,db=await openStore(`ci-package-test-workbench:${workspace}`),frame=document.getElementById('app'),output=document.getElementById('result'),lines=[];
 const require=(ok,message)=>{if(!ok)throw new Error(message);};
-async function until(check){for(let i=0;i<300;i++){if(await check())return;await new Promise(resolve=>setTimeout(resolve,20));}throw new Error('Timed out');}
+async function until(check){for(let i=0;i<300;i++){if(await check()&&frame.contentDocument?.documentElement.dataset.busy!=='true')return;await new Promise(resolve=>setTimeout(resolve,20));}throw new Error('Timed out');}
 const at='2026-10-22T12:00:00Z',env=id=>({id,label:`Fixture phone ${id}`,kind:'mobile',configuration:'Disposable fixture; no device connected'});
 const hint=screen=>({app:'fixture.app',screen,entryPath:['启动测试应用','打开指定页面'],targets:[{name:'测试按钮',by:'resource-id',value:'fixture.app:id/button',action:'核对当前页面后点击'}],verify:'检查实际截图中页面标题及所选手机'});
 const item=(id,dependsOn=[])=>({id,title:`Fixture ${id}`,priority:'P0',types:id==='LOGIN'?['smoke']:['functional'],preconditions:'Fixture preconditions',steps:`Execute ${id}`,expected:`Expected ${id}`,dependsOn,testLocation:hint(`Fixture ${id} screen`)});

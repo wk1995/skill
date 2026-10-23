@@ -19,27 +19,52 @@ Read [github-issues.md](github-issues.md) for case/round mapping, attachment sup
 
 Initial operation is single-operator and sequential. **Multi-user concurrency and strict remote history/audit protection remain deferred**, as requested. Existing state guards and frozen-history semantics still apply; editable GitHub comments are not tamper-resistant history.
 
-## Alternative: repository-tracked files
+## Included webpage adapters
 
-Reuse project-owned testing paths and any existing format. Keep **case definitions and execution records in separate files**, for example:
+Requires Node.js18+; GitHub mode also requires an authenticated local `gh`, repository access and Issues enabled. File mode requires Git and an existing repository with a HEAD commit. Copy both `scripts/` and `assets/workbench/` together, preserving their relative layout. Start from the Skill directory or use the actual absolute script path:
 
-```text
-testing/
-  plans.json                 # Version/plan metadata and current case definitions
-  environments.json          # Stable environment/device identities
-  records/
-    ROUND01.json             # Round snapshot, attached environment IDs, events and observations
-  annotations.json           # Pinned contexts and append-only annotation events, when used
+```bash
+# Default mode: GitHub Issues. Replace OWNER/REPO with the confirmed target.
+node scripts/workbench-server.mjs --repo OWNER/REPO
+# Explicit alternative: save to a selected repository; commits stay a separate action.
+node scripts/workbench-server.mjs --mode repository-files --repo-root /absolute/project --data-dir testing/testflow
 ```
 
-This is an illustrative mapping, not a new import format. A project adapter must assemble/validate the complete archive, retain references between these files and split validated updates back into the selected files; the starter does not import this directory layout directly. Preserve per-round source/build and original snapshots even if the current library changes. Preserve recorded observations/events; retests append attempts instead of replacing the previous result.
+Open the printed loopback URL. The banner shows the selected repository/source, initialization state and Git commit status. **Initialize this source** explicitly creates its empty workspace; existing workspaces load without replacement. Import an actual plan/archive, then use the normal case/round/environment/result/annotation controls: they read and write the selected source. Refresh reloads that authority; it never silently switches to browser data. An unconfigured static web server does not substitute IndexedDB. Optional `--workspace <lowercase-name>`, `--port <number>` and GitHub `--hostname <host>` / `--issue <index-number>` select a known scope; use `--issue` when discovery finds ambiguous indices. Preserve the chosen source configuration for future runs.
 
-Resolve the actual repository and paths before applying changes. Validate the assembled state and all affected file references before writing a proposed update. Distinguish browser draft/export, working-tree changes, a Git commit, and a pushed commit in the webpage/handoff; **a local save or download is not an in-repository committed record**. Commit/push only within the task's authorization and verify the resulting commit/path. Failed writes retain the original authoritative files and recoverable pending data. Do not claim multi-file atomicity from separate file writes.
+The service binds127.0.0.1 only, validates Host/origin and requires a session header on mutations. It exposes no token to the browser and does not serve arbitrary repository files. It serializes its own writes and rejects stale revisions, malformed state and history rewrites before source writes. HTTP archive requests are limited to16MiB; keep screenshot/log bytes in attachments and store their URLs. These local controls are not a distributed transaction/locking guarantee. Keep the existing gh account, repository and requested write scope; changing the gh actor while connected rejects writes. Do not expose this bridge on the network.
 
-Screenshots and logs may remain on GitHub attachments or the project's existing evidence service, referenced by URL in records; choosing file authority does not require adding binary evidence to Git. Keep stable case/round/environment associations and report missing or inaccessible evidence explicitly. Apply the same attachment version/type checks when using GitHub uploads from this mode.
+### GitHub persistence
 
-## Web delivery and mode changes
+One index Issue per workspace points to the published source generation. Case Issues are keyed by plan/case, and round Issues by round ID. Full definitions and round snapshots/events/observations are stored as append-only structured JSON comments; annotations and derived conclusions also live in comments. Documents split into bounded chunks with ordered IDs and a digest. The index's manifest references the exact published comments; it changes only after all new documents read back successfully. Reused unchanged documents retain their references. Issue closure/labels never determine the testing outcome.
 
-The bundled [workbench](web-workbench.md) currently implements IndexedDB with JSON import/export only. It has **no built-in GitHub Issues or repository-file persistence adapter**. When delivering a project workbench, connect the chosen source through the project's read/write bridge or provide an explicit validated import/export/apply workflow. Show the selected mode/location and whether changes are pending or confirmed at the primary source. Never imply that the default policy alone implements a backend. Keep credentials outside static webpage assets.
+An interrupted save may leave unreferenced comments or entity Issues; the previously published workspace stays authoritative. Do not delete such data automatically or call the interrupted save successful. On an uncertain final index write, inspect/read back the index rather than blindly repeating it. The initial implementation uses whole-entity snapshots, not one human-readable comment per individual event; the structured round document retains every event and observation. Read the exact referenced chunks, not an arbitrary latest comment. No screenshot/log upload is implied by saving a record: attach through the documented media/browser route and record the returned URL.
+
+### Repository file persistence and explicit commits
+
+The default file layout is:
+
+```text
+testing/testflow/
+  owner.json
+  workspace.json                # Atomically published generation pointer
+  snapshots/<generation>/
+    definitions.json            # Plans/cases, environment profiles, schema/revision
+    records.json                # Frozen rounds, execution events and observations
+    annotations.json            # Pinned contexts and annotation events
+    conclusions.json            # Revision-bound, machine-readable test conclusions
+```
+
+Definitions and execution records are separate files. Each save validates the entire proposed state and retained history, writes a fresh generation, then atomically replaces the pointer. Readers validate all referenced data and recompute conclusions for agreement. Original generations remain recoverable. Failed staging can leave pending files; preserve/inspect them, and never publish or commit an incomplete generation. Paths must stay inside the actual repository root; foreign nonempty directories, `.git` paths and symlinks reject. The service does not interpret this layout as a legacy plan import.
+
+A successful **Save** creates working-tree changes only. **Commit test data** explicitly stages/commits the owned data files, including definitions, records and conclusions, using the repository's configured Git identity and current branch. Other staged or working-tree files stay outside that commit. Missing identity, detached HEAD, ignored files, stale state or Git failure is reported with the pending data retained; no force-add or push is performed. Check the displayed commit/head separately from a working-tree save. Do not describe ignored/untracked data as committed.
+
+Screenshots/logs may remain GitHub attachments or links to the project's evidence service. File mode commits the structured evidence URLs, not those binary attachments by default.
+
+## Test conclusions and legacy browser data
+
+The webpage's **Round test conclusion** and AI `projection.conclusions` use the shared `ci-package-test/conclusions` contract, tied to `archiveRevision`, round/source/version and case/environment outcomes. Known failures remain failed through incomplete/skipped retests; blocked/partial coverage is explicit. Only a completed round whose every execution is a valid pass concludes passed; skips and missing coverage remain incomplete. Legacy rounds are labelled legacy without fabricating a managed conclusion. Conclusions are persisted and checked alongside their supporting records in both sources; file mode commits `conclusions.json` as well. These conclusions describe the recorded tests, not release approval.
+
+Existing IndexedDB databases are never silently migrated or cleared. For an explicit local preview/old-data export, serve `assets/workbench/` with a static server and open `?local=1` (the original database) or the existing `?workspace=<name>` URL (a named database). The banner states browser preview and no primary-source sync. Export first, restart with the chosen source bridge, explicitly initialize the destination if needed and import/verify the archive. Browser exports remain backups; primary writes go through the connected source. Node/gh/Git setup errors do not create an automatic file/IndexedDB fallback.
 
 For a requested source switch: retain a backup; map stable IDs, definitions, frozen rounds, environments, observations/events, annotations and evidence URLs; validate the destination projection; verify the transferred data and references; then record the new source selection. Keep the old source as a clearly marked backup/archive. Do not enable automatic bidirectional writes or treat both sources as authoritative during migration. If transfer fails, retain the old authority and pending migration data. Existing local archives remain readable without inventing source metadata or history.
