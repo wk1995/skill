@@ -1,10 +1,10 @@
 # GitHub Issues data and evidence plan
 
-Status: optional integration plan, not a GitHub-backed store implemented by the bundled webpage. The current template still uses IndexedDB and JSON archive export. Apply this plan when the project requests an Issues adapter; do not silently migrate its existing data.
+This is the **default authoritative source for new projects**, alongside the explicitly selected repository-file alternative in [data-sources.md](data-sources.md). It is an integration contract, not a GitHub-backed store implemented by the bundled webpage: that starter still uses IndexedDB and JSON archive export. Connect a project adapter or an explicit verified apply workflow before claiming primary-source persistence; preserve an existing project's source choice.
 
 ## Data ownership and deferred work
 
-An Issues-backed project may use one Issue per case definition, one Issue per round with frozen definitions/source/build/environments, and structured comments for start/result/retest events and observations. Attach evidence to the corresponding record and retain its returned URL with case/round/environment identity. Keep definitions separate from execution evidence; Issue closure does not mean passed. JSON exports can remain backup/migration tools rather than a second manually maintained source of truth. Attachments need not be committed into Git.
+Map one Issue per case definition, one Issue per round with frozen definitions/source/build/environments, and structured comments for start/result/retest events and observations. Attach evidence to the corresponding record and retain its returned URL with case/round/environment identity. Keep definitions separate from execution evidence; Issue closure does not mean passed. JSON exports can remain backup/migration tools rather than a second manually maintained source of truth. Attachments need not be committed into Git.
 
 **Deferred, 2026-10-23:** multi-user concurrent writes and strict remote history/audit protection are out of the initial integration scope. Start with a single operator writing sequentially. Distributed locking/atomic conflict handling and tamper-resistant remote history/recovery are future work, not a prerequisite for documenting or prototyping this single-operator flow. Do not claim multi-user consistency or immutable GitHub comments. This deferral does not remove the existing local revision checks, state-machine guards, frozen snapshots or append-only observation behavior.
 

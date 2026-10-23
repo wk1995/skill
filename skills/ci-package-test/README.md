@@ -9,6 +9,7 @@ Language: **English** | [简体中文](README.zh-CN.md)
 ```text
 Build a test package through CI and prepare regression cases for this PR.
 Improve our testing process and display cases, rounds, environments and results in a reusable web workbench.
+Use GitHub Issues as the default test-data source, or explicitly use Git-tracked definition and record files.
 Support saved web comments and Codex browser-native annotations, with excerpts, replies and resolution status.
 Express case prerequisites: require LOGIN01 and CART01 to pass before PAY01 in this round/environment.
 Define what to test next after pass, failure, partial execution, blocking or skipping; distinguish blockers from product defects.
@@ -20,7 +21,7 @@ Publish the verified artifact from CI run <run-id> to the specified distribution
 
 Complete test-process or web-display requests deliver a working web workbench, reusing an existing implementation or adapting the bundled [template](assets/workbench/). Build-only requests produce artifacts. Installation, execution, environment deployment and external publication follow the requested scope. For variant-based builds, Release is the default when supported.
 
-The template supports version/plan/round navigation, multi-type cases, failure/smoke selection, environment registration, timestamped observations, immutable round definitions, JSON import/export and deep links. Storage is browser-local IndexedDB; shared collaboration needs a project-owned server. Serve a copied template with `python3 -m http.server 4317 --bind 127.0.0.1 --directory <workbench-directory>`. It starts empty: import a plan based on actual changes, not demonstration results.
+The template supports version/plan/round navigation, multi-type cases, failure/smoke selection, environment registration, timestamped observations, immutable round definitions, JSON import/export and deep links. The bundled starter stores data in browser-local IndexedDB; primary-source integration is described below. Serve a copied template with `python3 -m http.server 4317 --bind 127.0.0.1 --directory <workbench-directory>`. It starts empty: import a plan based on actual changes, not demonstration results.
 
 Annotations can target a case, a field or an execution record; they retain the quoted text and original snapshot, support replies and resolve/reopen events, and are included in archives. Browser-native tools use the stable link/DOM context and a copy-context button. Sending a native annotation to chat is provided by the host; confirmed comments can be recorded in the workbench as native-origin annotations. There is no automatic chat send or writeback. See [annotations](references/annotations.md).
 
@@ -34,7 +35,9 @@ The webpage shows an interactive flow graph: solid prerequisite edges, dashed ou
 
 Optional `testLocation` hints show application/page, entry path and named control locators/actions. **Copy phone test hints** includes source/round/environment context and the actual procedure for a person or device controller. Hints require a live-screen check; they never prove a pass or trigger a phone command. Edit them in the current definition; historical rounds retain original hints. See [test location and device handoff](references/test-location.md).
 
-GitHub Issues backing storage is an [optional integration plan](references/github-issues.md); the bundled webpage still uses IndexedDB. Multi-user concurrency and strict remote history protection are explicitly deferred for an initial single-operator flow, while existing local guards remain. CLI image/video attachments require **gh 2.99.0+** and `--attach` in the actual command's help. For older/missing support, upgrade through the existing installation channel (Homebrew: `brew upgrade gh`) when authorized, recheck capabilities/account, or use browser upload. Logs/text/ZIP files use browser attachments or a separately verified adapter even on newer CLI versions. Ordinary CI/text tasks are not subject to this optional media version gate.
+The Skill has **two authoritative data-source modes**: **GitHub Issues by default** for a new project, or **repository-tracked files** when explicitly selected. Existing projects retain their recorded choice. Both modes use the same state machines, dependencies, flow graph, next-test guidance and annotations. File mode keeps case definitions and execution records in separate files; Issue mode does not require two primary JSON files in Git. Browser data/exports are caches or backups. See [source selection, file layout and migration](references/data-sources.md). The starter currently has no built-in adapter for either source: an explicit apply/commit workflow or project bridge is needed to confirm primary-source writes; a browser save alone does not do that.
+
+In the [GitHub Issues mode](references/github-issues.md), multi-user concurrency and strict remote history protection are explicitly deferred for an initial single-operator flow, while existing local guards remain. CLI image/video attachments require **gh 2.99.0+** and `--attach` in the actual command's help. For older/missing support, upgrade through the existing installation channel (Homebrew: `brew upgrade gh`) when authorized, recheck capabilities/account, or use browser upload. Logs/text/ZIP files use browser attachments or a separately verified adapter even on newer CLI versions. Ordinary CI/text tasks are not subject to this optional media version gate.
 
 ### Routing And Prerequisite Flow
 
