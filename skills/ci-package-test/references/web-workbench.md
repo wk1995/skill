@@ -61,6 +61,8 @@ Managed summaries use validated workflow replay for each case/environment; anoth
 
 For team use, keep these contracts while moving persistence behind the project's authenticated API with revision checks, authorization, append-only observations and backups. Do not expose a local write service publicly to simulate collaboration. Add project-specific automated-test ingestion, coverage mapping or annotation integration only when useful to the requested workflow.
 
+For the optional [GitHub Issues plan](github-issues.md), multi-user concurrency coordination and strict remote history/audit protection are explicitly deferred for the initial single-operator phase. That scope decision does not disable the current local revision/model guards or claim that an Issues store already exists. Use the same reference for the gh 2.99.0+ media gate, old-version upgrade/fallback handling and separate log-file upload path.
+
 ## Acceptance
 
 Run `node --test <skill-directory>/tests/*.test.mjs` (Node.js 18+). Exercise the actual copied/built app in a browser with isolated data: import, edit classification/steps, create a round, register/attach an environment, reject missing registration, mark ready/start, start individual/batch executions, reject invalid transitions or missing reasons/evidence, append results, end/reopen with a reason, export AI state, reload, export/import and prepare a subsequent no-diff smoke round. Verify another environment's pass cannot clear a failure, and old rounds remain unchanged. Check stale-tab saves preserve the newer state.

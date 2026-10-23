@@ -34,6 +34,8 @@ The webpage shows an interactive flow graph: solid prerequisite edges, dashed ou
 
 Optional `testLocation` hints show application/page, entry path and named control locators/actions. **Copy phone test hints** includes source/round/environment context and the actual procedure for a person or device controller. Hints require a live-screen check; they never prove a pass or trigger a phone command. Edit them in the current definition; historical rounds retain original hints. See [test location and device handoff](references/test-location.md).
 
+GitHub Issues backing storage is an [optional integration plan](references/github-issues.md); the bundled webpage still uses IndexedDB. Multi-user concurrency and strict remote history protection are explicitly deferred for an initial single-operator flow, while existing local guards remain. CLI image/video attachments require **gh 2.99.0+** and `--attach` in the actual command's help. For older/missing support, upgrade through the existing installation channel (Homebrew: `brew upgrade gh`) when authorized, recheck capabilities/account, or use browser upload. Logs/text/ZIP files use browser attachments or a separately verified adapter even on newer CLI versions. Ordinary CI/text tasks are not subject to this optional media version gate.
+
 ### Routing And Prerequisite Flow
 
 Declare a required pass on the **target's `dependsOn`**, including when that target is reached through `next`. For example, LOGIN01's passed branch targets PAY01, while PAY01 requires both LOGIN01 and CART01. Until CART01 passes, guidance identifies CART01 first; it does not record a result or change the configured route. See the [combined definition example](references/dependencies.md#where-to-put-the-condition).

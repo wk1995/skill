@@ -61,6 +61,7 @@ Read [references/test-rounds.md](references/test-rounds.md) for cases, environme
 - Register and select an environment before saving results. For mobile this includes physical device details; for web, desktop, services or libraries it includes browser, OS, runtime, deployment or consumer configuration. A shared model name does not establish identical environments.
 - Reuse one workbench and import/update its data for later packages. Validate single/batch saves, imports, stale revisions and round/environment context before persistence. Preserve historical snapshots and observations.
 - Test the workbench with disposable data, then deliver its local URL and export location. State whether storage is browser-local or shared; never claim collaboration from a local prototype.
+- For requested GitHub Issues data/evidence integration, read [references/github-issues.md](references/github-issues.md). The bundled store remains local; the initial remote plan defers multi-user concurrency and strict remote audit protection, retaining existing local guards. Before an authorized CLI media upload, require gh 2.99.0+ and `--attach` in the exact command's help; older/missing support needs an authorized installation-channel upgrade or browser-upload fallback. Newer CLI versions still do not make log files supported media attachments.
 
 ## Execute and report
 
