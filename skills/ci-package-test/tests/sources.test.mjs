@@ -137,3 +137,7 @@ test('command streaming preserves split UTF-8 and Git location environment canno
 test('server CLI remains executable through a linked Skill and rejects inherited option names',async t=>{
  const root=await fixture(t),link=path.join(root,'linked-server.mjs');await fs.symlink(new URL('../scripts/workbench-server.mjs',import.meta.url),link);assert.match(await command(process.execPath,[link,'--help']),/--repo OWNER\/REPO/);assert.throws(()=>options(['toString','anything','--repo','owner/repo']),/Unknown/);
 });
+
+test('Git diagnostics do not refresh or lock the index while testing data is being read',async t=>{
+ const root=await fixture(t),file=path.join(root,'README.md'),index=path.join(root,'.git/index'),before=await fs.readFile(index);const later=new Date(Date.now()+10000);await fs.utimes(file,later,later);await command('git',['-C',root,'status','--porcelain'],{env:{...process.env,GIT_OPTIONAL_LOCKS:'1'}});assert.deepEqual(await fs.readFile(index),before);
+});

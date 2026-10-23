@@ -20,7 +20,7 @@ export function proposed(current,expected,candidate){
 export function command(executable,args,{cwd,input,env=process.env}={}){
   return new Promise((resolve,reject)=>{
     const commandEnv={...env,GH_PROMPT_DISABLED:'1',GIT_TERMINAL_PROMPT:'0'};
-    if(executable==='git'){for(const key of ['GIT_DIR','GIT_WORK_TREE','GIT_INDEX_FILE','GIT_COMMON_DIR','GIT_OBJECT_DIRECTORY','GIT_ALTERNATE_OBJECT_DIRECTORIES','GIT_NAMESPACE','GIT_GLOB_PATHSPECS','GIT_NOGLOB_PATHSPECS','GIT_ICASE_PATHSPECS'])delete commandEnv[key];commandEnv.GIT_LITERAL_PATHSPECS='1';}
+    if(executable==='git'){for(const key of ['GIT_DIR','GIT_WORK_TREE','GIT_INDEX_FILE','GIT_COMMON_DIR','GIT_OBJECT_DIRECTORY','GIT_ALTERNATE_OBJECT_DIRECTORIES','GIT_NAMESPACE','GIT_GLOB_PATHSPECS','GIT_NOGLOB_PATHSPECS','GIT_ICASE_PATHSPECS'])delete commandEnv[key];commandEnv.GIT_LITERAL_PATHSPECS='1';commandEnv.GIT_OPTIONAL_LOCKS='0';}
     const child=spawn(executable,args,{cwd,stdio:['pipe','pipe','pipe'],env:commandEnv});
     child.stdout.setEncoding('utf8');child.stderr.setEncoding('utf8');
     let out='',err='',failure;const timer=setTimeout(()=>{failure=new Error(`${executable}: command timed out; inspect the source before retrying`);child.kill();},30000);

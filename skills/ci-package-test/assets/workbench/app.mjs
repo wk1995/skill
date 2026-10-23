@@ -242,10 +242,10 @@ $('import').onchange=async event=>{try{if(!event.target.files.length)return;cons
 $('json-form').onsubmit=async event=>{event.preventDefault();try{const value=JSON.parse(new FormData(event.target).get('json'));await save(state=>value.schemaVersion?model.importArchive(state,value):model.importPlan(state,value));}catch(error){message(error.message,true);}};
 $('export').onclick=()=>download(state,'test-workbench-archive.json');
 $('export-ai').onclick=()=>{try{download(model.exportAI(state),'test-workbench-ai-state.json');message('AI 快照包含状态机契约、原始归档、当前状态及允许的下一步；恢复数据请使用归档。');}catch(error){message(error.message,true);}};
-$('reload').onclick=async()=>{try{state=await read(db);if(linkError)readLocation();render();message('已读取最新数据；未保存的草稿保留。');}catch(error){message(error.message,true);}};
+$('reload').onclick=async()=>{try{await busy(async()=>{state=await read(db);if(linkError)readLocation();render();message('已读取最新数据；未保存的草稿保留。');});}catch(error){message(error.message,true);}};
 $('round-form').onsubmit=event=>{event.preventDefault();const data=new FormData(event.target),id=uuid(),targetPlanId=planId,changed=data.get('changed').trim();save(state=>model.createRound(state,{id,name:data.get('name'),planId:targetPlanId,createdAt:now(),changedIds:changed?changed.split(',').map(value=>value.trim()).filter(Boolean):undefined,includeUnfinished:data.has('unfinished')})).then(()=>{if(!$('message').classList.contains('error')){roundId=id;render();}});};
 $('environment-form').onsubmit=event=>{event.preventDefault();const data=Object.fromEntries(new FormData(event.target)),id=uuid();save(state=>model.registerEnvironment(state,{id,...data})).then(()=>{if(!$('message').classList.contains('error')){environmentId=id;render();}});};
-window.addEventListener('hashchange',async()=>{if(pendingAction){queuedHash=location.hash;return;}if(!db)return;try{state=await read(db);readLocation();$('search').value='';$('type').value='';$('status').value='';render();}catch(error){message(error.message,true);}});
+window.addEventListener('hashchange',async()=>{if(pendingAction){queuedHash=location.hash;return;}if(!db)return;try{await busy(async()=>{state=await read(db);readLocation();$('search').value='';$('type').value='';$('status').value='';render();});}catch(error){message(error.message,true);}});
 try {db=await openWorkspace();state=await read(db);readLocation();render(); } catch(error) {message(`无法载入数据：${error.message}。请保留原数据库并导出可用备份，不要清空。`,true);}
 
 function renderSource(){

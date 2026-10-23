@@ -20,13 +20,13 @@ export async function createWorkbenchServer({source,port=0}){
       require(!req.headers['sec-fetch-site']||['same-origin','none'].includes(req.headers['sec-fetch-site']),'Cross-site request rejected');
       const url=new URL(req.url,base);
       if(url.pathname==='/api/config'&&req.method==='GET')return send(res,200,{session,mode:source instanceof FileSource?'repository-files':'github-issues'});
-      if(url.pathname==='/api/workspace'&&req.method==='GET')return send(res,200,await source.read());
+      if(url.pathname==='/api/workspace'&&req.method==='GET'){const task=queue.then(()=>source.read());queue=task.catch(()=>{});return send(res,200,await task);}
       if(['/api/workspace','/api/initialize','/api/commit'].includes(url.pathname)&&['POST','PUT'].includes(req.method)){
         require(req.method===(url.pathname==='/api/workspace'?'PUT':'POST'),'Unsupported method');
         require(req.headers['x-testflow-session']===session,'Missing session token');require(req.headers['content-type']?.split(';')[0]==='application/json','JSON content type required');
         const chunks=[];let bytes=0;for await(const data of req){bytes+=data.length;require(bytes<=16*1024*1024,'Request too large');chunks.push(data);}
         const input=JSON.parse(Buffer.concat(chunks).toString('utf8'));require(input&&typeof input==='object'&&!Array.isArray(input),'Object body required');
-        // Serialize this service's writes; this is not a distributed lock.
+        // Serialize this service's source operations; this is not a distributed lock.
         const task=queue.then(async()=>{
           if(url.pathname==='/api/workspace')return source.write(input.expectedRevision,input.state);
           if(url.pathname==='/api/initialize'){require(Object.keys(input).length===0,'Initialize takes no replacement data');return source.initialize();}
