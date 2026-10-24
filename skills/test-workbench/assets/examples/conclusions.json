@@ -1,0 +1,50 @@
+{
+  "format": "ci-package-test/conclusions",
+  "version": 1,
+  "archiveRevision": 11,
+  "rounds": [
+    {
+      "roundId": "EXAMPLE-ROUND",
+      "planId": "EXAMPLE-PLAN",
+      "version": "example-product-1",
+      "source": "example-source-sha",
+      "build": "",
+      "pr": "",
+      "lifecycle": "completed",
+      "verdict": "failed",
+      "counts": {
+        "failed": 1,
+        "blocked": 0,
+        "partial": 0,
+        "running": 0,
+        "untested": 0,
+        "skipped": 0,
+        "passed": 1
+      },
+      "executions": [
+        {
+          "caseId": "LOGIN01",
+          "environmentId": "EXAMPLE-ENV",
+          "phase": "passed",
+          "result": "passed",
+          "observationId": "EXAMPLE-LOGIN-PASS",
+          "unresolvedFailureId": null,
+          "dependencyStale": false
+        },
+        {
+          "caseId": "PROFILE01",
+          "environmentId": "EXAMPLE-ENV",
+          "phase": "failed",
+          "result": "failed",
+          "observationId": "EXAMPLE-PROFILE-FAIL",
+          "unresolvedFailureId": "EXAMPLE-PROFILE-FAIL",
+          "dependencyStale": false,
+          "issues": [
+            "https://github.com/example/example/issues/123"
+          ]
+        }
+      ],
+      "meaning": "Derived from recorded evidence only; incomplete, skipped or missing coverage is not a pass. This is not release approval."
+    }
+  ]
+}

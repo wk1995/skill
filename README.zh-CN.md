@@ -97,6 +97,7 @@ Agent Skills 规范只要求 `SKILL.md`，但本仓库额外要求双语使用�
 | `choose-project-doc-location` | `choose-project-doc-location` 为项目文档选择路径，并整理指定文件夹或项目下的文档位置。适用于 PRD、技术文档和机器可读状态机规格文件，不管理它们的业务关联或内容 Schema。 | [README](skills/choose-project-doc-location/README.zh-CN.md) |
 | `pr-review-loop` | `pr-review-loop` 审查指定的 Pull Request。当前托管账号是 PR 作者，且项目级 Skill 或配置适用，或整机配置列出了该仓库时，可审查、修复、推送并复审。`max_rounds` 限制完成的审查次数；独立的 `comment` 开关控制是否向 PR 评论。本 Skill 定义流程，不定义审查标准。适用于：指明某个 PR 并要求审查、审查并修复，或继续已有闭环。不适用于：只要本地报告、同时禁止 PR 评论和代码改动，或只做 PR 管理。 | [README](skills/pr-review-loop/README.zh-CN.md) |
 | `sync-skills` | `sync-skills` 用于管理同一个 Agent Skill 在本仓库、其他项目、本机 Agent 安装目录、生成的 Agent 构建产物和明确指定的外部位置中的等价副本。它会记录稳定身份、来源、版本、摘要、快照与审计时间；比较或同步副本；盘点 Builder 关系；并从可信构建修复已登记的 Agent 安装。 | [README](skills/sync-skills/README.zh-CN.md) |
+| `test-workbench` | `test-workbench` 管理可复用的网页测试流程，统一测试用例、执行记录与绑定数据版本的测试总结。工作台组织版本、方案、轮次、环境/设备、用例依赖、下一步测试、Issue 证据及批注，并在需要时衔接不同平台的 CI 测试包和 PR 变更。普通 CI 只归档产物，对外发布须明确要求。当前技能版本：`0.0.2`。 | [README](skills/test-workbench/README.zh-CN.md) |
 <!-- skills-catalog:end -->
 
 本机 Skill 清单与跨项目映射见 [Skill 关系报告 PRD](docs/skill-relationship-report-prd.zh-CN.md)、随仓库维护的[技术设计](docs/skill-relationship-report-technical-design.zh-CN.md)和[测试计划](docs/skill-relationship-report-test-plan.zh-CN.md)。实际生成的关系报告仍只保存在本机；当前机器可读契约见 [skill-relationships.schema.json](schemas/skill-relationships.schema.json)。 报告运行时契约以随 Skill 分发的[校验器](skills/sync-skills/scripts/validate_skill_relationship_report.py)为权威。JSON Schema 用作互操作文档；运行时只使用其共享状态词汇，不执行 Draft 2020-12 引擎。

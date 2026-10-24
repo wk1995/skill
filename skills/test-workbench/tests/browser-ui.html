@@ -1,0 +1,37 @@
+<!doctype html><meta charset="utf-8"><title>Workbench UI regression tests</title>
+<h1>Isolated workbench context checks</h1><pre id="result">Running…</pre><iframe id="app" title="Isolated workbench" style="width:100%;height:650px"></iframe>
+<script type="module">
+import {openStore,read,update} from '../assets/workbench/store.mjs';
+import * as m from '../assets/workbench/model.mjs';
+const workspace=`ui-test-${crypto.randomUUID()}`,db=await openStore(`ci-package-test-workbench:${workspace}`);
+const frame=document.getElementById('app'),output=document.getElementById('result'),lines=[];
+const require=(condition,message)=>{if(!condition)throw new Error(message);};
+async function ready() {
+  for(let count=0;count<200;count++) {
+    if(frame.contentDocument?.querySelector('#round')?.options.length===3)return;
+    await new Promise(resolve=>setTimeout(resolve,20));
+  }
+  throw new Error('Workbench did not render both rounds');
+}
+try {
+  const original=await read(db);
+  await update(db,original.revision,state=>{
+    let next=m.importPlan(state,{id:'p',revision:0,version:'fixture',title:'Isolated UI regression',source:'fixture',build:'',pr:'',cases:[{id:'S',title:'Smoke fixture',priority:'P0',types:['smoke'],preconditions:'Fixture only',steps:'Fixture',expected:'Fixture'}]});
+    next=m.createRound(next,{id:'first',name:'First',planId:'p',createdAt:'2026-10-22T01:00:00Z'});
+    next=m.createRound(next,{id:'second',name:'Second',planId:'p',createdAt:'2026-10-22T02:00:00Z'});
+    // One persistence transaction; model sequence is a single proposed workspace.
+    next.revision=state.revision+1;return next;
+  });
+  frame.src=`../assets/workbench/?workspace=${workspace}#plan=p&round=first&case=S`;
+  await ready();
+  const doc=frame.contentDocument;
+  doc.getElementById('records-view').click();
+  require(new URLSearchParams(frame.contentWindow.location.hash.slice(1)).get('view')==='records','Records view missing from deep link');lines.push('PASS records view is encoded in location');
+  const round=doc.getElementById('round');round.value='second';round.dispatchEvent(new Event('change'));
+  require(new URLSearchParams(frame.contentWindow.location.hash.slice(1)).get('round')==='second','Records view retained an old round deep link');lines.push('PASS records view round change updates location');
+  const loaded=new Promise(resolve=>frame.addEventListener('load',resolve,{once:true}));frame.contentWindow.location.reload();await loaded;await ready();
+  require(frame.contentDocument.querySelector('#detail h2')?.textContent==='执行记录','Reload lost the records view');
+  require(frame.contentDocument.getElementById('round').value==='second','Reload lost selected round');lines.push('PASS deep link restores view and round on reload');
+  output.textContent=lines.join('\n')+'\nALL 3 UI CONTEXT CHECKS PASSED';
+}catch(error){output.textContent=lines.join('\n')+'\nFAIL '+error.stack;}finally{db.close();}
+</script>

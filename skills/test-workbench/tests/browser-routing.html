@@ -1,0 +1,49 @@
+<!doctype html><meta charset="utf-8"><title>Conditional test routing</title>
+<h1>Isolated next-test branching checks</h1><pre id="result">Running…</pre><iframe id="app" title="Branch routing fixture" style="width:100%;height:850px"></iframe>
+<script type="module">
+import {openStore,read,update} from '../assets/workbench/store.mjs';
+import * as m from '../assets/workbench/model.mjs';
+const workspace=`routing-test-${crypto.randomUUID()}`,db=await openStore(`ci-package-test-workbench:${workspace}`),frame=document.getElementById('app'),output=document.getElementById('result'),lines=[];
+const require=(value,message)=>{if(!value)throw new Error(message);};
+async function until(check){for(let i=0;i<250;i++){if(await check()&&frame.contentDocument?.documentElement.dataset.busy!=='true')return;await new Promise(resolve=>setTimeout(resolve,20));}throw new Error('Timed out');}
+const fill=(form,name,value)=>{const input=form.elements.namedItem(name);input.value=value;input.dispatchEvent(new Event('input',{bubbles:true}));};
+let doc;
+function go(id){const button=[...doc.querySelectorAll('.case-row button')].find(button=>button.querySelector('.case-id')?.textContent.startsWith(`${id} ·`));require(button,`Case ${id} missing`);button.click();}
+async function record(status,notes='Fixture actual outcome; completed input and unverified session') {
+  let form=doc.getElementById('observation-form');fill(form,'tester','Fixture tester');doc.getElementById('start-execution').click();
+  await until(()=>doc.getElementById('start-execution').disabled);
+  form=doc.getElementById('observation-form');fill(form,'status',status);fill(form,'notes',notes);fill(form,'issues','https://github.com/fixture/project/issues/12');form.querySelector('.primary').click();
+  await until(async()=>m.executionState((await read(db)).rounds[0],new URLSearchParams(frame.contentWindow.location.hash.slice(1)).get('case'),'e')===status);
+}
+try {
+  const original=await read(db),at='2026-10-22T01:00:00Z';
+  await update(db,original.revision,state=>{
+    const next={passed:{action:'test',caseId:'SESSION',reason:'成功后验证登录态'},failed:{action:'test',caseId:'DIAG',reason:'失败后收集诊断'},partial:{action:'retry',caseId:'LOGIN',reason:'补测未验证内容'},blocked:{action:'wait',reason:'等待账号或网络恢复',resumeWhen:'有效账号可用，且测试服务可访问'},skipped:{action:'test',caseId:'OFFLINE',reason:'继续独立的离线测试'}};
+    let s=m.importPlan(state,{id:'p',revision:0,version:'fixture',title:'Branch fixture only',source:'fixture-sha',build:'',pr:'',cases:['LOGIN','SESSION','DIAG','OFFLINE'].map((id,i)=>({id,title:`Fixture ${id}`,priority:'P0',types:i?['functional']:['smoke'],preconditions:`Prerequisite ${id}`,steps:`Execute ${id}`,expected:`Expected ${id}`,...(!i?{next}:{})}))});
+    s=m.createRound(s,{id:'r',planId:'p',name:'Conditional fixture',createdAt:at,changedIds:[]});s=m.registerEnvironment(s,{id:'e',label:'Fixture browser',kind:'browser',configuration:'Disposable'});s=m.attachEnvironment(s,'r','e');
+    s=m.transitionRound(s,'r',{id:'ready',action:'prepare',from:'draft',actor:'Fixture',at});s=m.transitionRound(s,'r',{id:'run',action:'begin',from:'ready',actor:'Fixture',at});s.revision=state.revision+1;return s;
+  });
+  frame.src=`../assets/workbench/?workspace=${workspace}#plan=p&round=r&case=LOGIN`;
+  await until(()=>frame.contentDocument?.getElementById('environment'));doc=frame.contentDocument;let choice=doc.getElementById('environment');choice.value='e';choice.dispatchEvent(new Event('change'));
+  for(const [caseId,status] of [['OFFLINE','skipped'],['SESSION','blocked']]) {
+    go(caseId);const form=doc.getElementById('observation-form');fill(form,'tester','Fixture tester');fill(form,'status',status);form.elements.status.dispatchEvent(new Event('change'));fill(form,'notes','Explicit fixture scope/prerequisite reason');fill(form,'executedAt','');form.querySelector('.primary').click();
+    await until(async()=>m.executionState((await read(db)).rounds[0],caseId,'e')===status);
+    const saved=await read(db),record=saved.rounds[0].observations.find(item=>item.caseId===caseId);require(record.executedAt===null&&doc.getElementById('detail').textContent.includes('执行：未执行')&&!saved.rounds[0].workflow.events.some(event=>event.caseId===caseId&&event.action==='start'),'Deferred case fabricated execution');
+  }
+  lines.push('PASS pre-execution blocking/skipping saves reasons with null execution time and no start event');
+  for(const [status,target] of [['passed','SESSION'],['failed','DIAG'],['partial','LOGIN'],['blocked',null],['skipped','OFFLINE']]){
+    go('LOGIN');await record(status);await until(()=>doc.querySelector('#next-test strong')?.textContent===({passed:'执行后续用例',failed:'执行后续用例',partial:'重新验证当前用例',blocked:'等待条件恢复',skipped:'执行后续用例'})[status]);
+    const panel=doc.getElementById('next-test'),before=await read(db);
+    if(['partial','blocked','skipped'].includes(status))require(m.statusOf(before.rounds[0],'LOGIN')==='failed'&&panel.textContent.includes('仍有未解决失败'),'Incomplete/skipped retest hid known failure');
+    if(target){require(panel.textContent.includes(`Execute ${target}`)&&panel.textContent.includes(`Expected ${target}`),'Concrete target procedure missing');panel.querySelector('button').click();require(new URLSearchParams(frame.contentWindow.location.hash.slice(1)).get('case')===target,'Wrong navigation target');require(JSON.stringify(await read(db))===JSON.stringify(before),'Navigation changed outcomes');}
+    else require(!panel.querySelector('button')&&panel.textContent.includes('有效账号可用'),'Wait branch omitted recovery condition or automatically navigated');
+    lines.push(`PASS ${status} selects ${target??'wait'} with concrete guidance and no automatic mutation`);
+  }
+  lines.push('PASS partial/blocked/skipped retests retain the known failure warning and overall failed result');
+  go('LOGIN');const meanings=[...doc.querySelectorAll('#detail details')].find(item=>item.querySelector('summary')?.textContent.includes('如何区分'));require(meanings?.textContent.includes('已发现问题应选失败')&&meanings.textContent.includes('前置条件')&&meanings.textContent.includes('明确决定'),'Outcome semantics missing');lines.push('PASS outcome help distinguishes failed, partial, blocked and skipped');
+  choice=doc.getElementById('round');choice.value='';choice.dispatchEvent(new Event('change'));go('LOGIN');
+  const editor=doc.querySelector('form.editor');editor.parentElement.open=true;const before=await read(db),branches=JSON.parse(editor.elements.next.value);branches.passed.caseId='missing';fill(editor,'next',JSON.stringify(branches));editor.querySelector('button').click();await until(()=>doc.getElementById('message').classList.contains('error'));require(JSON.stringify(await read(db))===JSON.stringify(before),'Invalid branch editor saved state');
+  branches.passed.caseId='OFFLINE';fill(editor,'next',JSON.stringify(branches));editor.querySelector('button').click();await until(async()=>(await read(db)).plans[0].cases[0].next.passed.caseId==='OFFLINE');require((await read(db)).rounds[0].cases[0].next.passed.caseId==='SESSION','Library edit rewrote frozen branch');lines.push('PASS branch editor validates targets and preserves round snapshots');
+  output.textContent=lines.join('\n')+'\nALL 9 BRANCH CHECKS PASSED';
+}catch(error){output.textContent=lines.join('\n')+'\nFAIL '+error.stack;}finally{db.close();}
+</script>

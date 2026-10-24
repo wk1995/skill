@@ -62,6 +62,11 @@ jobs:
           git push origin "HEAD:${HEAD_REF}"
           echo "updated=true" >> "$GITHUB_OUTPUT"
 
+      - name: Set up Node for web workbench contract tests
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
       - name: Validate Skill structure, documentation, and catalogs
         env:
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
