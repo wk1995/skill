@@ -6,6 +6,8 @@ Web delivery is part of complete test-process and visualization requests. Inspec
 
 For an existing tool, use [project-integrations.md](project-integrations.md) before replacing adapters or UI. Retain verified ADB, identity-association, WebMCP, PR-diff and selected screenshot capabilities. Respect the project's explicit storage/history policy and conditional conclusion presentation. These capabilities are integration procedures, not extra implemented starter features; the acceptance checks below apply after any requested adapter work.
 
+For UI changes, use [UI adoption and acceptance](ui-adoption.md) to retain the project layout while exposing complete editing, concrete next-step previews, round-wide annotations and AI export. These entry points must use existing validated operations and preserve frozen rounds.
+
 ## Included working template
 
 Start the included [primary-source service](data-sources.md#included-webpage-adapters), for example from the Skill directory:

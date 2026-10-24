@@ -3,7 +3,7 @@ name: test-workbench
 description: Manage a reusable web testing workbench with standardized cases, execution records and revision-bound summaries. Coordinate dependencies, next-test guidance, environments, Issue evidence, web/native annotations and repeat testing, using GitHub Issues by default or repository files. Connect exact CI packages and PR changes across platforms when requested; external publication requires an explicit request.
 metadata:
   sync_id: "android-ci-fir-test"
-  version: "0.0.2"
+  version: "0.0.3"
   triggering:
     include:
       - Build a test package through CI from a selected source ref for any platform or distribution channel.
@@ -35,7 +35,7 @@ For “完善测试流程”, “以网页展示测试”, or a complete package
 
 ## Preserve project integrations
 
-Read [references/project-integrations.md](references/project-integrations.md) when adopting or extending an existing workbench. Inventory the actual UI, service, data readers/writers and host tools before replacing anything. Preserve useful project capabilities even when absent from the bundled template:
+Read [references/project-integrations.md](references/project-integrations.md) when adopting or extending an existing workbench. For UI adoption or usability work, also read [references/ui-adoption.md](references/ui-adoption.md); distinguish the actual bundled UI from documented adapters and keep useful project navigation. Inventory the actual UI, service, data readers/writers and host tools before replacing anything. Preserve useful project capabilities even when absent from the bundled template:
 
 - Android device discovery and registration through ADB, including USB/wireless identity deduplication and revalidation before selection.
 - Explicit association of imported historical device records with a registered environment, preserving original snapshots and configuration boundaries.

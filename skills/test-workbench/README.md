@@ -82,3 +82,5 @@ See [SKILL.md](SKILL.md), [web delivery](references/web-workbench.md), [CI and p
 - Infrastructure changes without test-package delivery or process management.
 - Unrelated websites or QA theory without an actionable testing workflow.
 - Unrequested source version changes, branch promotion, fixes, PR creation, merges or tags.
+
+For an existing project UI, preserve its navigation and integrations while making full case editing, frozen next-step previews, a round-wide annotation list and read-only AI export easy to find. See [UI adoption and acceptance](references/ui-adoption.md). The bundled template uses tighter header/card spacing and marks the selected view; a project can retain separate conclusion, coverage and flow tabs.

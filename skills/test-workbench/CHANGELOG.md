@@ -4,6 +4,13 @@
 
 - No unreleased changes.
 
+## [0.0.3] - 2026-10-24
+
+- Change-Type: fix
+- Summary: Improve workbench UI adoption with complete definition-editing entry points, frozen next-test previews, round-wide annotation review and separate AI state export; restore the priority editor, reduce template header/card spacing and expose the selected workspace view.
+- Compatibility: User-requested version 0.0.3. Preserves triggers, data schemas, source ownership, managed workflow/history, existing project current-result policies and all project adapters. Existing rounds remain frozen; AI export stays read-only and is distinct from a recovery archive. No migration or external publication is performed.
+- Document concrete UI acceptance checks for optimistic edit conflicts, next-target snapshot provenance, annotation state/navigation and exports with unsaved drafts. Keep project-specific ADB, screenshot, PR and conditional conclusion/coverage tabs when adapting the template; optional layout choices are not universal storage requirements.
+
 ## [0.0.2] - 2026-10-23
 
 - Change-Type: fix

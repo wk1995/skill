@@ -60,6 +60,7 @@ function select(id, items, selected) { $(id).replaceChildren(...items.map(([valu
 const pill=(text,type)=>el('span',text,`pill ${type??''}`);
 function render() {
   renderSource();
+  for(const [id,target] of [['cases-view','cases'],['records-view','records'],['annotations-view','annotations']]){ $(id).classList.toggle('active-view',view===target);$(id).setAttribute('aria-pressed',String(view===target));}
   $('flow').replaceChildren();
   const versions=[...new Set(state.plans.map(plan=>plan.version))];
   let plan=state.plans.find(plan=>plan.id===planId)??state.plans[0]; planId=plan?.id??'';
@@ -130,13 +131,15 @@ function renderEditor(detail,plan,item) {
   const panel=el('details');panel.append(el('summary','编辑当前用例定义与分类'));
   const form=el('form',null,'editor');
   field(form,'标题','title',item.title).required=true;
+  const priority=field(form,'优先级','priority',item.priority,'select');
+  priority.replaceChildren(...[...new Set(['P0','P1','P2',item.priority])].map(value=>option(value,value)));priority.value=item.priority;
   const types=el('div'); for(const type of model.TYPES) {const label=el('label',labels[type],'check'),input=el('input');input.type='checkbox';input.name='types';input.value=type;input.checked=item.types.includes(type);label.prepend(input);types.append(label);}form.append(types);
   field(form,'前置条件','preconditions',item.preconditions,'textarea');field(form,'步骤','steps',item.steps,'textarea').required=true;field(form,'预期','expected',item.expected,'textarea').required=true;
   field(form,'前置用例 ID（逗号分隔）','dependsOn',(item.dependsOn??[]).join(', '));
   field(form,'结果分支 next（JSON，可留空）','next',item.next?JSON.stringify(item.next,null,2):'','textarea');
   field(form,'测试定位 testLocation（JSON，可留空）','testLocation',item.testLocation?JSON.stringify(item.testLocation,null,2):'','textarea');
   form.append(el('button','保存定义（不改历史轮次）','primary'));
-  form.onsubmit=event=>{event.preventDefault();try{const data=new FormData(form),edited={...item,title:data.get('title'),preconditions:data.get('preconditions'),steps:data.get('steps'),expected:data.get('expected'),types:data.getAll('types')};
+  form.onsubmit=event=>{event.preventDefault();try{const data=new FormData(form),edited={...item,title:data.get('title'),priority:data.get('priority'),preconditions:data.get('preconditions'),steps:data.get('steps'),expected:data.get('expected'),types:data.getAll('types')};
     edited.dependsOn=data.get('dependsOn').split(',').map(id=>id.trim()).filter(Boolean);
     if(data.get('next').trim())edited.next=JSON.parse(data.get('next'));else delete edited.next;
     if(data.get('testLocation').trim())edited.testLocation=JSON.parse(data.get('testLocation'));else delete edited.testLocation;

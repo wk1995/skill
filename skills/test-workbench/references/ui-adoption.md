@@ -1,0 +1,26 @@
+# Improve an existing workbench UI
+
+Use the project's working UI as the baseline. Compare actual rendered pages and entry points with `assets/workbench/`, not only the Skill's feature list. Explain differences in project terms: already present, present through another entry point, or missing. A documented integration is not a shipped starter adapter.
+
+## Four visible operations
+
+- **Complete case editing:** expose title, priority/classification, grouping when supported, prerequisites, steps and expected result as form fields. Keep stable IDs and observations outside the editable payload. Offer dependency, outcome-route and optional page/control hints alongside these fields; JSON is acceptable for advanced fields, not a substitute for basic case editing. Save the authoritative library through its existing validator and concurrency token, validate the entire graph before writing, and show that existing rounds retain their frozen definitions. Re-read on conflict; never silently overwrite another editor's decision.
+- **Next-test preview:** show the recommendation reason, target ID/title, prerequisites, ordered steps and expected result from the selected round's frozen target. Keep its environment, blockers, unresolved failure and stale-evidence context consistent with the graph and AI projection. Missing routes or locators stay explicitly missing. Opening a suggested case is navigation only, including after a round has ended; starts/results still require current guards.
+- **Round-wide annotations:** provide one entry point for all case/record threads in the selected round, with text/status filters and a visible pending count. Preserve quoted text, frozen definitions, record identity and replies. Reuse the same reply/resolve/reopen operations as detail cards; link back to the exact case/record. Filters and navigation must not create observations or change outcomes. Native browser annotations still require the host-provided transport or explicit contextual import.
+- **AI state export:** distinguish a read-only AI snapshot from an importable recovery archive. Include source/round/save revision, the actual storage/history contract, frozen definitions, raw observations, environment-scoped state, dependency evidence, recommended targets/procedures, legal next actions with required inputs, annotations, Issue references and conclusion freshness. Do not save drafts as a side effect or silently include them as confirmed evidence. Historical exports cannot borrow current lifecycle/devices/annotations; either export matching historical context or explicitly omit it. Do not export local credentials or private device-registry identity hashes.
+
+## Layout choices
+
+Keep the version/plan/round, selected environment, persistence status and current workflow actions discoverable. Tighten repeated headings, vertical gaps and card padding before adding more summary blocks. Preserve useful project sidebar filters and independent conclusion/coverage/flow tabs; conditional conclusion tabs are appropriate where already selected. The generic starter's always-visible conclusion/graph is an alternative layout, not a requirement to replace project tabs.
+
+On a typical desktop viewport, verify how far users must scroll to reach the current case and its start/skip controls. At narrow widths let toolbars wrap, keep controls reachable and wide graphs/tables internally scrollable. Do not remove source identity, failure/skip distinctions, blockers or save feedback merely to reduce height. Keep dependency/outcome edge legends explicit when the project uses a different line style.
+
+## Verification
+
+Use disposable data, not real test results:
+
+1. Edit all basic definition fields; confirm persistence and a new round's definition, while the old round/observations remain byte-equivalent. Reject stale tokens, unknown IDs, injected result fields, invalid classifications and graph cycles before persistence.
+2. Change a library procedure after freezing a round. Verify detail/graph/AI next previews still use the frozen procedure and the same environment. Missing targets do not produce invented steps; previews do not start tests.
+3. Add case and record annotations; filter, reply, resolve/reopen and navigate back to the exact record. Reload/import/export and verify thread identity/snapshots, with no changed outcome.
+4. Export with an unsaved observation draft; verify confirmed file data and save revision are unchanged, the draft is excluded, and actionable guidance respects lifecycle/dependency guards. Check old snapshots are read-only and do not inherit current execution context.
+5. Inspect desktop and narrow layouts plus disabled/error states. Report actual implementation and browser verification separately from documentation or fixture-only tests.
