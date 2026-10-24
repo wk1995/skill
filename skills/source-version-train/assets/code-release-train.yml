@@ -1,0 +1,50 @@
+# Copy to .release/code-release-train.yml and replace every placeholder before enabling writes.
+repository:
+  default_branch: TODO # Resolve from repository metadata; never assume main or master.
+  github_app:
+    app_id_secret: RELEASE_BOT_APP_ID
+    private_key_secret: RELEASE_BOT_PRIVATE_KEY
+
+branches:
+  requirement_prefixes: [feature/, bugfix/]
+  integration_prefix: dev/
+  # Default publication branch. Set publish_template to override it,
+  # for example "release/{version}". The resolved branch is protected.
+  publish_prefix: publish/
+  publish_template: publish/{version}
+  publish_protected: true
+  publish_direct_push: false
+  tag_prefix: v
+
+source:
+  version_sources: [] # Discover repository-owned version files and keys; do not assume a language or property name.
+  version_policy: TODO
+  initialize_versions_on_integration_creation: true
+  record_default_branch_baseline: true
+  # An optional repository helper may implement initialization. Without one,
+  # use equivalent Git/file operations under the configured version policy.
+
+code_gates:
+  requirement: [lint, unit-test, compile-check]
+  integration: [full-lint, full-unit-test, integration-test]
+  publish: [publish-lint, publish-unit-test, source-review]
+  required_reviewers: 1
+
+source_release:
+  rebase_publish_onto_default: true
+  push_rebased_publish_branch: true
+  require_gates_after_rebase: true
+  # Package through CI when the repository has that workflow. Without one,
+  # passed checks are enough to call the publish interface.
+  package_with_ci: auto
+  publish_implementations: [fir, github-actions-artifacts, wk1998.io]
+  publish_policy: one-success
+  tag_after_publish: true
+  merge_publish_to_default: true
+  tag_exact_published_commit: true
+  delete_integration_after_promotion: true
+  delete_publish_after_tag_verification: true
+
+# build-pipeline-engineering implements packaging. Each entry above names a
+# publish implementation; this train invokes the interface and does not embed
+# destination-specific upload logic.

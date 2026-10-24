@@ -23,4 +23,4 @@ Use this Skill for CI build configuration, build variants, signing environments,
 
 ## When It Does Not Trigger
 
-Do not use this Skill to implement a requirement, select code for an Android version, create or promote source branches and PRs, change source version files, merge code, or create release tags. Use `android-code-release-train` for that lifecycle. Ordinary compile/test checks that retain no distributable release output also do not trigger it.
+Do not use this Skill to implement a requirement, select code for a version, create or promote source branches and PRs, change source version files, merge code, or create release tags. Use `source-version-train` for that lifecycle. Ordinary compile/test checks that retain no distributable release output also do not trigger it.

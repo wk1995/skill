@@ -1,0 +1,22 @@
+# Changelog
+
+All notable changes to this Skill are documented here.
+
+## [Unreleased]
+
+- No unreleased changes.
+
+## [3.0.0] - 2026-10-13
+
+- Change-Type: breaking
+- Summary: Initialize both source version values when creating a selected integration train, preserve its pre-initialization baseline, and support repositories with or without a lifecycle helper.
+- Compatibility: The source-only boundary, requirement-branch behavior, code gates, and immutable tag rules remain; the version-initialization phase changes from release promotion to integration creation.
+- Breaking-Change: Previously a new integration branch could retain the default branch's versions until promotion, and accepted release code merged to the default branch before distribution. New trains must contain a verified initialization commit. Publication defaults to a protected publish/<version> branch, which a repository template may replace. That branch must be rebased onto the default branch, pushed through its protected path, rechecked, packaged when CI packaging exists, and accepted by at least one publish implementation before it is tagged and merged back.
+- Migration: Keep an existing publication name by setting publish_template; otherwise use publish/<version>. Protect the resolved branch against direct pushes. Configure publish_implementations and keep one-success unless the repository requires another policy. Update creation commands and CI to initialize repository-owned version fields without assuming Android metadata, record the default-branch SHA, and preserve the initial target at promotion. Insert the rebase, protected push, recheck, optional CI package, and publish interface before the tag and default-branch merge. Use equivalent Git/file operations when no helper exists. Validate and reuse legacy trains without rebumping or recreating their established publication branches.
+
+## [2.0.0] - 2026-09-04
+
+- Split the former combined Android release workflow into a source-only code train with explicit boundaries around requirement branches, version integration, release promotion, default-branch synchronization, and immutable source tags.
+- Moved signing, packaging, artifact verification, and uploads to `build-pipeline-engineering` so code readiness cannot be confused with artifact readiness.
+- Scoped branch inventory to the selected GitHub repository, deduplicated matching refs, and treated closed pull requests as development state rather than active integration candidates.
+- Added the immutable `android-code-release-train` synchronization ID.

@@ -10,8 +10,8 @@ from argparse import Namespace
 from pathlib import Path
 
 root = Path(sys.argv[1])
-path = root / "skills/android-code-release-train/scripts/code_release_train.py"
-spec = importlib.util.spec_from_file_location("android_code_release_train", path)
+path = root / "skills/source-version-train/scripts/code_release_train.py"
+spec = importlib.util.spec_from_file_location("source_version_train", path)
 module = importlib.util.module_from_spec(spec)
 sys.modules[spec.name] = module
 spec.loader.exec_module(module)
@@ -92,4 +92,4 @@ module.select(
 assert resolved_repos == ["acme/demo"], resolved_repos
 PY
 
-printf 'PASS: android-code-release-train script contracts\n'
+printf 'PASS: source-version-train script contracts\n'

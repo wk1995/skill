@@ -1,0 +1,4 @@
+interface:
+  display_name: "源码版本列车"
+  short_description: "约束需求分支到源码 Tag 的代码链路"
+  default_prompt: "Use $source-version-train to select requirement branches for a version, rebase the verified publication onto the default branch, and finalize the reviewed source tag without building artifacts."
