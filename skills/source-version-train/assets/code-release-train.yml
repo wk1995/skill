@@ -8,8 +8,9 @@ repository:
 branches:
   requirement_prefixes: [feature/, bugfix/]
   integration_prefix: dev/
-  # Visible pull-request branch. A template may select another visible name.
-  publish_template: publish/{version}
+  # Visible pull-request branch. publish_template is the only name source;
+  # {version} is major.minor.patch. A repository may replace the template.
+  publish_template: publish_{version}
   publish_protected: true
   publish_direct_push: false
   # Hidden candidate created by rebasing the merged publish branch onto the
@@ -21,8 +22,9 @@ branches:
 
 source:
   version_sources: [] # Discover repository-owned version files and keys; do not assume a language or property name.
-  # Only explicit dotted numeric identifiers are supported, such as 1.4.0.
-  version_identifier: explicit-numeric
+  # Exactly three canonical integers: major.minor.patch, such as 5.1.3.
+  # 0 is valid; a component with a leading zero, such as 1.01.0, is not.
+  version_identifier: major.minor.patch
   version_policy: TODO
   initialize_versions_on_integration_creation: true
   record_default_branch_baseline: true
@@ -38,17 +40,32 @@ code_gates:
 source_release:
   rebase_publish_onto_default: true
   push_rebased_publish_branch: true
+  # Apply a permitted build-number change only on the hidden candidate,
+  # after the rebase and before packaging, then require the gates again.
+  build_number_adjustment: after-rebase
   require_gates_after_rebase: true
+  require_gates_after_build_number_adjustment: true
   # No implementation means the interface passes. build-pipeline-engineering
   # is the packaging implementation when that Skill is available.
   package_implementation: build-pipeline-engineering
   package_pass_without_implementation: true
-  publish_implementations: [fir, github-actions-artifacts, wk1998.io]
-  publish_pass_without_implementation: true
+  # Used when publish_implementations is empty.
+  default_publish_implementation: github-actions-artifacts
+  publish_implementations: []
   publish_policy: one-success
+  # A retry of the same commit skips destinations already recorded as successful.
+  publish_idempotent: true
   tag_after_publish: true
   merge_publish_to_default: true
   tag_exact_published_commit: true
+  # A failed merge after tagging keeps the tag and all branches, then continues
+  # through a protected PR. The tag is not deleted or recreated.
+  retain_tag_on_merge_failure: true
+  retain_branches_on_merge_failure: true
+  recreate_tag_on_merge_failure: false
+  # Delete dev/<version> only after the tag is verified and the default-branch
+  # merge has succeeded. Keep it when publication fails so repair can start there.
+  delete_integration_after_promotion: false
   delete_integration_after_default_merge: true
   delete_visible_publish_branch: false
 

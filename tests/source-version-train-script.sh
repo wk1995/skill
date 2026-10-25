@@ -5,6 +5,8 @@ ROOT="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd -P)"
 
 PYTHONDONTWRITEBYTECODE=1 python3 - "$ROOT" <<'PY'
 import importlib.util
+import io
+import json
 import sys
 from argparse import Namespace
 from pathlib import Path
@@ -91,14 +93,31 @@ module.select(
 )
 assert resolved_repos == ["acme/demo"], resolved_repos
 
-for rejected in ("latest", "dev", "1.4.0-rc.1", "01.4", "1.", ""):
+for rejected in ("latest", "dev", "1", "1.4", "1.4.0-rc.1", "01.4.0", "1.01.0", "1.", ""):
     try:
         module.require_numeric_version(rejected)
     except RuntimeError:
         continue
-    raise AssertionError(f"accepted non-numeric version {rejected!r}")
-for accepted in ("1", "1.4", "1.4.0", "10.20.30"):
+    raise AssertionError(f"accepted version {rejected!r}")
+for accepted in ("0.1.0", "1.4.0", "5.1.3", "10.20.30"):
     assert module.require_numeric_version(accepted) == accepted
+
+for command in ("initialize", "reuse", "tag"):
+    try:
+        module.accept_version(Namespace(command=command, version="latest"))
+    except RuntimeError:
+        pass
+    else:
+        raise AssertionError(f"{command} accepted a named version")
+    buffer = io.StringIO()
+    stdout = sys.stdout
+    sys.stdout = buffer
+    try:
+        assert getattr(module, command)(Namespace(command=command, version="1.4.0")) == 0
+    finally:
+        sys.stdout = stdout
+    payload = json.loads(buffer.getvalue())
+    assert payload["action"] == command and payload["version"] == "1.4.0", payload
 PY
 
 printf 'PASS: source-version-train script contracts\n'
