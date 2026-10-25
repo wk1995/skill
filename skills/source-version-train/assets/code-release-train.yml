@@ -8,16 +8,21 @@ repository:
 branches:
   requirement_prefixes: [feature/, bugfix/]
   integration_prefix: dev/
-  # Default publication branch. Set publish_template to override it,
-  # for example "release/{version}". The resolved branch is protected.
-  publish_prefix: publish/
+  # Visible pull-request branch. A template may select another visible name.
   publish_template: publish/{version}
   publish_protected: true
   publish_direct_push: false
+  # Hidden candidate created by rebasing the merged publish branch onto the
+  # default branch. It is removed after both success and failure.
+  release_candidate_template: release-candidate/{version}/{attempt}
+  release_candidate_visible: false
+  delete_release_candidate_after_attempt: true
   tag_prefix: v
 
 source:
   version_sources: [] # Discover repository-owned version files and keys; do not assume a language or property name.
+  # Only explicit dotted numeric identifiers are supported, such as 1.4.0.
+  version_identifier: explicit-numeric
   version_policy: TODO
   initialize_versions_on_integration_creation: true
   record_default_branch_baseline: true
@@ -34,16 +39,18 @@ source_release:
   rebase_publish_onto_default: true
   push_rebased_publish_branch: true
   require_gates_after_rebase: true
-  # Package through CI when the repository has that workflow. Without one,
-  # passed checks are enough to call the publish interface.
-  package_with_ci: auto
+  # No implementation means the interface passes. build-pipeline-engineering
+  # is the packaging implementation when that Skill is available.
+  package_implementation: build-pipeline-engineering
+  package_pass_without_implementation: true
   publish_implementations: [fir, github-actions-artifacts, wk1998.io]
+  publish_pass_without_implementation: true
   publish_policy: one-success
   tag_after_publish: true
   merge_publish_to_default: true
   tag_exact_published_commit: true
-  delete_integration_after_promotion: true
-  delete_publish_after_tag_verification: true
+  delete_integration_after_default_merge: true
+  delete_visible_publish_branch: false
 
 # build-pipeline-engineering implements packaging. Each entry above names a
 # publish implementation; this train invokes the interface and does not embed

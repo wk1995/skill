@@ -5,10 +5,15 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 import subprocess
 import sys
 from dataclasses import dataclass
 from typing import Any
+
+# A supported version is an explicit dotted numeric identifier: 1, 1.4, or 1.4.0.
+# Named channels such as latest, dev, or release are not version identifiers.
+VERSION_IDENTIFIER = re.compile(r"(0|[1-9][0-9]*)(\.(0|[1-9][0-9]*))*")
 
 
 def run(*args: str) -> str:
@@ -110,9 +115,18 @@ def inventory(args: argparse.Namespace) -> int:
     return 0
 
 
+def require_numeric_version(version: str) -> str:
+    if not VERSION_IDENTIFIER.fullmatch(version or ""):
+        raise RuntimeError(
+            f"Version must be an explicit numeric identifier such as 1.4.0; got {version!r}"
+        )
+    return version
+
+
 def select(args: argparse.Namespace) -> int:
     if not args.version or not args.branches:
         raise RuntimeError("select requires --version and --branches")
+    require_numeric_version(args.version)
     repo = resolve_repo(args.repo)
     available = set(list_branches(repo))
     requested = [branch.strip() for branch in args.branches.split(",") if branch.strip()]

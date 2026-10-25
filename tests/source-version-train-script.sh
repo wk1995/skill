@@ -90,6 +90,15 @@ module.select(
     )
 )
 assert resolved_repos == ["acme/demo"], resolved_repos
+
+for rejected in ("latest", "dev", "1.4.0-rc.1", "01.4", "1.", ""):
+    try:
+        module.require_numeric_version(rejected)
+    except RuntimeError:
+        continue
+    raise AssertionError(f"accepted non-numeric version {rejected!r}")
+for accepted in ("1", "1.4", "1.4.0", "10.20.30"):
+    assert module.require_numeric_version(accepted) == accepted
 PY
 
 printf 'PASS: source-version-train script contracts\n'

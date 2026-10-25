@@ -1,6 +1,6 @@
 ---
 name: source-version-train
-description: Orchestrate source code from a requirement branch through version-train integration, publication, a verified rebase onto the default branch, and an immutable source tag. Use for feature/bugfix branches, versioned dev and publish PRs, code-readiness gates, version metadata, or source-release tags in any repository; do not use for packaging, signing, or artifact uploads.
+description: Orchestrate source code from a requirement branch through a visible publish PR, a hidden release candidate, packaging and publish interfaces, and an immutable source tag. Use for feature/bugfix branches, dev and publish PRs, code gates, version metadata, or source tags; do not use to implement packaging or a publish destination.
 metadata:
   sync_id: "android-code-release-train"
   version: "3.0.0"
@@ -12,10 +12,10 @@ metadata:
   triggering:
     include:
       - The user asks to implement a requirement on a feature or bugfix branch and carry its code into a selected version train.
-      - The task involves selecting or assessing code for dev/<version>, promoting code to publish/<version>, rebasing that publication onto the default branch, synchronizing the default branch, or creating the source release tag.
+      - The task involves selecting code for dev/<version>, merging it through a visible publish/<version> PR, rebasing that result onto a hidden release candidate, or tagging and synchronizing the default branch.
       - The user needs source-branch orchestration, PR readiness, code gates, or version metadata changes for a release train.
     exclude:
-      - The task is to configure or run packaging builds, signing, checksums, or output uploads; use build-pipeline-engineering instead.
+      - The task is to implement or troubleshoot a packaging build, signing, checksums, or one publish destination. Those are implementations of this train's packaging and publish interfaces; use build-pipeline-engineering for packaging.
       - The request is an ordinary build, test, or code edit without the version-train lifecycle.
       - The request only manages copies or metadata of Skills; use sync-skills instead.
 ---
@@ -24,17 +24,20 @@ metadata:
 
 Operate this source-only lifecycle for any repository:
 
-`requirement` -> `feature/*` / `bugfix/*` -> `dev/B` -> `publish/B` -> rebase onto the default branch -> package and publish -> `vB` -> default branch
+`requirement` -> `feature/*` / `bugfix/*` -> `dev/B` -> visible `publish/B` -> hidden release candidate -> package and publish -> `vB` -> default branch
 
-`publish/B` is the default publication branch. A repository may configure another template, such as `release/B`; every publication step below applies to that resolved branch. The publication branch is protected: changes reach it through a reviewed pull request, never by a direct push.
+`publish/B` is the visible publication branch shown in pull requests. A repository may configure another visible template. It is protected: changes reach it through a reviewed pull request, never by a direct push. Merging `dev/B` into it does not publish anything.
 
-The output is a reviewed, versioned source commit and immutable tag. Creating the publication branch does not publish anything. Publication is an interface invoked only after the rebased branch is pushed and its checks pass: use the repository's CI package when one exists, then call the configured publish implementations. Use `build-pipeline-engineering` for the packaging implementation. One successful publish implementation is enough by default. Tag and merge the default branch only after that success.
+The merge creates a hidden release candidate by rebasing `publish/B` onto the default branch. That candidate is not a pull-request branch and is deleted after the attempt, whether publication succeeds or fails. The visible `publish/B` remains.
+
+Packaging and publication are interfaces. No packaging implementation means packaging passes. `build-pipeline-engineering` is the packaging implementation used when it is available. No publish implementation means publication passes. When implementations are configured, one success is enough by default. Tag and merge the default branch only after both interfaces pass.
 
 ## Prerequisites
 
 - Read [references/code-train-contract.md](references/code-train-contract.md) before a mutating train operation.
 - Resolve the repository default branch instead of assuming `main` or `master`.
-- Discover the project's branch conventions, authoritative version sources, and version policy. Default the publication branch to `publish/B`. Use a configured publication template when the repository or the user specifies one; `release/B` remains valid under that template.
+- Discover the project's branch conventions, authoritative version sources, and version policy. Default the visible publication branch to `publish/B`. A configured template may select another visible name. The hidden release candidate is separate and is never used as that visible branch.
+- Accept only an explicit numeric version identifier, such as `1`, `1.4`, or `1.4.0`. Each component is a non-negative integer without leading zeroes. Reject named or descriptive versions such as `latest`, `dev`, `release`, or `1.4.0-rc.1` before creating or reusing a train.
 - Require `gh`, `git`, a clean worktree, and GitHub authentication for repository operations.
 - Use the repository's GitHub App when automated branch, PR, merge, or tag operations must retrigger workflows. Do not substitute `GITHUB_TOKEN` when its events would not retrigger ordinary workflows.
 - Use [assets/code-release-train.yml](assets/code-release-train.yml) as the source-flow configuration template when bootstrapping a repository.
@@ -47,9 +50,9 @@ Inspect branch conventions, default branch, version source, required code checks
 
 1. Code validation on feature, bugfix, integration, publication, and default branches.
 2. Train orchestration for `dev/B`, selected feature-to-dev PRs, and the unique promotion PR into the resolved publication branch. Protect that branch so it accepts changes only through a reviewed pull request.
-3. Source finalization that rebases the accepted publication onto the default branch, invokes packaging and the publish interface, creates `vB` after one implementation succeeds, and then merges that result back.
+3. Finalization that creates a hidden release candidate from the visible publication branch, invokes the packaging and publish interfaces, creates `vB` after both pass, and then merges that result back.
 
-The checks may compile or test code. This Skill selects and invokes the packaging and publish interfaces; it does not implement signing, packaging, upload, or retention. Use `build-pipeline-engineering` for packaging and a configured publish implementation for each destination.
+The checks may compile or test code. This Skill calls the two interfaces and does not implement signing, packaging, upload, or retention. Use `build-pipeline-engineering` when that packaging implementation is available. Use a configured publish implementation for each destination.
 
 ### Implement a requirement
 
@@ -82,16 +85,16 @@ When publication branches are initialized in advance, start them from the record
 
 Only promote after all selected requirement PRs are merged into `dev/B` and integration code checks pass:
 
-1. Create the publication branch from the default branch. Its name is `publish/B` unless a publication template resolves a different name. Open the unique promotion PR from `dev/B`.
-2. Preserve the version initialized on `dev/B`, validate it against repository policy, and apply only the policy's permitted publication or build-number adjustments. Do not repeat the initial version bump at promotion or in artifact jobs.
-3. Delete `dev/B` only after promotion is merged and the publication branch contains every selected commit.
-4. Accept only publication fixes through a reviewed pull request. The publication branch is protected and cannot be updated by a direct push.
-5. After those gates pass, fetch the default branch and rebase the publication branch onto that exact commit. Resolve conflicts there; do not merge the default branch in the other direction and do not force-push.
-6. Push the rebased publication branch through its protected update path and rerun its source review and code gates. A rebase that changes the commit requires this verification again.
-7. Package and publish that exact pushed commit. When the repository has a CI packaging workflow, run it through `build-pipeline-engineering` and publish its outputs. When it has no CI packaging, the passed checks in step 6 are sufficient and publication may proceed without a package. Call every configured publish implementation, such as FIR, GitHub Actions Artifacts, or `wk1998.io`. One successful implementation satisfies the default policy; record which implementations succeeded and failed.
-8. Only after that publish policy passes, tag the exact published commit as `vB`, verify the tag, merge it into the default branch, and then delete the publication branch.
+1. Create the visible publication branch from the default branch. Its name is `publish/B` unless a publication template resolves a different visible name. Open the unique PR from `dev/B`.
+2. Preserve the version initialized on `dev/B`, validate it against repository policy, and apply only the policy's permitted publication or build-number adjustments. Do not repeat the initial version bump in packaging.
+3. When the `dev/B -> publish/B` PR merges, first record that merge on the visible publication branch. Keep that branch and its history unchanged by the later rebase.
+4. Fetch the default branch and rebase the merged publication onto that exact commit, creating a new hidden release candidate. Resolve conflicts on the candidate. Do not merge the default branch into `publish/B`, do not rewrite `publish/B`, and do not open a PR for the candidate.
+5. Call the packaging interface for that exact candidate commit. If no packaging implementation is available, packaging passes. If `build-pipeline-engineering` is available, it is the implementation and must package that commit. A packaging failure stops publication.
+6. Call the publish interface for the same commit. If no publish implementation is configured, publication passes. Otherwise call every configured implementation, such as FIR, GitHub Actions Artifacts, or `wk1998.io`. One success satisfies the default policy; record every success and failure.
+7. Delete the hidden release candidate after the attempt. Delete it when publication succeeds and when it fails. Never delete the visible `publish/B` as part of that cleanup.
+8. Only after both interfaces pass, tag that exact candidate commit as `vB`, verify the tag, and merge it into the default branch. Delete `dev/B` only after that merge succeeds and the tag is verified.
 
-Do not tag or merge when every publish implementation fails. A later retry must reuse the same published commit unless the user explicitly creates a new source release. The tag is immutable and must not be moved or replaced by a publish implementation.
+Do not tag or merge when packaging fails or every configured publish implementation fails. A later retry creates a new hidden candidate from the current visible publication branch. The tag is immutable and must not be moved or replaced by either interface.
 
 ## Remote-Write Gates
 
