@@ -4,6 +4,13 @@
 
 - No unreleased changes.
 
+## [0.0.6] - 2026-10-26
+
+- Change-Type: fix
+- Summary: Restore execution responsibilities to Test cases: start/retest, skip and result entry sit beside the selected frozen procedure. Test records inspect saved outcomes and supporting time/actor/environment/evidence, with navigation back to the case for retesting.
+- Compatibility: User-requested patch upgrade from 0.0.5 to 0.0.6. Preserves existing view links, schemas, source adapters, workflow guards, frozen definitions, observations, annotations and conclusions. No data migration or outcome changes. Existing navigation filters, bound drafts, evidence links and summary independence remain supported.
+- Move the bundled template's execution and batch controls out of record history, align the adoption guidance and bilingual usage, and verify cases/forms versus saved-record responsibility with disposable browser fixtures.
+
 ## [0.0.5] - 2026-10-26
 
 - Change-Type: fix

@@ -86,13 +86,13 @@ function render() {
     if(/^https?:\/\//i.test(value)) {const a=el('a',value);a.href=value;a.target='_blank';a.rel='noopener noreferrer';p.append(a);} else p.append(document.createTextNode(value||'未提供'));
     $('identity').append(p);
   }
-  renderWorkflow(round);$('workflow').hidden=view!=='records';
-  $('round-setup').hidden=view!=='records';$('environment-setup').hidden=view!=='records';
+  renderWorkflow(round);$('workflow').hidden=view!=='cases';
+  $('round-setup').hidden=view!=='cases';$('environment-setup').hidden=view!=='cases';
   $('stats').hidden=!['cases','records'].includes(view);$('workspace').hidden=view==='summary';$('case-sidebar').hidden=view==='annotations';
   $('flow').hidden=view!=='cases';$('test-conclusion').hidden=view!=='summary';$('copy-results').hidden=view!=='summary'||!round;
-  const titles={cases:'测试用例',records:'执行记录',summary:'测试总结',annotations:'批注'};
+  const titles={cases:'测试用例',records:'测试记录',summary:'测试总结',annotations:'批注'};
   $('view-title').textContent=titles[view];
-  $('view-description').textContent=({cases:round?'查看所选轮次的冻结定义；执行和结果保存请进入执行记录。':'维护当前方案：要测什么、怎样测、预期是什么。',records:'选择用例与环境执行测试，下方逐条保留本轮实际尝试；统计和筛选按记录计算，涵盖所有环境。',summary:'按整轮、所有用例和环境计算结论，不受用例列表或记录筛选影响。',annotations:'按当前方案／轮次查看批注，回复和处理不会改变测试结果。'})[view];
+  $('view-description').textContent=({cases:round?'按所选轮次的冻结步骤执行测试、记录实际结果；已保存结果集中在测试记录。':'维护当前方案：要测什么、怎样测、预期是什么。',records:'查看已保存的实际结果、时间、执行人、环境与证据；统计和筛选按记录计算，不在此开始测试。',summary:'按整轮、所有用例和环境计算结论，不受用例列表或记录筛选影响。',annotations:'按当前方案／轮次查看批注，回复和处理不会改变测试结果。'})[view];
   renderConclusion(round);
 
   const stats=statistics(definitions,round,view),filters=currentFilters();
@@ -109,7 +109,7 @@ function render() {
   const selected=selections.get(roundId)??new Set();selections.set(roundId,selected);
   $('case-list').replaceChildren(...shown.map(item=>{
     const wrapper=el('div',null,'case-row');
-    if(round&&view==='records'){const check=el('input');check.type='checkbox';check.checked=selected.has(item.id);check.setAttribute('aria-label',`批量选择 ${item.id}`);check.onchange=()=>{check.checked?selected.add(item.id):selected.delete(item.id);};wrapper.append(check);}
+    if(round&&view==='cases'){const check=el('input');check.type='checkbox';check.checked=selected.has(item.id);check.setAttribute('aria-label',`批量选择 ${item.id}`);check.onchange=()=>{check.checked?selected.add(item.id):selected.delete(item.id);};wrapper.append(check);}
     const button=el('button',null,item.id===caseId?'selected':''); button.append(el('span',`${item.id} · ${item.priority}`,'case-id'),el('span',item.title));
     for(const type of item.types) button.append(pill(labels[type],type));
     const status=round?model.statusOf(round,item.id):'untested';button.append(pill(view==='records'?`当前：${labels[status]}`:labels[status],status));
@@ -130,10 +130,10 @@ function render() {
   }
   if(view==='summary')return;
   if(view==='records') {
-    detail.append(el('h2','执行记录'));
+    detail.append(el('h2','测试记录'));
     const item=shown.find(item=>item.id===caseId);
     if(!round){detail.append(el('p','请选择一个执行轮次，或在左侧准备下一轮。','empty'));return;}
-    if(item){const procedure=el('details');procedure.append(el('summary',`${item.id} · ${item.title} · 查看冻结步骤`),el('p',`前置条件：${item.preconditions}`,'prose'),el('p',`步骤：${item.steps}`,'prose'),el('p',`预期：${item.expected}`,'prose'));detail.append(procedure);const execution=el('details');execution.id='execution-panel';execution.open=!round.workflow||model.inspectWorkflow(round).state!=='completed';execution.append(el('summary',`记录新一次执行 · ${item.id}`));renderExecution(execution,round,item);detail.append(execution);}
+    if(item){const execute=el('button','在测试用例中执行 / 复测');execute.type='button';execute.onclick=()=>{observationTarget='';showView('cases',{reset:true});};detail.append(execute);}
     const records=visibleRecords(round,filters).slice().reverse(),history=el('section');history.id='record-history';history.append(el('h3',`本轮执行历史 · ${records.length} / ${round.observations.length} 条`));
     if(!records.length)history.append(el('p','没有符合筛选的执行记录。统计卡片或结果筛选只改变列表，不改变测试结论。','empty'));
     for(const observation of records)renderObservation(history,observation);detail.append(history);
@@ -153,7 +153,7 @@ function render() {
   renderTestLocation(detail,item,{version:round?.version??plan.version,source:round?.source??plan.source,build:round?.build??plan.build,planId,roundId,environmentId:locationEnv?.id??'',environment:locationEnv,...locationExecution,state:locationExecution?.state??(round?'未选择状态机环境':'定义')},message);
   const link=el('button','复制用例定位信息'); link.onclick=async()=>{try {await navigator.clipboard.writeText(`${plan.version} / ${plan.title} / ${round?.name??'方案定义'} / ${caseId}\n${location.href}`);message('定位信息已复制');}catch{message(location.href);}};detail.append(link);
   if(!round) renderEditor(detail,plan,item);
-  else {if(locationEnv&&round.workflow)renderNextTest(detail,round,item,locationEnv,'cases');const execute=el('button','去执行此用例','primary');execute.onclick=()=>{observationTarget='';showView('records',{reset:true});};detail.append(execute);}
+  else {const execution=el('section');execution.id='execution-panel';execution.append(el('h3','执行此用例并记录结果'));renderExecution(execution,round,item);detail.append(execution);}
   renderScopedAnnotations(detail,{...caseScope,observationId:observationTarget});
 }
 function renderScopedAnnotations(detail,scope){
@@ -244,7 +244,7 @@ function renderExecution(detail,round,item) {
   if(env&&managed)renderNextTest(detail,round,item,env);
 
 }
-function renderNextTest(detail,round,item,env,targetView='records') {
+function renderNextTest(detail,round,item,env,targetView='cases') {
   const advice=model.nextTest(round,item.id,env.id),panel=el('section');panel.id='next-test';
   panel.append(el('h3','下一步测什么'));
   const actionLabels={current:'继续当前用例',test:'执行后续用例',retry:'重新验证当前用例',wait:'等待条件恢复',done:'此分支结束',unconfigured:'尚未配置下一步',unavailable:'当前流程不支持分支',prerequisite:'先完成前置用例',stale:'依赖已变化，先记录阻塞'};

@@ -23,7 +23,7 @@ try {
     s=m.createRound(s,{id:'r',planId:'p',name:'Conditional fixture',createdAt:at,changedIds:[]});s=m.registerEnvironment(s,{id:'e',label:'Fixture browser',kind:'browser',configuration:'Disposable'});s=m.attachEnvironment(s,'r','e');
     s=m.transitionRound(s,'r',{id:'ready',action:'prepare',from:'draft',actor:'Fixture',at});s=m.transitionRound(s,'r',{id:'run',action:'begin',from:'ready',actor:'Fixture',at});s.revision=state.revision+1;return s;
   });
-  frame.src=`../assets/workbench/?workspace=${workspace}#plan=p&round=r&case=LOGIN&view=records`;
+  frame.src=`../assets/workbench/?workspace=${workspace}#plan=p&round=r&case=LOGIN&view=cases`;
   await until(()=>frame.contentDocument?.getElementById('environment'));doc=frame.contentDocument;let choice=doc.getElementById('environment');choice.value='e';choice.dispatchEvent(new Event('change'));
   for(const [caseId,status] of [['OFFLINE','skipped'],['SESSION','blocked']]) {
     go(caseId);const form=doc.getElementById('observation-form');fill(form,'tester','Fixture tester');fill(form,'status',status);form.elements.status.dispatchEvent(new Event('change'));fill(form,'notes','Explicit fixture scope/prerequisite reason');fill(form,'executedAt','');form.querySelector('.primary').click();

@@ -30,7 +30,7 @@ try {
   const round=doc.getElementById('round');round.value='second';round.dispatchEvent(new Event('change'));
   require(new URLSearchParams(frame.contentWindow.location.hash.slice(1)).get('round')==='second','Records view retained an old round deep link');lines.push('PASS records view round change updates location');
   const loaded=new Promise(resolve=>frame.addEventListener('load',resolve,{once:true}));frame.contentWindow.location.reload();await loaded;await ready();
-  require(frame.contentDocument.querySelector('#detail h2')?.textContent==='执行记录','Reload lost the records view');
+  require(frame.contentDocument.querySelector('#detail h2')?.textContent==='测试记录','Reload lost the records view');
   require(frame.contentDocument.getElementById('round').value==='second','Reload lost selected round');lines.push('PASS deep link restores view and round on reload');
   output.textContent=lines.join('\n')+'\nALL 3 UI CONTEXT CHECKS PASSED';
 }catch(error){output.textContent=lines.join('\n')+'\nFAIL '+error.stack;}finally{db.close();}
