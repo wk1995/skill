@@ -10,7 +10,7 @@ The executable field contract is `CONTRACT.data` in [workflow.mjs](../assets/wor
 
 | Value | Contract |
 | --- | --- |
-| Skill `metadata.version` | Skill release version, currently `0.0.4`; independent from data versions |
+| Skill `metadata.version` | Skill release version, currently `0.0.5`; independent from data versions |
 | Archive `schemaVersion` | Integer `1` |
 | Round `workflow.version` | Integer `1` for managed execution; omission identifies legacy history only |
 | Conclusion `format` / `version` | `ci-package-test/conclusions` / integer `1` |

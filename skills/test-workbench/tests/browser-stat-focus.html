@@ -1,0 +1,26 @@
+<!doctype html><meta charset="utf-8"><title>Statistic focus regression</title>
+<h1>Disposable statistic focus and scroll checks</h1><pre id="result">Running…</pre><iframe id="app" style="width:1100px;height:600px" title="Isolated statistic focus fixture"></iframe>
+<script type="module">
+import {openStore,read,update} from '../assets/workbench/store.mjs';import * as m from '../assets/workbench/model.mjs';
+const frame=document.getElementById('app'),out=document.getElementById('result'),lines=[],workspace=`stat-focus-${crypto.randomUUID()}`,db=await openStore(`ci-package-test-workbench:${workspace}`);
+const check=(ok,message)=>{if(!ok)throw new Error(message);};
+async function until(fn){for(let i=0;i<300;i++){if(await fn())return;await new Promise(r=>setTimeout(r,20));}throw new Error('Timed out');}
+const settled=()=>new Promise(resolve=>frame.contentWindow.requestAnimationFrame(()=>frame.contentWindow.requestAnimationFrame(resolve)));
+try{
+ const archive=await(await fetch('../assets/examples/archive.json')).json();await update(db,0,s=>m.importArchive(s,archive));frame.src=`../assets/workbench/?workspace=${workspace}#plan=EXAMPLE-PLAN&round=EXAMPLE-ROUND&case=LOGIN01&environment=EXAMPLE-ENV`;
+ await until(()=>frame.contentDocument?.querySelector('.stat'));const doc=frame.contentDocument,win=frame.contentWindow,before=JSON.stringify(await read(db));
+ for(const view of ['cases','records']){
+  doc.getElementById(`${view}-view`).click();
+  for(const status of ['passed','failed','blocked','']){
+   const button=doc.querySelector(`.stat[data-status="${status}"]`);win.scrollTo(0,100);button.focus({preventScroll:true});await settled();const top=button.getBoundingClientRect().top,y=win.scrollY;
+   check(y===100,'Fixture was not scrolled before activation');button.click();await settled();
+   check(button.isConnected&&doc.activeElement===button,`${view}/${status}: clicked statistic lost focus or was replaced`);
+   check(win.scrollY===y&&Math.abs(button.getBoundingClientRect().top-top)<1,`${view}/${status}: filtering moved viewport or statistic`);
+   check(button.getAttribute('aria-pressed')==='true'&&doc.getElementById('status').value===status,'Filter selection did not update');
+  }
+  lines.push(`PASS ${view}: repeated/empty/all filters retain statistic identity, focus and scrolled viewport`);
+  const dropdown=doc.getElementById('status');dropdown.focus({preventScroll:true});const y=win.scrollY;dropdown.value='passed';dropdown.dispatchEvent(new Event('input'));await settled();check(doc.activeElement===dropdown&&win.scrollY===y,'Dropdown filtering lost focus or scroll');lines.push(`PASS ${view}: dropdown filtering retains focus and scroll`);
+ }
+ check(JSON.stringify(await read(db))===before,'Presentation changed persisted test evidence');lines.push('PASS filtering never writes evidence');out.textContent=lines.join('\n')+'\nALL 5 STATISTIC FOCUS CHECKS PASSED';
+}catch(error){out.textContent=lines.join('\n')+'\nFAIL '+error.stack;}finally{db.close();}
+</script>

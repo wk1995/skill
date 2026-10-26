@@ -4,6 +4,15 @@
 
 - No unreleased changes.
 
+## [0.0.5] - 2026-10-26
+
+- Change-Type: fix
+- Summary: Clarify the existing case/record/summary responsibilities with separate template views, clickable statistic filters, whole-round evidence navigation and retained definition/execution drafts.
+- Compatibility: Patch optimization from 0.0.4 to 0.0.5. Existing cases/records/annotations links remain supported; summary links are optional. Preserve triggers, archive schema 1, workflow version 1, conclusion format, both source adapters, frozen rounds and all mutation guards. Existing archives require no migration.
+- Count execution history by actual attempts and case lists by effective current outcomes; keep deterministic case/environment conclusions independent of filters. Preserve view/environment/filter context in links and navigate to the exact supporting observation. Keep the flow graph with definitions and recording controls with execution history.
+
+- Keep statistic controls mounted while filtering so pointer/keyboard focus and viewport position stay stable; remove forced scrolling to the list.
+
 ## [0.0.4] - 2026-10-26
 
 - Change-Type: fix

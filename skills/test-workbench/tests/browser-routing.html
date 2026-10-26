@@ -23,7 +23,7 @@ try {
     s=m.createRound(s,{id:'r',planId:'p',name:'Conditional fixture',createdAt:at,changedIds:[]});s=m.registerEnvironment(s,{id:'e',label:'Fixture browser',kind:'browser',configuration:'Disposable'});s=m.attachEnvironment(s,'r','e');
     s=m.transitionRound(s,'r',{id:'ready',action:'prepare',from:'draft',actor:'Fixture',at});s=m.transitionRound(s,'r',{id:'run',action:'begin',from:'ready',actor:'Fixture',at});s.revision=state.revision+1;return s;
   });
-  frame.src=`../assets/workbench/?workspace=${workspace}#plan=p&round=r&case=LOGIN`;
+  frame.src=`../assets/workbench/?workspace=${workspace}#plan=p&round=r&case=LOGIN&view=records`;
   await until(()=>frame.contentDocument?.getElementById('environment'));doc=frame.contentDocument;let choice=doc.getElementById('environment');choice.value='e';choice.dispatchEvent(new Event('change'));
   for(const [caseId,status] of [['OFFLINE','skipped'],['SESSION','blocked']]) {
     go(caseId);const form=doc.getElementById('observation-form');fill(form,'tester','Fixture tester');fill(form,'status',status);form.elements.status.dispatchEvent(new Event('change'));fill(form,'notes','Explicit fixture scope/prerequisite reason');fill(form,'executedAt','');form.querySelector('.primary').click();
@@ -42,7 +42,7 @@ try {
   lines.push('PASS partial/blocked/skipped retests retain the known failure warning and overall failed result');
   go('LOGIN');const meanings=[...doc.querySelectorAll('#detail details')].find(item=>item.querySelector('summary')?.textContent.includes('如何区分'));require(meanings?.textContent.includes('已发现问题应选失败')&&meanings.textContent.includes('前置条件')&&meanings.textContent.includes('明确决定'),'Outcome semantics missing');lines.push('PASS outcome help distinguishes failed, partial, blocked and skipped');
   choice=doc.getElementById('round');choice.value='';choice.dispatchEvent(new Event('change'));go('LOGIN');
-  const editor=doc.querySelector('form.editor');editor.parentElement.open=true;const before=await read(db),branches=JSON.parse(editor.elements.next.value);branches.passed.caseId='missing';fill(editor,'next',JSON.stringify(branches));editor.querySelector('button').click();await until(()=>doc.getElementById('message').classList.contains('error'));require(JSON.stringify(await read(db))===JSON.stringify(before),'Invalid branch editor saved state');
+  doc.getElementById('cases-view').click();const editor=doc.querySelector('form.editor');editor.parentElement.open=true;const before=await read(db),branches=JSON.parse(editor.elements.next.value);branches.passed.caseId='missing';fill(editor,'next',JSON.stringify(branches));editor.querySelector('button').click();await until(()=>doc.getElementById('message').classList.contains('error'));require(JSON.stringify(await read(db))===JSON.stringify(before),'Invalid branch editor saved state');
   branches.passed.caseId='OFFLINE';fill(editor,'next',JSON.stringify(branches));editor.querySelector('button').click();await until(async()=>(await read(db)).plans[0].cases[0].next.passed.caseId==='OFFLINE');require((await read(db)).rounds[0].cases[0].next.passed.caseId==='SESSION','Library edit rewrote frozen branch');lines.push('PASS branch editor validates targets and preserves round snapshots');
   output.textContent=lines.join('\n')+'\nALL 9 BRANCH CHECKS PASSED';
 }catch(error){output.textContent=lines.join('\n')+'\nFAIL '+error.stack;}finally{db.close();}

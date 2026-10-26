@@ -17,7 +17,7 @@ try {
     next=m.createRound(next,{id:'r',name:'State fixture',planId:'p',createdAt:'2026-10-22T01:00:00Z'});
     next=m.registerEnvironment(next,{id:'e',label:'Fixture browser',kind:'browser',configuration:'Disposable'});next=m.attachEnvironment(next,'r','e');next.revision=state.revision+1;return next;
   });
-  frame.src=`../assets/workbench/?workspace=${workspace}#plan=p&round=r&case=S`;
+  frame.src=`../assets/workbench/?workspace=${workspace}#plan=p&round=r&case=S&view=records`;
   await until(()=>frame.contentDocument?.getElementById('workflow-form'));
   let doc=frame.contentDocument,form=doc.getElementById('workflow-form');fill(form,'actor','Fixture operator');submit(form,'prepare');
   await until(async()=>m.inspectWorkflow(await current()).state==='ready');
