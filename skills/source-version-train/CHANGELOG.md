@@ -6,6 +6,14 @@ All notable changes to this Skill are documented here.
 
 - No unreleased changes.
 
+## [4.0.0] - 2026-10-26
+
+- Change-Type: breaking
+- Summary: Name integration branches `dev_<version>` and keep GitHub Actions Artifacts as the only publish destination named by this Skill.
+- Compatibility: Numeric version checks, the hidden release candidate, packaging as an interface, immutable tags, and the rule that `dev_<version>` survives a failed publish remain.
+- Breaking-Change: `dev/5.1.3` is no longer the default integration branch; version `5.1.3` now uses `dev_5.1.3`. A repository may replace `integration_template`, but this Skill does not add another prefix. GitHub Actions Artifacts is the only publish destination named here. Other channels are configured by the repository and are not part of this Skill.
+- Migration: Retarget requirement pull requests and branch protection from `dev/**` to `dev_*`. Resolve the integration branch only from `integration_template`. Keep additional publish channels in repository configuration rather than in this Skill.
+
 ## [3.0.0] - 2026-10-13
 
 - Change-Type: breaking

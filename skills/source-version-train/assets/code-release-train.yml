@@ -7,7 +7,9 @@ repository:
 
 branches:
   requirement_prefixes: [feature/, bugfix/]
-  integration_prefix: dev/
+  # Integration branch. integration_template is the only name source;
+  # {version} is major.minor.patch, so 5.1.3 becomes dev_5.1.3.
+  integration_template: dev_{version}
   # Visible pull-request branch. publish_template is the only name source;
   # {version} is major.minor.patch. A repository may replace the template.
   publish_template: publish_{version}
@@ -49,10 +51,9 @@ source_release:
   # is the packaging implementation when that Skill is available.
   package_implementation: build-pipeline-engineering
   package_pass_without_implementation: true
-  # Used when publish_implementations is empty.
+  # GitHub Actions Artifacts is the only destination named by this Skill.
   default_publish_implementation: github-actions-artifacts
   publish_implementations: []
-  publish_policy: one-success
   # A retry of the same commit skips destinations already recorded as successful.
   publish_idempotent: true
   tag_after_publish: true
@@ -63,7 +64,7 @@ source_release:
   retain_tag_on_merge_failure: true
   retain_branches_on_merge_failure: true
   recreate_tag_on_merge_failure: false
-  # Delete dev/<version> only after the tag is verified and the default-branch
+  # Delete dev_<version> only after the tag is verified and the default-branch
   # merge has succeeded. Keep it when publication fails so repair can start there.
   delete_integration_after_promotion: false
   delete_integration_after_default_merge: true

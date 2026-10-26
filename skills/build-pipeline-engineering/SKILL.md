@@ -15,7 +15,7 @@ metadata:
       - The task produces APK, AAB, AAR, JAR, Gradle plugin, native, mapping, metadata, checksum, or archive outputs from a specified source ref.
       - The user asks to build a signed Android package or store build outputs in GitHub Actions Artifacts or another explicit destination.
     exclude:
-      - The task selects requirements for a version, creates feature/dev/publish branches or PRs, changes source version metadata, merges code, or creates release tags; use source-version-train for that source lifecycle.
+      - The task selects requirements for a version, creates feature, dev_<version>, or publish_<version> branches or PRs, changes source version metadata, merges code, or creates release tags; use source-version-train for that source lifecycle.
       - The request is a normal compile or test used only to validate a code edit and does not retain a distributable artifact.
       - The request only manages copies or metadata of Skills; use sync-skills instead.
 ---

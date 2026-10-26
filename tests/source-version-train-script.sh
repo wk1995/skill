@@ -57,13 +57,35 @@ assert all(call[3].startswith("repos/acme/demo/") for call in calls)
 module.find_pr = lambda repo, branch: {
     "state": "CLOSED",
     "isDraft": False,
-    "baseRefName": "dev/1.4.0",
+    "baseRefName": "dev_1.4.0",
     "reviewDecision": "APPROVED",
     "statusCheckRollup": [{"status": "COMPLETED", "conclusion": "SUCCESS"}],
     "url": "https://example.invalid/pr/1",
 }
 closed = module.inspect("acme/demo", "feature/login")
 assert closed.state == "development", closed
+
+module.find_pr = lambda repo, branch: {
+    "state": "OPEN",
+    "isDraft": False,
+    "baseRefName": "dev/1.4.0",
+    "reviewDecision": "APPROVED",
+    "statusCheckRollup": [{"status": "COMPLETED", "conclusion": "SUCCESS"}],
+    "url": "https://example.invalid/pr/2",
+}
+slash = module.inspect("acme/demo", "feature/login")
+assert slash.state == "misrouted" and slash.target == "dev/1.4.0", slash
+
+module.find_pr = lambda repo, branch: {
+    "state": "OPEN",
+    "isDraft": False,
+    "baseRefName": "dev_1.4.0",
+    "reviewDecision": "APPROVED",
+    "statusCheckRollup": [{"status": "COMPLETED", "conclusion": "SUCCESS"}],
+    "url": "https://example.invalid/pr/3",
+}
+underscore = module.inspect("acme/demo", "feature/login")
+assert underscore.state == "ready" and underscore.target == "dev_1.4.0", underscore
 
 
 resolved_repos = []

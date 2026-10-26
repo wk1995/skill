@@ -93,7 +93,7 @@ def inspect(repo: str, branch: str) -> BranchStatus:
     review = str(pr.get("reviewDecision") or "PENDING").upper()
     checks = checks_state(pr.get("statusCheckRollup"))
     target = str(pr.get("baseRefName", "-"))
-    if not target.startswith("dev/"):
+    if not target.startswith("dev_"):
         return BranchStatus(branch, "misrouted", target, review, checks, str(pr.get("url", "")))
     ready = not pr.get("isDraft") and review == "APPROVED" and checks == "success"
     state = "ready" if ready else ("blocked" if checks == "failed" else "pending")
@@ -159,7 +159,7 @@ def select(args: argparse.Namespace) -> int:
     if missing:
         raise RuntimeError(f"Branches not found in {repo}: {', '.join(missing)}")
     statuses = [inspect(repo, branch) for branch in requested]
-    expected_target = f"dev/{args.version}"
+    expected_target = f"dev_{args.version}"
     conflicting = [item.branch for item in statuses if item.target not in ("-", expected_target)]
     if conflicting:
         raise RuntimeError(
@@ -191,7 +191,7 @@ def main() -> int:
     select_parser.add_argument(
         "--require-ready",
         action="store_true",
-        help="Require ready PRs targeting dev/<version>; use after train PRs have been created.",
+        help="Require ready PRs targeting dev_<version>; use after train PRs have been created.",
     )
     select_parser.set_defaults(handler=select)
     for command, handler, help_text in (
