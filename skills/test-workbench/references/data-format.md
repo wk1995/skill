@@ -10,7 +10,7 @@ The executable field contract is `CONTRACT.data` in [workflow.mjs](../assets/wor
 
 | Value | Contract |
 | --- | --- |
-| Skill `metadata.version` | Skill release version, currently0.0.2; independent from data versions |
+| Skill `metadata.version` | Skill release version, currently `0.0.4`; independent from data versions |
 | Archive `schemaVersion` | Integer `1` |
 | Round `workflow.version` | Integer `1` for managed execution; omission identifies legacy history only |
 | Conclusion `format` / `version` | `ci-package-test/conclusions` / integer `1` |
@@ -22,6 +22,8 @@ The executable field contract is `CONTRACT.data` in [workflow.mjs](../assets/wor
 | Empty / absent | Required text fields stay present even when an allowed value is `""`. Optional collections may be absent; JSON `null` is allowed only where described |
 
 Localized labels belong to presentation. Persist the exact English enum keys. Project metadata such as priority, environment kind and source/build strings follows the documented field types; the current validator does not enforce a universal priority scale, OS list, URL or source-SHA syntax. Verify the actual package independently.
+
+The [execution-quality procedures](execution-quality.md) use supported definition/observation text and linked evidence for required checks, component combinations, measurement validity and resource setup. Their report tables are not archive schemas. The bundled validator checks structure and workflow consistency; it does not inspect raw test artifacts, enforce required sample counts, prove runtime compatibility or decide case/environment applicability. A structurally valid `passed` record is not independent proof of an adequate experiment. Do not add `invalid`/`not-applicable` statuses, component/metric objects or an automatic N/A projection without a complete project adapter and schema review. Existing archives and exact conclusion projections stay unchanged.
 
 ## 1. Test-case definition
 

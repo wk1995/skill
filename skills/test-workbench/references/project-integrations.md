@@ -8,6 +8,8 @@ Record the actual source repository/branch, running service directory, authorita
 
 For each requested integration, trace UI/AI/CLI entry point → shared validation → first write → read-back. Verify it with disposable data. Keep existing guards and observe the selected source mode; host tools and browser drafts are not additional primary sources. Mark an absent or unverified adapter pending and retain supported independent work.
 
+For existing test runners and hardware benches, use [execution-quality.md](execution-quality.md): validate report completeness and case-level outcomes before guarded saves, verify the tested component combination, preserve measurement methods/baselines, and respect resource ownership and cleanup. The starter supplies none of those automatic adapters. Preserve project-specific commands, report formats and independently observed boundaries instead of replacing them with a generic success/exit-code parser.
+
 Custom schemas require an explicit mapping of definitions, observations, environments, Issue associations, conclusions and unknown legacy fields. Preserve unmapped source data. The bundled unified-format validator rejects unsupported archives; neither changing `schemaVersion` nor copying only recognized fields is a migration. Update validators, writers, import/export and UI/AI consumers together when extending a schema. Do not add the configuration choices in this guide as unrecognized archive fields.
 
 ## ADB device discovery and registration

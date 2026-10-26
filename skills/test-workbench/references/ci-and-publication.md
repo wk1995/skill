@@ -4,6 +4,8 @@
 
 Read repository instructions and the requested ref's workflow definitions, reusable workflows, local actions, and scripts. Discover the actual target, channel, build mode, toolchain versions, signing requirements, artifact names, and retention. A workflow step called “Upload package” may mean GitHub artifact storage; inspect the action and destination.
 
+Resolve defaults from the user's explicit selection, then applicable project instructions, then the documented test-package mode; use Release only as the supported fallback. Discover test targets and platform destinations from actual configuration. A package-only run does not establish test execution. For App/firmware/schema/service combinations, apply [execution-quality.md](execution-quality.md#3-freeze-the-complete-tested-combination) to each participating component and verify installed/runtime identity before accepting integration results; the workflow checkout SHA identifies only the source it actually built.
+
 Before a remote write, verify `gh auth status`, `gh api user --jq '.login'`, and the intended repository. Do not print tokens or signing material. Inspect workflow inputs, environments and ref restrictions. Manual dispatch requires a dispatch-enabled workflow registered on the default branch; do not silently merge or modify branches to make it runnable. The selected workflow ref and any separate checkout/source input must both be understood.
 
 Typical discovery commands (fill in verified values):

@@ -2,7 +2,7 @@
 
 Language: **English** | [简体中文](README.zh-CN.md)
 
-`test-workbench` manages a reusable web testing process with standardized cases, execution records and revision-bound summaries. It organizes versions, plans, rounds, environments/devices, dependencies, next-test guidance, Issue evidence and annotations, and connects CI packages and PR changes across platforms when requested. Ordinary CI archives artifacts; external publication requires an explicit request. Current Skill version: `0.0.2`.
+`test-workbench` manages a reusable web testing process with standardized cases, execution records and revision-bound summaries. It organizes versions, plans, rounds, environments/devices, dependencies, next-test guidance, Issue evidence and annotations, and connects CI packages and PR changes across platforms when requested. Ordinary CI archives artifacts; external publication requires an explicit request. Current Skill version: `0.0.4`.
 
 ## How To Use It
 
@@ -21,7 +21,9 @@ Preserve our ADB device picker, historical-device associations, WebMCP tools and
 Keep our selected screenshot storage, one-file-per-round/current-result policy and conclusion-tab behavior instead of replacing them with starter defaults.
 ```
 
-Complete test-process or web-display requests deliver a working web workbench, reusing an existing implementation or adapting the bundled [template](assets/workbench/). Build-only requests produce artifacts. Installation, execution, environment deployment and external publication follow the requested scope. For variant-based builds, Release is the default when supported.
+Requests to implement a complete test process or web display deliver a working web workbench, reusing an existing implementation or adapting the bundled [template](assets/workbench/). Assessment/explanation requests return findings and examples; design requests return a proposal. They do not themselves start a site, CI, test-data writes or device operations. Build-only requests produce artifacts. Installation, execution, environment deployment and external publication follow the requested scope. Build defaults follow the explicit user choice, applicable project instructions and documented test-package mode, with Release as the supported fallback.
+
+Version 0.0.4 clarifies [execution quality and acceptance](references/execution-quality.md): check samples/scenarios and actual duration before accepting a pass, verify App/firmware/schema combinations, and retain required checks and applicable environments. Reuse existing runners with case-level result mapping, comparable measurements and project bench setup/cleanup. These are agent procedures; automatic report parsing, combination checks, sparse applicability, metric comparison and resource control require verified project adapters. The bundled runtime and persisted data formats remain unchanged, with no migration of old records.
 
 Version 0.0.2 adds [project integration procedures](references/project-integrations.md) for ADB device discovery, explicit imported-device identity associations, live AI/WebMCP operations, real GitHub PR comparison, selected local screenshot upload/preview and project storage/conclusion presentation. These procedures preserve existing project capabilities; the starter does not implement those adapters. Each requested adapter needs shared validation and actual verification before being reported available. Existing custom formats require an explicit migration adapter. One file per round is distinct from history retained inside it; an explicitly selected current-results-only policy must not be described as managed append-only history. Issue attachments remain the default for new integrations; existing local screenshot workflows are retained until a migration is requested.
 

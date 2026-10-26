@@ -21,9 +21,11 @@ Useful test types include smoke, functional, performance, compatibility, stabili
 
 Keep build checks and environment tests separate. A static compatibility check does not cover the corresponding runtime environment. One distribution channel does not cover another channel's identity or login flows. A short session does not cover a 90-minute background or overnight test. Record the required environment and duration instead of claiming equivalent coverage.
 
+Use [execution-quality.md](execution-quality.md) to make that boundary explicit: link requirements to required checks and independent oracles, verify the complete tested component combination, and check actual samples/scenario coverage before accepting runner output. Keep invalid attempts and incomplete required work visible. Store these details in supported case/observation text and linked evidence; do not invent JSON fields or new result enums. The starter's all-pairs environment model needs separate applicable scopes or a verified project adapter for a sparse matrix.
+
 ## Round preparation and history
 
-Use version → plan → round, permitting multiple plans per version and repeated rounds per plan. Reuse the existing template/data format when present; do not create another site for each case list. Complete test-process and visualization requests include a working web workbench; a case-only request may return a document or structured data.
+Use version → plan → round, permitting multiple plans per version and repeated rounds per plan. Reuse the existing template/data format when present; do not create another site for each case list. Requests to implement a complete test process or visualization include a working web workbench; a case-only request may return a document or structured data. Assessment, explanation and design requests deliver their requested findings/examples/proposal without starting implementation or execution.
 
 Prepare each round as an ordered union by stable case ID:
 

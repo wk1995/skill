@@ -4,6 +4,14 @@
 
 - No unreleased changes.
 
+## [0.0.4] - 2026-10-26
+
+- Change-Type: fix
+- Summary: Make existing evidence-based acceptance concrete: reject empty or incomplete runs as proof of a pass, verify the complete tested component combination, and retain requirement/check/environment coverage. Clarify assessment versus implementation scope and user/project/build-default precedence.
+- Compatibility: User-requested patch upgrade from 0.0.3 to 0.0.4. Preserves trigger boundaries, bundled runtime/UI, archive schema 1, workflow version 1, conclusion format/version, storage adapters, historical records and project integrations. Existing valid archives require no migration; no new persisted fields, statuses or universal device/measurement prerequisites are introduced.
+- Add focused execution-quality guidance for independent oracles, invalid-attempt handling and bounded retries, App/BT/ISP/schema provenance, case-level runner result mapping, compatible measurement baselines, observer/resource/cleanup sequencing and relevant cross-language protocol checks. Distinguish these agent procedures from adapters that need project implementation and verification; retain current all-pairs environment semantics and deterministic conclusions.
+- Align English/Chinese usage, reference routing and current-version documentation. Assessment requests return findings/examples without creating a website or operating devices. Product/runner fixes, test-data migration, CI dispatch and external publication remain within the separately requested stages.
+
 ## [0.0.3] - 2026-10-24
 
 - Change-Type: fix

@@ -3,7 +3,7 @@ name: test-workbench
 description: Manage a reusable web testing workbench with standardized cases, execution records and revision-bound summaries. Coordinate dependencies, next-test guidance, environments, Issue evidence, web/native annotations and repeat testing, using GitHub Issues by default or repository files. Connect exact CI packages and PR changes across platforms when requested; external publication requires an explicit request.
 metadata:
   sync_id: "android-ci-fir-test"
-  version: "0.0.3"
+  version: "0.0.4"
   triggering:
     include:
       - Build a test package through CI from a selected source ref for any platform or distribution channel.
@@ -25,13 +25,15 @@ Manage an executable, visible testing process with standardized case definitions
 
 ## Establish scope
 
-Inspect repository instructions, build/test configuration, workflows and any existing workbench. Determine the source ref, package target, build variant, PR/change set, environments and requested stages. Infer known inputs before asking. For variant-based builds default to `release` when supported; otherwise use the project's documented test-package mode.
+Match the requested stage: assessment/explanation returns findings and examples; design returns a concrete proposal; implementation updates the requested workbench; execution operates the selected cases. A request to assess or explain improvements does not itself request creating a website, changing test data, dispatching CI or operating devices. Continue an already authorized implementation or execution when the user asks an interim question.
+
+Inspect repository instructions, build/test configuration, workflows and any existing workbench. Determine the source ref, package target, build variant, PR/change set, environments and requested stages. Infer known inputs before asking. Resolve build defaults in order: explicit user choice → applicable project instructions → documented test-package mode → `release` when supported. Discover actual targets and supported runtimes from configuration; stale documentation or a familiar test command does not prove that a target exists or can run on the host.
 
 For a test-data/workbench task, select one authoritative source using [references/data-sources.md](references/data-sources.md): **GitHub Issues is the default for a new project**; **repository-tracked files** are the explicit alternative. Preserve an existing project's recorded choice unless a switch is requested. Both modes use the same case/execution state machines, dependencies, routing, annotations and flow graph. Browser storage and exports are caches/backups, not a third primary mode. Establish source identity and the actual read/write path before claiming a save; unavailable access or an absent adapter leaves that integration pending, never silently switches modes.
 
 A build-only request produces CI artifacts. A channel name, release variant or successful CI does not authorize external distribution. Publish only when explicitly requested or already authorized in a release flow. Installation, test-environment deployment, execution, source fixes and external website hosting follow the requested scope.
 
-For “完善测试流程”, “以网页展示测试”, or a complete package-to-regression workflow, include the web workbench as a deliverable. Reuse and improve the current workbench; when absent, adapt [assets/workbench/](assets/workbench/) using [references/web-workbench.md](references/web-workbench.md). Do not stop at a prose checklist or generate a new app for every round.
+When asked to implement “完善测试流程”, “以网页展示测试”, or a complete package-to-regression workflow, include the web workbench as a deliverable. Reuse and improve the current workbench; when absent, adapt [assets/workbench/](assets/workbench/) using [references/web-workbench.md](references/web-workbench.md). An assessment of those workflows stays an assessment. Do not stop an implementation at a prose checklist or generate a new app for every round.
 
 ## Preserve project integrations
 
@@ -45,6 +47,12 @@ Read [references/project-integrations.md](references/project-integrations.md) wh
 - Project-selected per-round single-file/current-result storage and conditional conclusion tabs. Preserve the selected history policy; do not silently compact managed event history or add historical snapshots against the user's instruction.
 
 These are integration procedures, not claims that the starter implements each adapter. Report implemented, verified and pending capabilities separately. Existing custom archives need an explicit format adapter; never rename their schema version or discard fields to make them pass the bundled validator. User-selected current-result archives retain their actual scope and must not be presented as managed append-only history.
+
+## Verify execution quality
+
+Read [references/execution-quality.md](references/execution-quality.md) when preparing or judging actual runs, importing automated results, comparing measurements or coordinating multiple components/devices. Apply only the relevant procedures. Confirm valid samples, required scenarios, actual duration and an independent observable result before accepting a pass; a zero exit code or success banner alone is insufficient. Preserve invalid attempts and observed failures separately, with the existing partial/blocked outcomes and bounded recovery.
+
+For multi-component tests, freeze and verify the actual App/firmware/service/schema combination, including installed read-back where available. Define which requirement each case verifies, its applicable environment, required checks and pass rule. Keep untested required work visible. Use compatible measurements and the project's real setup/listen/trigger/cleanup sequence. Reuse existing test runners through verified adapters; the starter does not automatically parse their reports, enforce component compatibility, filter case/environment pairs or manage bench resources. Keep these execution details in supported definition/record text and linked evidence until an explicit schema/adapter extension is implemented and verified.
 
 ## Package and verify
 
@@ -83,6 +91,6 @@ Read [references/test-rounds.md](references/test-rounds.md) for cases, environme
 
 ## Execute and report
 
-Execute the requested stages, preserving existing app/environment data. Distinguish unreliable automation from product defects. Report passed, failed, partial, blocked, skipped, running and untested cases, distinguishing round completion from all-pass. CI success, a different channel or a short run cannot replace the required environment/duration. For Android installation, optionally read [references/android-example.md](references/android-example.md).
+Execute the requested stages, preserving existing app/environment data. Apply [execution-quality.md](references/execution-quality.md) before accepting script output or comparing baselines. Distinguish unreliable automation from product defects. Report passed, failed, partial, blocked, skipped, running and untested cases, distinguishing round completion from all-pass. Report invalid/missing measurements and remaining required checks explicitly; do not invent a new persisted status or override computed conclusions. CI success, a different channel or a short run cannot replace the required environment/duration. For Android installation, optionally read [references/android-example.md](references/android-example.md).
 
 Handoff includes source SHA, target/variant/version, CI artifacts/retention, verification evidence, publication outcome if requested, and the web workbench URL when part of the task. Include the selected data-source mode and repository/Issue or file references, confirmed persistence versus pending changes, plan/round, environment, counts, defects/evidence and remaining coverage. A discovered defect authorizes a report, not an unrequested fix or PR.
