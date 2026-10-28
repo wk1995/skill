@@ -142,4 +142,127 @@ for command in ("initialize", "reuse", "tag"):
     assert payload["action"] == command and payload["version"] == "1.4.0", payload
 PY
 
+PYTHONDONTWRITEBYTECODE=1 python3 - "$ROOT" <<'PY'
+import os
+from pathlib import Path
+import re
+import shutil
+import subprocess
+import sys
+import tempfile
+
+root = Path(sys.argv[1])
+contract = (root / "skills/source-version-train/references/code-train-contract.md").read_text()
+# Run the actual documented check, so the distributed instructions are tested.
+checks = re.findall(r"```bash\n(verify_tagged_source\(\).*?)\n```", contract, re.S)
+assert len(checks) == 1, "expected one executable finalization check"
+bash = shutil.which("bash")
+assert bash
+env = os.environ.copy()
+env.update({
+    "GIT_CONFIG_GLOBAL": os.devnull,
+    "GIT_CONFIG_NOSYSTEM": "1",
+    "GIT_TERMINAL_PROMPT": "0",
+    "GIT_AUTHOR_NAME": "Train test",
+    "GIT_AUTHOR_EMAIL": "train@example.invalid",
+    "GIT_COMMITTER_NAME": "Train test",
+    "GIT_COMMITTER_EMAIL": "train@example.invalid",
+})
+
+
+def run(*args, cwd=None, input=None):
+    result = subprocess.run(args, cwd=cwd, env=env, input=input, text=True, capture_output=True)
+    assert result.returncode == 0, (args, result.stderr)
+    return result.stdout.strip()
+
+
+scenarios = [
+    ("fast-forward", True),
+    ("merge-commit", True),
+    ("later-default-descendant", True),
+    ("stale-local-tag", True),
+    ("unmerged", False),
+    ("squash", False),
+    ("rebase-and-merge", False),
+    ("cherry-pick", False),
+    ("wrong-remote-tag", False),
+    ("wrong-published-sha", False),
+    ("missing-tag", False),
+    ("missing-default", False),
+    ("unreachable-remote", False),
+    ("shallow", False),
+    ("missing-git", False),
+]
+for tag_kind in ("lightweight", "annotated"):
+    for scenario, expected in scenarios:
+        with tempfile.TemporaryDirectory(prefix="train-finalization-") as raw:
+            tmp = Path(raw)
+            remote, local = tmp / "remote.git", tmp / "local"
+            run("git", "init", "--bare", "-q", str(remote))
+            tree = run("git", "-C", str(remote), "mktree", input="")
+
+            def commit(message, *parents):
+                args = ["git", "-C", str(remote), "commit-tree", tree]
+                for parent in parents:
+                    args.extend(["-p", parent])
+                return run(*args, input=message + "\n")
+
+            base = commit("base")
+            candidate = commit("published", base)
+            advanced = commit("default advanced", base)
+            merged = commit("merge original candidate", advanced, candidate)
+            tips = {
+                "fast-forward": candidate,
+                "later-default-descendant": commit("later work", merged),
+                "unmerged": advanced,
+                # Equal trees deliberately cannot substitute for commit ancestry.
+                "squash": commit("squashed publication", advanced),
+                "rebase-and-merge": commit("rebased publication", advanced),
+                "cherry-pick": commit("cherry-picked publication", advanced),
+            }
+            if scenario != "missing-default":
+                run("git", "-C", str(remote), "update-ref", "refs/heads/trunk", tips.get(scenario, merged))
+            for branch in ("dev_1.4.0", "publish_1.4.0", "release-candidate/1.4.0/1"):
+                run("git", "-C", str(remote), "update-ref", f"refs/heads/{branch}", candidate)
+            if scenario != "missing-tag":
+                tagged = base if scenario == "wrong-remote-tag" else candidate
+                args = ["git", "-C", str(remote), "tag"]
+                if tag_kind == "annotated":
+                    args.extend(["-a", "-m", "published release"])
+                run(*args, "v1.4.0", tagged)
+
+            if scenario == "shallow":
+                run("git", "clone", "-q", "--depth=1", "--no-tags", "--branch", "trunk", remote.as_uri(), str(local))
+            else:
+                run("git", "init", "-q", str(local))
+                run("git", "-C", str(local), "remote", "add", "origin", str(remote))
+                run("git", "-C", str(local), "fetch", "-q", "--no-tags", "origin", "refs/heads/dev_1.4.0")
+                # Misleading local success evidence must not hide a remote failure.
+                run("git", "-C", str(local), "update-ref", "refs/heads/trunk", candidate)
+                run("git", "-C", str(local), "tag", "v1.4.0", base if scenario == "stale-local-tag" else candidate)
+
+            def refs(repo):
+                return run("git", "-C", str(repo), "for-each-ref", "--format=%(refname) %(objectname)", "refs/heads", "refs/tags")
+
+            before_remote, before_local = refs(remote), refs(local)
+            check_env = env.copy()
+            if scenario == "missing-git":
+                empty_bin = tmp / "empty-bin"
+                empty_bin.mkdir()
+                check_env["PATH"] = str(empty_bin)
+            remote_arg = str(tmp / "absent.git") if scenario == "unreachable-remote" else "origin"
+            expected_sha = base if scenario == "wrong-published-sha" else candidate
+            for attempt in range(2):
+                result = subprocess.run(
+                    [bash, "-c", checks[0] + '\nverify_tagged_source "$1" "$2" "$3" "$4"',
+                     "verify", remote_arg, "trunk", "v1.4.0", expected_sha],
+                    cwd=local, env=check_env, text=True, capture_output=True,
+                )
+                assert (result.returncode == 0) == expected, (tag_kind, scenario, attempt, result.stdout, result.stderr)
+                assert ("verified candidate=" in result.stdout) == expected, (scenario, result.stdout)
+                assert refs(remote) == before_remote, (scenario, "remote refs changed")
+                assert refs(local) == before_local, (scenario, "local branch or tag changed")
+            print(f"PASS: {tag_kind} {scenario} (repeat preserves branches and tags)")
+PY
+
 printf 'PASS: source-version-train script contracts\n'

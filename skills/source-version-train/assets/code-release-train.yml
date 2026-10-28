@@ -16,7 +16,8 @@ branches:
   publish_protected: true
   publish_direct_push: false
   # Hidden candidate created by rebasing the merged publish branch onto the
-  # default branch. It is removed after both success and failure.
+  # default branch. Remove after failure before tagging, or after verified
+  # finalization. Retain after tagging until ancestry verification passes.
   release_candidate_template: release-candidate/{version}/{attempt}
   release_candidate_visible: false
   delete_release_candidate_after_attempt: true
@@ -66,10 +67,18 @@ source_release:
   tag_after_publish: true
   merge_publish_to_default: true
   tag_exact_published_commit: true
+  # Enforce on the protected default-branch path before packaging/publication.
+  # A true fast-forward is allowed only when repository policy permits it.
+  default_merge_methods: [merge-commit, fast-forward]
+  reject_rewriting_default_merge: true # No squash, rebase-and-merge, or cherry-pick.
+  verify_remote_tag_matches_published_commit: true
+  verify_tag_ancestor_of_fetched_default: true
+  require_finalization_check_before_completion_and_cleanup: true
   # A failed merge after tagging keeps the tag and all branches, then continues
   # through a protected PR. The tag is not deleted or recreated.
   retain_tag_on_merge_failure: true
   retain_branches_on_merge_failure: true
+  retain_branches_on_finalization_check_failure: true
   recreate_tag_on_merge_failure: false
   # Delete dev_<version> only after the tag is verified and the default-branch
   # merge has succeeded. Keep it when publication fails so repair can start there.
