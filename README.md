@@ -99,31 +99,6 @@ Every Skill has a companion README with usage and trigger guidance. This table i
 | `sync-skills` | Use when linking, converting, synchronizing, inventorying, reporting, repairing Agent installs, versioning, auditing, or rolling back Skill copies across repository, project, machine-wide, or explicit external locations. | [README](skills/sync-skills/README.md) |
 <!-- skills-catalog:end -->
 
-## Build And Packaging Workflows
-
-Use [Build Pipeline Engineering](skills/build-pipeline-engineering/README.md) to configure, run, or troubleshoot distributable builds from a specific source tag or commit. It provides workflow guidance for these targets:
-
-| Target | Deliverables covered | Inputs to specify |
-| --- | --- | --- |
-| Android | APK, AAB, AAR | Module, build variant, signing requirements |
-| Windows | EXE installer, MSI, MSIX, portable ZIP | Windows version, architecture, installer or portable format, runtime and signing requirements |
-| Linux | DEB, RPM, AppImage, tar archive | Distribution/version, architecture, libc/runtime baseline, package format |
-| Plugins | JAR or the project's configured plugin package | Plugin module, toolchain, packaging entry point |
-
-Provide the repository, source ref, target environment, desired output, and upload destination. Existing project configuration supplies defaults; targets with build variants default to `release`, and GitHub Actions builds default to Actions Artifacts for output storage.
-
-Example requests to an Agent with the Skill available:
-
-```text
-Use build-pipeline-engineering to build this tag as a signed Android release AAB.
-Package this commit as a Windows x64 MSI and verify silent installation, upgrade, and uninstall.
-Package this tag for Ubuntu 22.04 amd64 as DEB and AppImage, then upload checksums and artifacts to GitHub Actions Artifacts.
-```
-
-The workflow records the resolved source SHA, build environment, manifest, SHA-256 checksums, signing status, and verification evidence. Windows/Linux installation checks use disposable target environments; unavailable checks are reported as unverified. Package selection, runtime dependencies, signing, and upgrade behavior are covered in the Skill's guide.
-
-For Android requirement branches, version integration, source-release PRs, and tags, use [Android Code Release Train](skills/android-code-release-train/README.md), then pass its exact source ref to the build workflow. Ordinary compile/test checks that retain no distributable output do not select the packaging Skill.
-
 ## Pull Request Review Gate
 
 Run `bash tests/pr-review-gate.sh origin/main` from a clean, committed worktree before declaring a PR ready, and follow the independent adversarial passes in the [PR review playbook](docs/pr-review-playbook.md). The `skill-catalog` required GitHub Actions check invokes the same gate before a PR can merge into `main`. It validates the complete PR diff and simulated merge, protects legacy `.skill-sync/` state until its [coordinated migration](docs/skill-sync-state-migration.md) is complete, rejects unexpected tracked ignored files, parses Python sources, and runs every repository validation test. New sync state defaults to an external XDG state directory. A green gate is necessary but does not replace path-identity, direct-entry-point, recursive-rule, dependency-degradation, and failure-state review. For internal branches it can still commit regenerated catalogs when `SKILL_CATALOG_TOKEN` is configured; fork PRs must commit both generated root READMEs themselves.
