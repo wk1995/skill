@@ -47,10 +47,17 @@ source_release:
   build_number_adjustment: after-rebase
   require_gates_after_rebase: true
   require_gates_after_build_number_adjustment: true
-  # No implementation means the interface passes. build-pipeline-engineering
-  # is the packaging implementation when that Skill is available.
+  # A repository-defined package must exist. Missing, failed, or never-run
+  # packages block the tag and default-branch merge. No defined package flow
+  # may merge without a tag. build-pipeline-engineering supplies packaging.
   package_implementation: build-pipeline-engineering
-  package_pass_without_implementation: true
+  package_evidence:
+    android: [apk, aab]
+    windows: [exe, msi, msix, zip]
+    macos: [dmg, pkg, app-zip]
+    ios: [ipa]
+  package_pass_without_definition: merge-without-tag
+  package_missing_defined_output: fail
   # GitHub Actions Artifacts is the only destination named by this Skill.
   default_publish_implementation: github-actions-artifacts
   publish_implementations: []

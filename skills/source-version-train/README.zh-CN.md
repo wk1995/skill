@@ -2,7 +2,7 @@
 
 语言：[English](README.md) | **中文**
 
-`source-version-train` 把需求分支送入 `dev_<version>` 和可见的 `publish_<version>` PR，再 rebase 成不可见的发布候选，然后调用打包和发布，通过后才打 Tag。没有打包实现时打包直接通过，有 `build-pipeline-engineering` 时由它打包。发布默认只发送到 GitHub Actions Artifacts。本 Skill 不点名其他发布渠道，也不实现签名、校验和、产物保留或某个目的地的上传。
+`source-version-train` 把需求分支送入 `dev_<version>` 和可见的 `publish_<version>` PR，再 rebase 成不可见的发布候选，然后调用打包和发布，通过后才打 Tag。先识别仓库声明的各平台产物。声明过的产物缺失、失败或从未运行，都会拦住 Tag 和合入默认分支。仓库完全没有打包流程时可以合入，但不能打 Tag。存在声明产物时，由可用的 `build-pipeline-engineering` 打包。全部声明产物都存在后，发布才默认发送到 GitHub Actions Artifacts。本 Skill 不点名其他发布渠道，也不实现签名、校验和、产物保留或某个目的地的上传。
 
 ## 如何使用
 
@@ -15,7 +15,7 @@
 将通过评审的代码提升到 publish_1.4.0，并完成源码 Tag。
 ```
 
-该 Skill 会解析默认分支，在版本确定前保留独立需求分支，检查 PR 就绪状态，并更新仓库内的版本元数据。集成分支只由 `integration_template` 决定，默认是 `dev_<version>`，例如 `dev_5.1.3`。PR 中可见的发布分支只由 `publish_template` 决定，默认是受保护的 `publish_<version>`，版本必须是 `x.x.x`，例如 `publish_5.1.3`。仓库可以替换这两个模板，但不会再叠加前缀；发布分支的修改只能经评审的 PR 进入，不能直接推送。`dev_<version>` 合入该分支后，先保留这次合并，再将结果 rebase 到默认分支，生成一条不可见的 release 候选分支。允许的构建号调整只发生在这条候选上，位于 rebase 之后、打包之前，并且必须重新通过检查。随后调用打包接口：没有实现即通过；存在 `build-pipeline-engineering` 时由它打包。发布默认只发送到 GitHub Actions Artifacts，不在本 Skill 中点名其他渠道。重试同一个提交时跳过已成功的目的地，只补发失败的目的地。无论发布成功或失败，这条不可见分支都会删除。只有通过时才打 Tag，并合并回默认分支。Tag 已创建但合入失败时，保留 Tag 和所有分支，从已有 Tag 继续，不重新打。`dev_<version>` 要保留到 Tag 校验通过且合入默认分支成功之后；发布失败时它仍然在，用来修复。完整约束见 [SKILL.md](SKILL.md)。
+该 Skill 会解析默认分支，在版本确定前保留独立需求分支，检查 PR 就绪状态，并更新仓库内的版本元数据。集成分支只由 `integration_template` 决定，默认是 `dev_<version>`，例如 `dev_5.1.3`。PR 中可见的发布分支只由 `publish_template` 决定，默认是受保护的 `publish_<version>`，版本必须是 `x.x.x`，例如 `publish_5.1.3`。仓库可以替换这两个模板，但不会再叠加前缀；发布分支的修改只能经评审的 PR 进入，不能直接推送。`dev_<version>` 合入该分支后，先保留这次合并，再将结果 rebase 到默认分支，生成一条不可见的 release 候选分支。允许的构建号调整只发生在这条候选上，位于 rebase 之后、打包之前，并且必须重新通过检查。随后调用打包接口。Android 产物是 `.apk` 或 `.aab`，Windows 是 `.exe`、`.msi`、`.msix` 或便携 `.zip`，macOS 是 `.dmg`、`.pkg` 或 `.app` 归档，iOS 是 `.ipa`。绿色任务如果没有对应产物文件，也算失败。存在声明产物时，由可用的 `build-pipeline-engineering` 产出。仓库没有打包流程时，候选可以合入且不打 Tag，并跳过发布。否则要等全部声明产物都存在，发布才默认发送到 GitHub Actions Artifacts，不在本 Skill 中点名其他渠道。重试同一个提交时跳过已成功的目的地，只补发失败的目的地。无论发布成功或失败，这条不可见分支都会删除。声明了产物时，两个接口都通过才打 Tag，再合并回默认分支。Tag 已创建但合入失败时，保留 Tag 和所有分支，从已有 Tag 继续，不重新打。`dev_<version>` 要保留到合入默认分支成功、且需要 Tag 时 Tag 已校验通过之后；打包或发布失败时它仍然在，用来修复。完整约束见 [SKILL.md](SKILL.md)。
 
 新建版本集成分支时，按仓库自身的版本规则初始化全部版本值；已有分支经过校验后复用，不重复递增。有项目流程脚本时使用统一入口，没有脚本时通过 Git 和版本文件操作完成同样的初始化。不要求特定脚本、版本编码公式、语言或分支命名。发布保留已初始化的目标版本；提前创建的发布分支从记录的默认分支基准提交创建。
 

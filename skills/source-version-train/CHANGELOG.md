@@ -4,7 +4,13 @@ All notable changes to this Skill are documented here.
 
 ## [Unreleased]
 
-- No unreleased changes.
+## [4.1.0] - 2026-10-28
+
+- Change-Type: breaking
+- Summary: Require each repository-defined platform package before tagging, and merge an undefined package flow without a tag.
+- Compatibility: The source train, hidden candidate, and immutable tag rules remain. Android is no longer the implied package type.
+- Breaking-Change: A green packaging workflow without its defined `.apk`, `.aab`, `.exe`, `.msi`, `.msix`, portable `.zip`, `.dmg`, `.pkg`, `.app` archive, or `.ipa` is a failure and blocks the default-branch merge. A repository that defines no package flow may merge, but it must not be tagged.
+- Migration: Declare the package outputs the repository owns. Treat a missing run and a failed run as the same gate failure. Remove any automation that tags a source-only repository or accepts a successful job with no package file.
 
 ## [4.0.0] - 2026-10-26
 
