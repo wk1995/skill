@@ -6,7 +6,7 @@ Personal Skills 是一个用于集中管理个人 Agent Skills 的 monorepo。�
 
 ## 当前状态
 
-- 已完成：仓库定位、通用 Skill 约定、声明式 Codex / WorkBuddy / WorkBuddy AI 适配器、确定性 Agent 构建和 PR 校验。
+- 已完成：仓库定位、通用 Skill 约定、声明式 Codex / WorkBuddy / WorkBuddy AI / DeepSeek Harness 适配器、确定性 Agent 构建和 PR 校验。
 - 规划中：共享管理包、CLI、MCP Server、安装、registry 发布和自动化发布流程。
 - 尚未提供：项目级可执行命令。本文中的命令均描述目标接口。
 
@@ -55,7 +55,10 @@ skill/
 |   |-- workbuddy/
 |   |   |-- adapter.json
 |   |   `-- SKILL.append.md
-|   `-- workbuddy-ai/
+|   |-- workbuddy-ai/
+|   |   |-- adapter.json
+|   |   `-- SKILL.append.md
+|   `-- dsh/
 |       |-- adapter.json
 |       `-- SKILL.append.md
 |-- scripts/
@@ -203,6 +206,7 @@ MCP Server 与 CLI 共享 `packages/core`，计划提供：
 python3 scripts/agent_build.py --list
 python3 scripts/agent_build.py --check
 python3 scripts/agent_build.py codex
+python3 scripts/agent_build.py dsh
 python3 scripts/agent_build.py workbuddy
 python3 scripts/agent_build.py workbuddy-ai
 ```
