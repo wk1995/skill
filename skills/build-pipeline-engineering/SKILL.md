@@ -15,7 +15,7 @@ metadata:
       - The task produces APK, AAB, AAR, JAR, Gradle plugin, native, mapping, metadata, checksum, or archive outputs from a specified source ref.
       - The user asks to build a signed Android package or store build outputs in GitHub Actions Artifacts or another explicit destination.
     exclude:
-      - The task selects Android requirements for a version, creates feature/dev/release branches or PRs, changes source version metadata, merges code, or creates release tags; use android-code-release-train for that source lifecycle.
+      - The task selects requirements for a version, creates feature, dev_<version>, or publish_<version> branches or PRs, changes source version metadata, merges code, or creates release tags; use source-version-train for that source lifecycle.
       - The request is a normal compile or test used only to validate a code edit and does not retain a distributable artifact.
       - The request only manages copies or metadata of Skills; use sync-skills instead.
 ---
@@ -39,7 +39,7 @@ Output:
 - Upload destination and retention evidence.
 - Source-ref-to-artifact traceability.
 
-If the required source ref, version commit, branch promotion, or tag does not exist, stop at that boundary and use `android-code-release-train` for an Android code train. Never create or modify a source branch, PR, version file, merge, or tag to make an artifact build proceed.
+If the required source ref, version commit, branch promotion, or tag does not exist, stop at that boundary and use `source-version-train` for the source train. Never create or modify a source branch, PR, version file, merge, or tag to make an artifact build proceed.
 
 ## Start Here
 
