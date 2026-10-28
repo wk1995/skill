@@ -15,6 +15,9 @@ branches:
   publish_template: publish_{version}
   publish_protected: true
   publish_direct_push: false
+  # Separate PR source for a protected default branch; the hidden candidate
+  # remains outside PRs. Start this branch from the exact recorded candidate.
+  finalization_template: finalize_{version}
   # Hidden candidate created by rebasing the merged publish branch onto the
   # default branch. Remove after failure before tagging, or after verified
   # finalization. Retain after tagging until ancestry verification passes.
@@ -38,11 +41,19 @@ code_gates:
   requirement: [lint, unit-test, compile-check]
   integration: [full-lint, full-unit-test, integration-test]
   publish: [publish-lint, publish-unit-test, source-review]
+  candidate: [publish-lint, publish-unit-test, source-review]
+  finalization: [publish-lint, publish-unit-test, source-review]
   required_reviewers: 1
 
 source_release:
   rebase_publish_onto_default: true
-  push_rebased_publish_branch: true
+  push_rebased_publish_branch: false
+  push_hidden_release_candidate: true
+  default_merge_requires_pr: true
+  resume_recorded_candidate_on_retry: true
+  check_existing_remote_tag_before_packaging: true
+  durable_attempt_record: required
+  retain_candidate_objects_and_packages_for_retry: true
   # Apply a permitted build-number change only on the hidden candidate,
   # after the rebase and before packaging, then require the gates again.
   build_number_adjustment: after-rebase
@@ -62,10 +73,13 @@ source_release:
   # GitHub Actions Artifacts is the only destination named by this Skill.
   default_publish_implementation: github-actions-artifacts
   publish_implementations: []
+  # A configured list replaces the fallback. One configured success passes
+  # under 'any'; repositories can explicitly require 'all'.
+  publish_success_policy: any
   # A retry of the same commit skips destinations already recorded as successful.
   publish_idempotent: true
   tag_after_publish: true
-  merge_publish_to_default: true
+  merge_candidate_to_default: true
   tag_exact_published_commit: true
   # Enforce on the protected default-branch path before packaging/publication.
   # A true fast-forward is allowed only when repository policy permits it.
@@ -84,6 +98,7 @@ source_release:
   # merge has succeeded. Keep it when publication fails so repair can start there.
   delete_integration_after_promotion: false
   delete_integration_after_default_merge: true
+  delete_finalization_after_verified_merge: true
   delete_visible_publish_branch: false
 
 # build-pipeline-engineering implements packaging. Each entry above names a

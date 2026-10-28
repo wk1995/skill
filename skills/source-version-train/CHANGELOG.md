@@ -4,6 +4,10 @@ All notable changes to this Skill are documented here.
 
 ## [Unreleased]
 
+- Clarify the separate protected finalization PR, correct the template's visible-branch push setting, and retain original candidate identity across publication retries and already-tagged resumes.
+- Apply the one-success publication policy consistently to configured destinations and require the sole fallback only when no destinations are configured.
+- Isolate remote tag/ancestry checks from fetch mappings, replacement refs, and grafts; cover unchanged refs and false-ancestry rejection with regression fixtures. Version remains `3.0.0` at the user's request.
+
 ## [3.0.0] - 2026-10-28
 
 - Change-Type: breaking

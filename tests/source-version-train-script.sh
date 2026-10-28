@@ -181,6 +181,12 @@ scenarios = [
     ("merge-commit", True),
     ("later-default-descendant", True),
     ("stale-local-tag", True),
+    ("fetch-map-heads", True),
+    ("fetch-map-tags", True),
+    ("fetch-prune-tags", True),
+    ("replace-ancestry", False),
+    ("graft-ancestry", False),
+    ("graft-env-ancestry", False),
     ("unmerged", False),
     ("squash", False),
     ("rebase-and-merge", False),
@@ -215,6 +221,9 @@ for tag_kind in ("lightweight", "annotated"):
                 "fast-forward": candidate,
                 "later-default-descendant": commit("later work", merged),
                 "unmerged": advanced,
+                "replace-ancestry": advanced,
+                "graft-ancestry": advanced,
+                "graft-env-ancestry": advanced,
                 # Equal trees deliberately cannot substitute for commit ancestry.
                 "squash": commit("squashed publication", advanced),
                 "rebase-and-merge": commit("rebased publication", advanced),
@@ -241,11 +250,33 @@ for tag_kind in ("lightweight", "annotated"):
                 run("git", "-C", str(local), "update-ref", "refs/heads/trunk", candidate)
                 run("git", "-C", str(local), "tag", "v1.4.0", base if scenario == "stale-local-tag" else candidate)
 
+            if scenario == "fetch-map-heads":
+                run("git", "-C", str(local), "config", "remote.origin.fetch", "+refs/heads/*:refs/heads/*")
+            if scenario == "fetch-map-tags":
+                run("git", "-C", str(local), "config", "remote.origin.fetch", "+refs/tags/*:refs/tags/*")
+            if scenario == "fetch-prune-tags":
+                run("git", "-C", str(local), "tag", "private-local", candidate)
+                run("git", "-C", str(local), "config", "fetch.prune", "true")
+                run("git", "-C", str(local), "config", "fetch.pruneTags", "true")
+            if scenario == "replace-ancestry":
+                run("git", "-C", str(local), "fetch", "-q", "--no-tags", "origin", "refs/heads/trunk")
+                forged = run("git", "-C", str(local), "commit-tree", tree, "-p", candidate, input="local replacement\n")
+                run("git", "-C", str(local), "replace", advanced, forged)
+                # The ordinary local traversal is false evidence for remote ancestry.
+                run("git", "-C", str(local), "merge-base", "--is-ancestor", candidate, advanced)
+            if scenario in ("graft-ancestry", "graft-env-ancestry"):
+                run("git", "-C", str(local), "fetch", "-q", "--no-tags", "origin", "refs/heads/trunk")
+                graft_file = local / ".git/info/grafts" if scenario == "graft-ancestry" else tmp / "custom-grafts"
+                graft_file.parent.mkdir(parents=True, exist_ok=True)
+                graft_file.write_text(f"{advanced} {candidate}\n")
+
             def refs(repo):
-                return run("git", "-C", str(repo), "for-each-ref", "--format=%(refname) %(objectname)", "refs/heads", "refs/tags")
+                return run("git", "-C", str(repo), "for-each-ref", "--format=%(refname) %(objectname)", "refs/heads", "refs/tags", "refs/replace")
 
             before_remote, before_local = refs(remote), refs(local)
             check_env = env.copy()
+            if scenario == "graft-env-ancestry":
+                check_env["GIT_GRAFT_FILE"] = str(graft_file)
             if scenario == "missing-git":
                 empty_bin = tmp / "empty-bin"
                 empty_bin.mkdir()
