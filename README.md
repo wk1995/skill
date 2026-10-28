@@ -8,7 +8,7 @@ Personal Skills is a monorepo for managing personal Agent Skills. Each Skill own
 
 - Done: repository purpose, portable Skill conventions, declarative Codex, WorkBuddy, WorkBuddy AI, and DeepSeek Harness adapters, deterministic Agent builds, and PR validation.
 - Planned: shared management packages, CLI, MCP server, installation, registry publishing, and release automation.
-- Not yet available: project-level executable commands. Commands shown in this README describe the target interface.
+- Available now: the Python catalog validator and Agent builder shown below. The project-level `skills ...` CLI commands remain planned interfaces.
 
 See [Agent Build Architecture](docs/agent-build-architecture.md) for the current adapter and version boundaries. The [original repository design](docs/superpowers/specs/2026-07-10-skill-management-architecture-design.md) remains as historical context.
 
@@ -98,6 +98,31 @@ Every Skill has a companion README with usage and trigger guidance. This table i
 | `source-version-train` | Orchestrate source code from a requirement branch through a visible publish PR, a hidden release candidate, packaging and publish interfaces, and an immutable source tag. Use for feature/bugfix branches, dev and publish PRs, code gates, version metadata, or source tags; do not use to implement packaging or a publish destination. | [README](skills/source-version-train/README.md) |
 | `sync-skills` | Use when linking, converting, synchronizing, inventorying, reporting, repairing Agent installs, versioning, auditing, or rolling back Skill copies across repository, project, machine-wide, or explicit external locations. | [README](skills/sync-skills/README.md) |
 <!-- skills-catalog:end -->
+
+## Build And Packaging Workflows
+
+Use [Build Pipeline Engineering](skills/build-pipeline-engineering/README.md) to configure, run, or troubleshoot distributable builds from a specific source tag or commit. It provides workflow guidance for these targets:
+
+| Target | Deliverables covered | Inputs to specify |
+| --- | --- | --- |
+| Android | APK, AAB, AAR | Module, build variant, signing requirements |
+| Windows | EXE installer, MSI, MSIX, portable ZIP | Windows version, architecture, installer or portable format, runtime and signing requirements |
+| Linux | DEB, RPM, AppImage, tar archive | Distribution/version, architecture, libc/runtime baseline, package format |
+| Plugins | JAR or the project's configured plugin package | Plugin module, toolchain, packaging entry point |
+
+Provide the repository, source ref, target environment, desired output, and upload destination. Existing project configuration supplies defaults; targets with build variants default to `release`, and GitHub Actions builds default to Actions Artifacts for output storage.
+
+Example requests to an Agent with the Skill available:
+
+```text
+Use build-pipeline-engineering to build this tag as a signed Android release AAB.
+Package this commit as a Windows x64 MSI and verify silent installation, upgrade, and uninstall.
+Package this tag for Ubuntu 22.04 amd64 as DEB and AppImage, then upload checksums and artifacts to GitHub Actions Artifacts.
+```
+
+The workflow records the resolved source SHA, build environment, manifest, SHA-256 checksums, signing status, and verification evidence. Windows/Linux installation checks use disposable target environments; unavailable checks are reported as unverified. Package selection, runtime dependencies, signing, and upgrade behavior are covered in the Skill's guide.
+
+For Android requirement branches, version integration, source-release PRs, and tags, use [Android Code Release Train](skills/android-code-release-train/README.md), then pass its exact source ref to the build workflow. Ordinary compile/test checks that retain no distributable output do not select the packaging Skill.
 
 ## Pull Request Review Gate
 

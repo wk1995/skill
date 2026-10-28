@@ -8,7 +8,7 @@ Personal Skills 是一个用于集中管理个人 Agent Skills 的 monorepo。�
 
 - 已完成：仓库定位、通用 Skill 约定、声明式 Codex / WorkBuddy / WorkBuddy AI / DeepSeek Harness 适配器、确定性 Agent 构建和 PR 校验。
 - 规划中：共享管理包、CLI、MCP Server、安装、registry 发布和自动化发布流程。
-- 尚未提供：项目级可执行命令。本文中的命令均描述目标接口。
+- 现在可用：下文列出的 Python 目录校验器和 Agent 构建器。项目级 `skills ...` CLI 命令仍为规划接口。
 
 当前适配层和版本边界见 [Agent Build 架构](docs/agent-build-architecture.md)；[最初的仓库设计](docs/superpowers/specs/2026-07-10-skill-management-architecture-design.md)保留为历史背景。
 
@@ -98,6 +98,31 @@ Agent Skills 规范只要求 `SKILL.md`，但本仓库额外要求双语使用�
 | `source-version-train` | `source-version-train` 把需求分支送入 `dev_<version>` 和可见的 `publish_<version>` PR，再 rebase 成不可见的发布候选，然后调用打包和发布，通过后才打 Tag。先识别仓库声明的各平台产物。声明过的产物缺失、失败或从未运行，都会拦住 Tag 和合入默认分支。仓库完全没有打包流程时可以合入，但不能打 Tag。存在声明产物时，由可用的 `build-pipeline-engineering` 打包。全部声明产物都存在后，发布才默认发送到 GitHub Actions Artifacts。本 Skill 不点名其他发布渠道，也不实现签名、校验和、产物保留或某个目的地的上传。 | [README](skills/source-version-train/README.zh-CN.md) |
 | `sync-skills` | `sync-skills` 用于管理同一个 Agent Skill 在本仓库、其他项目、本机 Agent 安装目录、生成的 Agent 构建产物和明确指定的外部位置中的等价副本。它会记录稳定身份、来源、版本、摘要、快照与审计时间；比较或同步副本；盘点 Builder 关系；并从可信构建修复已登记的 Agent 安装。 | [README](skills/sync-skills/README.zh-CN.md) |
 <!-- skills-catalog:end -->
+
+## 构建与打包工作流
+
+使用 [Build Pipeline Engineering](skills/build-pipeline-engineering/README.zh-CN.md) 从指定源码 Tag 或 commit 配置、执行或排查可分发构建。它为以下目标提供工作流指导：
+
+| 目标 | 覆盖的产物 | 需要指定的输入 |
+| --- | --- | --- |
+| Android | APK、AAB、AAR | 模块、build variant、签名要求 |
+| Windows | EXE 安装器、MSI、MSIX、便携 ZIP | Windows 版本、架构、安装包或便携格式、运行时与签名要求 |
+| Linux | DEB、RPM、AppImage、tar 归档 | 发行版及版本、架构、libc/运行时基线、包格式 |
+| 插件 | JAR 或项目已配置的插件包 | 插件模块、工具链、打包入口 |
+
+提供仓库、源码引用、目标环境、期望产物和上传目的地。已有项目配置提供默认值；支持 build variant 的目标默认使用 `release`，GitHub Actions 构建默认将输出保存到 Actions Artifacts。
+
+向已具备此 Skill 的 Agent 提出请求，例如：
+
+```text
+使用 build-pipeline-engineering 将这个 Tag 构建为已签名的 Android release AAB。
+将这个 commit 打包为 Windows x64 MSI，并验证静默安装、升级和卸载。
+将这个 Tag 打包为 Ubuntu 22.04 amd64 的 DEB 和 AppImage，再把校验和及产物上传到 GitHub Actions Artifacts。
+```
+
+工作流会记录解析后的源码 SHA、构建环境、manifest、SHA-256 校验和、签名状态和验证证据。Windows/Linux 安装检查在可丢弃的目标环境中执行；无法执行的检查会标记为未验证。包格式选择、运行依赖、签名和升级行为详见该 Skill 的使用说明。
+
+Android 需求分支、版本集成、源码发布 PR 和 Tag 使用 [Android Code Release Train](skills/android-code-release-train/README.zh-CN.md)，再将其确定的源码引用交给构建工作流。不保留可分发产物的普通编译或测试检查不触发打包 Skill。
 
 本机 Skill 清单与跨项目映射见 [Skill 关系报告 PRD](docs/skill-relationship-report-prd.zh-CN.md)、随仓库维护的[技术设计](docs/skill-relationship-report-technical-design.zh-CN.md)和[测试计划](docs/skill-relationship-report-test-plan.zh-CN.md)。实际生成的关系报告仍只保存在本机；当前机器可读契约见 [skill-relationships.schema.json](schemas/skill-relationships.schema.json)。 报告运行时契约以随 Skill 分发的[校验器](skills/sync-skills/scripts/validate_skill_relationship_report.py)为权威。JSON Schema 用作互操作文档；运行时只使用其共享状态词汇，不执行 Draft 2020-12 引擎。
 
