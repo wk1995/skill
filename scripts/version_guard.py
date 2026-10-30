@@ -218,8 +218,8 @@ def validate_release(base: Tree, result: Tree, old: Component | None, new: Compo
     declaration(body, "Summary", new.changelog)
     declaration(body, "Compatibility", new.changelog)
     if old is None:
-        require(change_type == "initial" and new.version in {"0.1.0", "1.0.0"},
-                f"{new.path}: new components require Change-Type: initial and version 0.1.0 or 1.0.0")
+        require(change_type == "initial" and new.version in {"0.0.1", "0.1.0", "1.0.0"},
+                f"{new.path}: new components require Change-Type: initial and version 0.0.1, 0.1.0 or 1.0.0")
     else:
         old_major, old_minor, old_patch = (int(part) for part in version_parts(old.version, old.path))
         new_major, new_minor, new_patch = (int(part) for part in version_parts(new.version, new.path))

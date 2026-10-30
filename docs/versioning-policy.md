@@ -69,7 +69,8 @@ document the result before choosing a level. Do not default to MAJOR to be safe.
 - For one release, aggregate pending changes and use the highest required level
   once. Three fixes plus one compatible feature mean at least
   `1.2.3 -> 1.3.0`. Do not bump once per commit.
-- A new experimental component starts at `0.1.0`; a component with an explicitly
+- A new experimental component starts at `0.1.0` by default; an explicitly
+  requested initial `0.0.1` is also supported. A component with an explicitly
   established stable contract may start at `1.0.0`.
 - This repository also protects documented compatibility during `0.x.x`:
   a fix is `0.2.3 -> 0.2.4`, a compatible feature is `0.2.3 -> 0.3.0`, and an
@@ -169,7 +170,7 @@ evidence; they also do not count as duplicate or previously released entries.
 | `feature` | MINOR + 1, PATCH = 0 | None |
 | `breaking` | MAJOR + 1, MINOR = PATCH = 0, including `0.x.x -> 1.0.0` | `Breaking-Change` (old/new behavior and affected consumers), `Migration` (steps) |
 | `stable` | Only `0.x.x -> 1.0.0` | `Stable-Contract`, `Readiness` |
-| `initial` | New component at `0.1.0` or `1.0.0` | For `1.0.0`: `Stable-Contract`, `Readiness` |
+| `initial` | New component at `0.0.1`, `0.1.0` or `1.0.0` | For `1.0.0`: `Stable-Contract`, `Readiness` |
 
 A release declared as `fix` cannot change `1.2.3` to `2.0.0`. Downgrades, skipped
 numbers, missing resets, duplicate or reused release headings, and missing

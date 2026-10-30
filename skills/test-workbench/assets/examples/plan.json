@@ -1,0 +1,89 @@
+{
+  "id": "EXAMPLE-PLAN",
+  "revision": 0,
+  "version": "example-product-1",
+  "title": "FORMAT EXAMPLE ONLY — not product evidence",
+  "source": "example-source-sha",
+  "build": "",
+  "pr": "",
+  "cases": [
+    {
+      "id": "LOGIN01",
+      "title": "Sign in with a valid fixture account",
+      "priority": "P0",
+      "types": [
+        "smoke",
+        "functional"
+      ],
+      "preconditions": "Disposable fixture account and service available",
+      "steps": "Enter fixture credentials and select Sign in",
+      "expected": "Home screen shows the fixture account",
+      "dependsOn": [],
+      "next": {
+        "passed": {
+          "action": "test",
+          "caseId": "PROFILE01",
+          "reason": "Check account details after login"
+        },
+        "failed": {
+          "action": "retry",
+          "caseId": "LOGIN01",
+          "reason": "Verify the fix while retaining this failure"
+        },
+        "partial": {
+          "action": "retry",
+          "caseId": "LOGIN01",
+          "reason": "Complete remaining checks"
+        },
+        "blocked": {
+          "action": "wait",
+          "reason": "Prerequisite unavailable",
+          "resumeWhen": "Fixture service and account are available"
+        },
+        "skipped": {
+          "action": "done",
+          "reason": "Explicitly excluded from this fixture round"
+        }
+      }
+    },
+    {
+      "id": "PROFILE01",
+      "title": "View the signed-in account profile",
+      "priority": "P1",
+      "types": [
+        "functional"
+      ],
+      "preconditions": "Logged in in this round/environment",
+      "steps": "Open Profile and inspect the fixture account details",
+      "expected": "Account details match the fixture",
+      "dependsOn": [
+        "LOGIN01"
+      ],
+      "next": {
+        "passed": {
+          "action": "done",
+          "reason": "This branch is covered"
+        },
+        "failed": {
+          "action": "retry",
+          "caseId": "PROFILE01",
+          "reason": "Verify the fix while retaining this failure"
+        },
+        "partial": {
+          "action": "retry",
+          "caseId": "PROFILE01",
+          "reason": "Complete remaining checks"
+        },
+        "blocked": {
+          "action": "wait",
+          "reason": "Prerequisite unavailable",
+          "resumeWhen": "Fixture service and account are available"
+        },
+        "skipped": {
+          "action": "done",
+          "reason": "Explicitly excluded from this fixture round"
+        }
+      }
+    }
+  ]
+}

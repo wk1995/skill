@@ -1,0 +1,37 @@
+<!doctype html><meta charset="utf-8"><title>Case dependencies</title>
+<h1>Isolated prerequisite and stale-result checks</h1><pre id="result">Running…</pre><iframe id="app" title="Dependency fixture" style="width:100%;height:850px"></iframe>
+<script type="module">
+import {openStore,read,update} from '../assets/workbench/store.mjs';
+import * as m from '../assets/workbench/model.mjs';
+const workspace=`dependencies-${crypto.randomUUID()}`,db=await openStore(`ci-package-test-workbench:${workspace}`),frame=document.getElementById('app'),output=document.getElementById('result'),lines=[];
+const require=(ok,message)=>{if(!ok)throw new Error(message);};
+async function until(fn){for(let i=0;i<300;i++){if(await fn()&&frame.contentDocument?.documentElement.dataset.busy!=='true')return;await new Promise(resolve=>setTimeout(resolve,20));}throw new Error('Timed out');}
+const fill=(form,name,value)=>{const input=form.elements.namedItem(name);input.value=value;input.dispatchEvent(new Event('input',{bubbles:true}));};
+let doc;
+const current=async()=>(await read(db)).rounds[0];
+const go=id=>{const button=[...doc.querySelectorAll('.case-row button')].find(button=>button.querySelector('.case-id')?.textContent.startsWith(`${id} ·`));require(button,`Missing ${id}`);button.click();};
+async function start(){fill(doc.getElementById('observation-form'),'tester','Fixture tester');require(!doc.getElementById('start-execution').disabled,'Start disabled');doc.getElementById('start-execution').click();await until(()=>doc.getElementById('start-execution').disabled);}
+async function finish(status='passed'){
+  const form=doc.getElementById('observation-form');fill(form,'tester','Fixture tester');fill(form,'status',status);fill(form,'notes','Actual fixture observation');fill(form,'issues','https://github.com/fixture/project/issues/12');form.querySelector('.primary').click();
+  const id=new URLSearchParams(frame.contentWindow.location.hash.slice(1)).get('case');await until(async()=>m.executionState(await current(),id,'e')===status);
+}
+try {
+  const original=await read(db),at='2026-10-22T01:00:00Z';
+  await update(db,original.revision,state=>{
+    const cases=[['PAY',['CART']],['CART',['LOGIN']],['LOGIN',[]]].map(([id,dependsOn])=>({id,title:`Fixture ${id}`,priority:'P0',types:id==='PAY'?['smoke']:['functional'],preconditions:'Fixture prerequisites',steps:`Execute ${id}`,expected:`Expected ${id}`,dependsOn,...(id!=='PAY'?{next:Object.fromEntries(m.RESULTS.map(status=>[status,{action:'test',caseId:id==='LOGIN'?'CART':'PAY',reason:'Continue dependent fixture'}]))}:{})}));
+    let s=m.importPlan(state,{id:'p',revision:0,version:'fixture',title:'Dependency fixture only',source:'fixture-sha',build:'',pr:'',cases});s=m.createRound(s,{id:'r',planId:'p',name:'Dependency fixture',createdAt:at,changedIds:[]});s=m.registerEnvironment(s,{id:'e',label:'Fixture browser',kind:'browser',configuration:'Disposable'});s=m.attachEnvironment(s,'r','e');s=m.transitionRound(s,'r',{id:'ready',action:'prepare',from:'draft',actor:'Fixture',at});s=m.transitionRound(s,'r',{id:'begin',action:'begin',from:'ready',actor:'Fixture',at});s.revision=state.revision+1;return s;
+  });
+  frame.src=`../assets/workbench/?workspace=${workspace}#plan=p&round=r&case=PAY&view=cases`;await until(()=>frame.contentDocument?.getElementById('environment'));doc=frame.contentDocument;const choice=doc.getElementById('environment');choice.value='e';choice.dispatchEvent(new Event('change'));
+  require(doc.getElementById('start-execution').disabled&&doc.querySelector('#next-test').textContent.includes('Execute LOGIN'),'Missing prerequisite did not block start or identify LOGIN');lines.push('PASS dependent start is disabled and concrete ancestor LOGIN is recommended');
+  const before=await read(db);doc.querySelector('#next-test button').click();require(JSON.stringify(await read(db))===JSON.stringify(before),'Prerequisite navigation changed data');lines.push('PASS prerequisite navigation is read-only and preserves environment');
+  await start();await finish();doc.querySelector('#next-test button').click();require(!doc.getElementById('start-execution').disabled,'LOGIN pass did not unlock CART');await start();await finish();doc.querySelector('#next-test button').click();require(!doc.getElementById('start-execution').disabled,'CART pass did not unlock PAY');lines.push('PASS same-environment passes unlock the dependency chain one case at a time');
+  await start();const old=structuredClone((await current()).observations);go('LOGIN');await start();await finish();go('PAY');
+  require(doc.getElementById('detail').textContent.includes('证据已变化')&&m.statusOf(await current(),'CART')==='blocked'&&m.statusOf(await current(),'PAY')==='blocked','Upstream change did not invalidate descendants');require(JSON.stringify((await current()).observations.slice(0,old.length))===JSON.stringify(old),'Upstream retest rewrote old observations');lines.push('PASS upstream retest propagates staleness without rewriting prior evidence');
+  const saved=await read(db),form=doc.getElementById('observation-form');fill(form,'tester','Fixture tester');fill(form,'status','passed');form.querySelector('.primary').click();await until(()=>doc.getElementById('message').classList.contains('error'));require(JSON.stringify(await read(db))===JSON.stringify(saved),'Stale dependent pass reached persistence');lines.push('PASS stale result is rejected before the IndexedDB mutation');
+  await finish('blocked');go('CART');await start();await finish();go('PAY');await start();await finish();require(m.inspectWorkflow(await current()).executions.every(entry=>entry.validPass),'Fresh retests did not restore valid passes');lines.push('PASS explicit block followed by fresh prerequisite/dependent retests restores validity');
+  const selection=doc.getElementById('round');selection.value='';selection.dispatchEvent(new Event('change'));go('PAY');doc.getElementById('cases-view').click();const editor=doc.querySelector('form.editor');editor.parentElement.open=true;
+  const originalState=await read(db);fill(editor,'dependsOn','PAY');editor.querySelector('button').click();await until(()=>doc.getElementById('message').classList.contains('error'));require(JSON.stringify(await read(db))===JSON.stringify(originalState),'Self dependency changed persistence');
+  fill(editor,'dependsOn','LOGIN');editor.querySelector('button').click();await until(async()=>(await read(db)).plans[0].cases.find(item=>item.id==='PAY').dependsOn[0]==='LOGIN');require((await current()).cases.find(item=>item.id==='PAY').dependsOn[0]==='CART','Library edit rewrote dependency snapshot');lines.push('PASS dependency editor rejects invalid graphs and preserves historical round definitions');
+  output.textContent=lines.join('\n')+'\nALL 7 DEPENDENCY CHECKS PASSED';
+}catch(error){output.textContent=lines.join('\n')+'\nFAIL '+error.stack;}finally{db.close();}
+</script>
