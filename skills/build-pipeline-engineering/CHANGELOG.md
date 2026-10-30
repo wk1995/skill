@@ -8,6 +8,10 @@ All notable changes to this Skill are documented here.
 
 ## [2.1.0] - 2026-09-10
 
+- Change-Type: feature
+- Summary: Extend build-pipeline-engineering from 2.0.0 to 2.1.0 with Windows and Linux distributable packaging workflows.
+- Compatibility: Existing Android and plugin workflows, immutable source-ref boundaries, variant defaults, and CI artifact destinations remain supported. Windows/Linux packaging adds compatible capabilities; no migration is required.
+
 - Added Windows EXE/MSI/MSIX and portable packaging, plus Linux DEB/RPM/AppImage/archive workflows, with target architecture, runtime dependencies, signing, and install/upgrade/uninstall verification.
 - Expanded build inputs and CI evidence for OS/distribution matrices, native versus cross-build constraints, and preservation of Linux file modes and symlinks in uploaded artifacts.
 - Added Windows/Linux packaging triggers and excluded standalone format/certificate explanations; preserved Android behavior, immutable source boundaries, and default CI artifact storage.
