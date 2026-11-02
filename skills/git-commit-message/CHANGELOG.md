@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+## [0.1.0] - 2026-11-02
+
+- Change-Type: feature
+- Summary: Add machine-level prefix configuration, placed before repository and AI prefixes, with repository switches for machine and repository groups. Machine prefixes are opt-in (`machine_prefix: false` by default); repository prefix values remain empty by default.
+- Compatibility: Compatible optional inputs since 0.0.1. Existing repository policies retain their output because machine prefixes require explicit opt-in. Both configuration files are validated before writes, including disabled groups. Shared machine/repository tokens are emitted once. Machine settings are outside Skill installations and are not copied between devices. No persisted format migration is required; installed standalone hooks need explicit replacement to use this release.
+
 ## [0.0.1] - 2026-11-02
 
 - Change-Type: initial

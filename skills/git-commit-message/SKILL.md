@@ -1,13 +1,13 @@
 ---
 name: git-commit-message
-description: Check and normalize Git commit messages with AI client, optional client version, and model attribution plus repository-specific prefixes. Use before executing git commit and when configuring or installing its commit-msg hook; do not use for Git reads, staging alone, or PR comments.
+description: Check and normalize Git commit messages with AI client, optional client version, and model attribution, opt-in machine prefixes, and repository-specific prefixes. Use before executing git commit and when configuring machine or repository policy or installing its commit-msg hook; do not use for Git reads, staging alone, or PR comments.
 metadata:
   sync_id: "git-commit-message"
-  version: "0.0.1"
+  version: "0.1.0"
   triggering:
     include:
       - Before an agent executes git commit, including amend and message-file commits.
-      - Install or configure automatic commit-message checks and repository-specific prefixes.
+      - Install or configure automatic commit-message checks, machine prefixes, and repository-specific prefixes.
     exclude:
       - Git reads, staging without committing, branch management, and push-only requests.
       - Formatting pull-request comments, reviews, or release notes.
@@ -15,9 +15,14 @@ metadata:
 
 # Git Commit Message
 
-Before a commit, read the target repository's `.git-commit-message.json` if it
-exists. Repository policy decides whether to add attribution, extra prefixes,
-or neither. Read [README.md](README.md) for configuration and commands.
+Before a commit, load machine prefixes from
+`$XDG_CONFIG_HOME/git-commit-message/config.json` (default
+`~/.config/git-commit-message/config.json`) and the target repository's
+`.git-commit-message.json`, when present. Machine prefixes default to an empty
+list and require repository `machine_prefix: true` to be used. Repository
+`extra_prefixes` also default to an empty list; `repo_prefix: false` disables
+them. `ai_prefix: false` disables attribution; `enabled: false` disables all
+prefix requirements. Read [README.md](README.md) for configuration and commands.
 The policy may be tracked for team sharing or kept untracked for local use;
 both are read identically. Version control participation is optional.
 
@@ -30,8 +35,15 @@ policy. Omit an unknown client or version; when attribution is enabled and the
 model is unknown, resolve it with the user before committing.
 
 The prefix is `[Client version][Model]`, `[Client][Model]`, or `[Model]`.
-Repository `extra_prefixes` come first. Keep the meaningful subject and body;
+Enabled machine prefixes come first, followed by enabled repository
+`extra_prefixes`, then the AI group. A shared machine/repository token appears
+once, at its first position. Keep the meaningful subject and body;
 do not replace existing project conventions with a different message style.
+
+Keep machine settings outside repositories and Skill directories so this
+device's marker is not distributed to other devices by Skill synchronization.
+Do not enable machine prefixes in a repository unless the user requests it.
+Both policy files are validated even when a prefix group is disabled.
 
 For the requested automatic behavior, run `scripts/commit_message.py install`
 against the selected repository. It installs a self-contained `commit-msg`

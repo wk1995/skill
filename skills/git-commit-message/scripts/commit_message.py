@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Repository-configured commit attribution; also usable as a standalone commit-msg hook."""
+"""Machine and repository commit prefixes; also a standalone commit-msg hook."""
 
 from __future__ import annotations
 
@@ -18,11 +18,14 @@ POLICY = ".git-commit-message.json"
 DEFAULTS = {
     "schema_version": 1,
     "enabled": True,
+    "machine_prefix": False,
+    "repo_prefix": True,
     "ai_prefix": True,
     "extra_prefixes": [],
     "mode": "fix",
     "skip_autosquash": True,
 }
+MACHINE_DEFAULTS = {"schema_version": 1, "extra_prefixes": []}
 
 
 class PolicyError(Exception):
@@ -73,20 +76,23 @@ def token(value: object, name: str) -> str:
     return value
 
 
-def policy(repo: Path) -> dict:
-    path = repo / POLICY
+def machine_policy_path() -> Path:
+    configured = os.environ.get("XDG_CONFIG_HOME")
+    root = Path(configured) if configured else Path.home() / ".config"
+    require(root.is_absolute(), "XDG_CONFIG_HOME must be an absolute path")
+    return root / "git-commit-message" / "config.json"
+
+
+def read_policy(path: Path, defaults: dict) -> dict:
     data = {}
     if path.exists() or path.is_symlink():
         regular(path)
         data = json.loads(path.read_text(encoding="utf-8"), object_pairs_hook=unique_object)
-    require(isinstance(data, dict), f"{POLICY} must contain a JSON object")
-    require(not (set(data) - set(DEFAULTS)), f"unknown {POLICY} keys: {set(data) - set(DEFAULTS)}")
-    result = {**DEFAULTS, **data}
+    require(isinstance(data, dict), f"{path} must contain a JSON object")
+    require(not (set(data) - set(defaults)), f"unknown {path} keys: {set(data) - set(defaults)}")
+    result = {**defaults, **data}
     require(type(result["schema_version"]) is int and result["schema_version"] == 1,
             "schema_version must be 1")
-    for key in ("enabled", "ai_prefix", "skip_autosquash"):
-        require(type(result[key]) is bool, f"{key} must be boolean")
-    require(result["mode"] in ("fix", "check"), "mode must be fix or check")
     prefixes = result["extra_prefixes"]
     require(isinstance(prefixes, list), "extra_prefixes must be an array")
     for value in prefixes:
@@ -95,8 +101,20 @@ def policy(repo: Path) -> dict:
     return result
 
 
+def policy(repo: Path) -> dict:
+    result = read_policy(repo / POLICY, DEFAULTS)
+    for key in ("enabled", "machine_prefix", "repo_prefix", "ai_prefix", "skip_autosquash"):
+        require(type(result[key]) is bool, f"{key} must be boolean")
+    require(result["mode"] in ("fix", "check"), "mode must be fix or check")
+    machine = read_policy(machine_policy_path(), MACHINE_DEFAULTS)
+    result["machine_prefixes"] = machine["extra_prefixes"]
+    return result
+
+
 def prefix_parts(config: dict) -> list[str]:
-    parts = list(config["extra_prefixes"])
+    machine = config["machine_prefixes"] if config["machine_prefix"] else []
+    project = config["extra_prefixes"] if config["repo_prefix"] else []
+    parts = list(dict.fromkeys([*machine, *project]))
     if config["ai_prefix"]:
         client = os.environ.get("AI_AGENT_CLIENT", "")
         version = os.environ.get("AI_AGENT_CLIENT_VERSION", "")
@@ -179,7 +197,7 @@ def atomic_write(path: Path, content: bytes, mode: int, *, replace: bool = True)
 def process(repo: Path, config: dict, message: Path, mode: str) -> None:
     regular(message)
     # Direct commands may receive any message file, but must not overwrite their policy or executable.
-    for protected in (repo / POLICY, Path(__file__)):
+    for protected in (repo / POLICY, machine_policy_path(), Path(__file__)):
         require(not protected.exists() or not message.samefile(protected),
                 f"message file aliases a protected input: {protected}")
     raw = message.read_bytes()

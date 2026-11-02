@@ -2,7 +2,7 @@
 
 语言：**简体中文** | [English](README.md)
 
-在执行 Git 提交前检查并规范提交信息，添加 AI 客户端、可选客户端版本和模型身份前缀，支持仓库额外前缀、仅检查模式及关闭约束。用于执行 git commit 前或配置、安装 commit-msg Hook；不用于 Git 只读操作、单独暂存或 PR 评论。
+在执行 Git 提交前检查并规范提交信息，添加 AI 客户端、可选客户端版本和模型身份前缀，支持按仓库开启的整机前缀、仓库额外前缀、分组开关、仅检查模式及关闭约束。用于执行 git commit 前或配置整机/仓库策略、安装 commit-msg Hook；不用于 Git 只读操作、单独暂存或 PR 评论。
 
 ## 如何使用
 
@@ -28,6 +28,18 @@ AI_AGENT_MODEL='example-model' git commit -m 'fix: 修复登录'
 
 身份由**每次执行时**的上述环境变量提供。未知客户端或版本直接省略；只有版本而没有客户端时忽略版本。启用 AI 前缀时，`AI_AGENT_MODEL` 必填，缺失会阻止提交，不猜测身份。安装不会保存身份。人工提交也会遇到已安装策略：应提供相应身份、配置 `ai_prefix: false` 或关闭策略，不能沿用之前 Agent 的身份。
 
+### 整机配置
+
+创建 `$XDG_CONFIG_HOME/git-commit-message/config.json`；若 `XDG_CONFIG_HOME` 未设置或为空，则使用 `~/.config/git-commit-message/config.json`。非空的 `XDG_CONFIG_HOME` 必须是绝对路径。同一台设备的所有 Agent 客户端共用该文件，每次执行重新读取：
+
+```json
+{"schema_version": 1, "extra_prefixes": ["work"]}
+```
+
+另一台设备可以配置成 `{"extra_prefixes": ["home"]}`。整机文件只接受 `schema_version` 和 `extra_prefixes`，两者均可省略；文件不存在时没有整机前缀。该文件放在仓库和 Skill 目录之外，不会随 Skill 同步到其他设备。
+
+**默认不添加整机前缀**，即使整机文件中已经配置 `work`。仓库须显式设置 `"machine_prefix": true` 才会使用。开启后的顺序固定为 `[整机前缀][仓库前缀][客户端 版本][模型]`。整机和仓库配置了相同值时，只在最前面的首次位置保留一次。
+
 ### 仓库自定义配置
 
 在工作区根目录创建 `.git-commit-message.json`。每次执行都会重新读取，在子目录和关联工作树中同样如此。**这个文件可以入库，也可以不入库**：入库后供团队共享；不入库时仅供本地使用，两种方式的读取和校验行为一致。仅本地使用时，可在 `git rev-parse --git-path info/exclude` 定位的本机忽略文件中加入 `/.git-commit-message.json`；团队也可以将该规则写入 `.gitignore`。忽略规则只影响尚未跟踪的文件。配置中只保存策略，不要存放会话身份。未配置时使用以下默认值：
@@ -36,6 +48,8 @@ AI_AGENT_MODEL='example-model' git commit -m 'fix: 修复登录'
 {
   "schema_version": 1,
   "enabled": true,
+  "machine_prefix": false,
+  "repo_prefix": true,
   "ai_prefix": true,
   "extra_prefixes": [],
   "mode": "fix",
@@ -46,12 +60,22 @@ AI_AGENT_MODEL='example-model' git commit -m 'fix: 修复登录'
 | 配置项 | 含义 |
 | --- | --- |
 | `enabled` | `false` 保留原消息，不要求身份。 |
+| `machine_prefix` | 默认 `false`；设为 `true` 后，将本设备整机前缀放在最前面。 |
+| `repo_prefix` | 默认 `true`；设为 `false` 后，不要求仓库 `extra_prefixes`。 |
 | `ai_prefix` | `false` 不要求 AI 客户端/模型前缀，也不要求身份。 |
-| `extra_prefixes` | 按顺序放在 AI 前缀之前的字符串，不写方括号。 |
+| `extra_prefixes` | 默认 `[]`，即没有仓库前缀；字符串不写方括号，顺序在整机前缀之后、AI 前缀之前。 |
 | `mode` | `fix` 自动规范前缀；`check` 仅检查，格式不符时拒绝且不修改消息。 |
 | `skip_autosquash` | 默认 `true`，跳过以 `fixup! `、`squash! `、`amend! ` 开头的标题，保留自动压缩的目标匹配。 |
 
-所有配置项均可省略。未知/重复键、错误类型、重复前缀值，以及前缀或身份中的方括号、控制字符、首尾空白都会被拒绝。即使 `enabled` 为 false，配置错误也不会放行。
+所有配置项均可省略。未知/重复键、错误类型、重复前缀值，以及前缀或身份中的方括号、控制字符、首尾空白都会被拒绝。即使 `enabled` 或某组开关为 false，两个配置文件的错误也不会放行。消息检查和 Hook 安装均不会修改配置文件。
+
+将整机 `work` 与可共享的项目标记叠加：
+
+```json
+{"machine_prefix": true, "extra_prefixes": ["PROJ-42"]}
+```
+
+结果：`[work][PROJ-42][Codex][example-model] fix: 修复登录`。同一仓库在家庭设备上会使用 `[home][PROJ-42]...`。仓库设为 `machine_prefix: false` 可仅保留项目和 AI 前缀；设为 `repo_prefix: false` 可关闭已配置的仓库前缀而无需删除列表；`ai_prefix` 独立控制 AI 组。
 
 需要额外项目标记：
 
@@ -101,7 +125,7 @@ python3 /absolute/path/to/commit_message.py hook "$1"
 
 - Agent 即将执行 `git commit`，包括 `--amend` 和 `-F`。
 - 安装、卸载、配置、检查或修正提交信息归属 Hook。
-- 为 Git 项目增加额外前缀，或按仓库关闭 AI 归属标记。
+- 配置整机前缀、按仓库开启整机标记，或分别关闭整机、仓库、AI 前缀组。
 
 ## 何时不触发
 

@@ -3,8 +3,9 @@
 Language: **English** | [简体中文](README.zh-CN.md)
 
 Check and normalize Git commit messages with AI client, optional client version,
-and model attribution plus repository-specific prefixes. Use before executing
-`git commit` and when configuring or installing its `commit-msg` hook; Git reads,
+and model attribution, opt-in machine prefixes, and repository-specific prefixes.
+Use before executing `git commit` and when configuring machine or repository
+policy or installing its `commit-msg` hook; Git reads,
 staging alone, and PR comments are outside its scope.
 
 ## How To Use It
@@ -44,6 +45,27 @@ commit instead of guessing. No identity is saved by installation. Human commits
 also encounter the installed policy: provide appropriate identity, configure
 `ai_prefix: false`, or disable the policy. Never reuse stale agent identity.
 
+### Machine Configuration
+
+Create `$XDG_CONFIG_HOME/git-commit-message/config.json`, or
+`~/.config/git-commit-message/config.json` when `XDG_CONFIG_HOME` is unset or
+empty. A nonempty `XDG_CONFIG_HOME` must be absolute. The same file serves all
+Agent clients on this device and is reloaded on every invocation:
+
+```json
+{"schema_version": 1, "extra_prefixes": ["work"]}
+```
+
+On another device, use `{"extra_prefixes": ["home"]}`. The machine file accepts
+only `schema_version` and `extra_prefixes`; both are optional. Missing files
+mean no machine prefixes. Keep it outside the repository and Skill directory;
+it is not included in Skill synchronization.
+
+**Machine prefixes are off by default**, even when this file exists. A
+repository must opt in with `"machine_prefix": true`. Enabled groups appear
+in this order: `[machine][repository][client version][model]`. Identical values
+shared by the machine and repository groups appear once at the first position.
+
 ### Repository Configuration
 
 Create `.git-commit-message.json` in the worktree root; it is reloaded on every
@@ -59,6 +81,8 @@ policy only, never per-session identity. No configuration means these defaults:
 {
   "schema_version": 1,
   "enabled": true,
+  "machine_prefix": false,
+  "repo_prefix": true,
   "ai_prefix": true,
   "extra_prefixes": [],
   "mode": "fix",
@@ -69,14 +93,29 @@ policy only, never per-session identity. No configuration means these defaults:
 | Key | Meaning |
 | --- | --- |
 | `enabled` | `false` leaves messages unchanged and requires no identity. |
+| `machine_prefix` | Default `false`; `true` adds this device's configured prefixes first. |
+| `repo_prefix` | Default `true`; `false` suppresses the repository's `extra_prefixes`. |
 | `ai_prefix` | `false` omits the AI client/model group and requires no identity. |
-| `extra_prefixes` | Ordered strings, without brackets; prepended before the AI group. |
+| `extra_prefixes` | Default `[]`; repository strings without brackets, after machine prefixes and before the AI group. |
 | `mode` | `fix` automatically normalizes prefixes; `check` rejects noncanonical messages without changing them. |
 | `skip_autosquash` | `true` exempts subjects beginning `fixup! `, `squash! `, or `amend! ` to preserve autosquash matching. |
 
 All keys are optional. Unknown/duplicate keys, invalid types, duplicate prefix
 values, brackets, control characters, or surrounding whitespace in tokens are
-rejected. Malformed configuration fails even when `enabled` is false.
+rejected. Both files are validated even when `enabled` or a group switch is
+false. Neither file is modified by message checks or hook installation.
+
+To combine this device's `work` marker with a shared project marker:
+
+```json
+{"machine_prefix": true, "extra_prefixes": ["PROJ-42"]}
+```
+
+Output: `[work][PROJ-42][Codex][example-model] fix: repair login`.
+The same repository on the home device produces `[home][PROJ-42]...` instead.
+Set `machine_prefix: false` to keep the project and AI groups only. Set
+`repo_prefix: false` to suppress configured repository values without deleting
+them. `ai_prefix` independently controls the AI group.
 
 For extra project prefixes:
 
@@ -162,7 +201,8 @@ and [autosquash message behavior](https://git-scm.com/docs/git-commit).
 
 - An agent is about to execute `git commit`, including `--amend` or `-F`.
 - Install, remove, configure, check, or fix commit-message attribution hooks.
-- Add repository prefixes or disable attribution for a particular Git project.
+- Configure machine prefixes, opt in per repository, or independently disable
+  machine, repository, or AI prefix groups.
 
 ## When It Does Not Trigger
 

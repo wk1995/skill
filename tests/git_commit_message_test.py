@@ -33,7 +33,11 @@ class CommitMessageTests(unittest.TestCase):
         self.env = {k: v for k, v in os.environ.items()
                     if not k.startswith(("GIT_", "AI_AGENT_"))}
         self.env.update(GIT_CONFIG_NOSYSTEM="1", GIT_CONFIG_GLOBAL=os.devnull,
-                        GIT_TERMINAL_PROMPT="0")
+                        GIT_TERMINAL_PROMPT="0", XDG_CONFIG_HOME=str(self.root / "config"))
+        self.machine = self.root / "config/git-commit-message/config.json"
+        isolated_config = patch.dict(os.environ, {"XDG_CONFIG_HOME": str(self.root / "config")})
+        isolated_config.start()
+        self.addCleanup(isolated_config.stop)
         self.git("init", "--template=", "-b", "main")
         self.git("config", "user.name", "Hook Test")
         self.git("config", "user.email", "hook-test@example.invalid")
@@ -64,6 +68,10 @@ class CommitMessageTests(unittest.TestCase):
     def policy(self, **values):
         (self.repo / module.POLICY).write_text(json.dumps(values), encoding="utf-8")
 
+    def machine_policy(self, **values):
+        self.machine.parent.mkdir(parents=True, exist_ok=True)
+        self.machine.write_text(json.dumps(values), encoding="utf-8")
+
     def commit(self, *args, **kwargs):
         # Disposable fixture identity and state are inspected before every commit.
         self.git("status", "--short", "--branch")
@@ -89,6 +97,149 @@ class CommitMessageTests(unittest.TestCase):
                 self.tool("fix", self.message, env=env)
                 self.tool("check", self.message, env=env)
                 self.assertEqual(self.message.read_bytes(), fixed)
+
+    def test_machine_is_opt_in_and_repository_prefixes_default_empty(self):
+        self.machine_policy(extra_prefixes=["work"])
+        self.tool("fix", self.message, env=self.identity())
+        self.assertEqual(self.message.read_text(),
+                         "[Test Agent 2.3.4][test-model] fix: login\n\nBody\nSigned-off-by: Test\n")
+        self.assertFalse((self.repo / module.POLICY).exists())
+        self.assertEqual(module.policy(self.repo)["extra_prefixes"], [])
+        self.assertFalse(module.policy(self.repo)["machine_prefix"])
+
+    def test_machine_repository_ai_switch_matrix(self):
+        self.machine_policy(extra_prefixes=["work"])
+        raw = b"fix: login\n\nBody\n"
+        for machine in (False, True):
+            for project in (False, True):
+                for ai in (False, True):
+                    with self.subTest(machine=machine, project=project, ai=ai):
+                        self.policy(machine_prefix=machine, repo_prefix=project,
+                                    ai_prefix=ai, extra_prefixes=["project"])
+                        self.message.write_bytes(raw)
+                        groups = (["work"] if machine else []) + (["project"] if project else [])
+                        if ai:
+                            groups.extend(["Test Agent 2.3.4", "test-model"])
+                        expected = ("".join(f"[{value}]" for value in groups) + " ").encode() + raw if groups else raw
+                        env = self.identity() if ai else self.env
+                        self.tool("check", self.message, env=env, ok=not groups)
+                        self.assertEqual(self.message.read_bytes(), raw)
+                        self.tool("fix", self.message, env=env)
+                        self.assertEqual(self.message.read_bytes(), expected)
+                        self.tool("hook", self.message, env=env)
+                        self.tool("check", self.message, env=env)
+                        self.assertEqual(self.message.read_bytes(), expected)
+
+    def test_shared_machine_repository_values_emitted_once_in_first_position(self):
+        self.machine_policy(extra_prefixes=["work", "shared"])
+        self.policy(machine_prefix=True, extra_prefixes=["shared", "project"])
+        self.message.write_text("[project][shared] [work] fix: login\n")
+        self.tool("hook", self.message, env=self.identity())
+        expected = "[work][shared][project][Test Agent 2.3.4][test-model] fix: login\n"
+        self.assertEqual(self.message.read_text(), expected)
+        self.tool("hook", self.message, env=self.identity())
+        self.assertEqual(self.message.read_text(), expected)
+
+    def test_machine_reload_check_only_and_global_disable(self):
+        self.machine_policy(extra_prefixes=["work"])
+        self.policy(machine_prefix=True, ai_prefix=False, mode="check")
+        raw = self.message.read_bytes()
+        self.tool("hook", self.message, ok=False)
+        self.assertEqual(self.message.read_bytes(), raw)
+        self.tool("fix", self.message)
+        self.tool("hook", self.message)
+        self.machine_policy(extra_prefixes=["home"])
+        self.message.write_bytes(raw)
+        self.tool("fix", self.message)
+        self.assertTrue(self.message.read_bytes().startswith(b"[home] "))
+        self.policy(enabled=False, machine_prefix=True, extra_prefixes=["project"])
+        self.message.write_bytes(raw)
+        self.tool("hook", self.message)
+        self.assertEqual(self.message.read_bytes(), raw)
+
+    def test_machine_invalid_configuration_blocks_all_commands_even_disabled(self):
+        self.tool("install")
+        self.machine.parent.mkdir(parents=True)
+        self.policy(enabled=False, machine_prefix=False)
+        hook_bytes = self.hook.read_bytes()
+        raw = self.message.read_bytes()
+        for value in ("{", "[]", '{"extra_prefixes":"work"}', '{"schema_version":true}',
+                      '{"extra_prefixes":["work","work"]}', '{"extra_prefixes":["[work]"]}',
+                      '{"extra_prefixes":[null]}', '{"enabled":false}',
+                      '{"extra_prefixes":[],"extra_prefixes":["work"]}'):
+            self.machine.write_text(value)
+            for command in ("install", "uninstall", "hook", "check", "fix"):
+                with self.subTest(config=value, command=command):
+                    args = () if command in ("install", "uninstall") else (self.message,)
+                    self.tool(command, *args, ok=False)
+                    self.assertEqual(self.hook.read_bytes(), hook_bytes)
+                    self.assertEqual(self.message.read_bytes(), raw)
+                    self.assertEqual(self.machine.read_text(), value)
+
+    def test_machine_config_symlink_hardlink_and_directory_rejected(self):
+        self.tool("install")
+        self.machine.parent.mkdir(parents=True)
+        external = self.root / "machine-original.json"
+        external.write_text('{"extra_prefixes":["work"]}')
+        for kind in ("symlink", "hardlink", "directory"):
+            if kind == "symlink":
+                self.machine.symlink_to(external)
+            elif kind == "hardlink":
+                os.link(external, self.machine)
+            else:
+                self.machine.mkdir()
+            for command in ("install", "uninstall", "hook", "check", "fix"):
+                args = () if command in ("install", "uninstall") else (self.message,)
+                self.tool(command, *args, env=self.identity(), ok=False)
+                self.assertTrue(self.hook.exists())
+                self.assertEqual(external.read_text(), '{"extra_prefixes":["work"]}')
+            self.machine.rmdir() if kind == "directory" else self.machine.unlink()
+
+    def test_machine_file_cannot_be_a_message_output_including_case_alias(self):
+        self.machine_policy(extra_prefixes=["work"])
+        before = self.machine.read_bytes()
+        alias = self.machine.with_name("CONFIG.JSON")
+        paths = [self.machine]
+        if alias.exists() and alias.samefile(self.machine):
+            paths.append(alias)
+        for path in paths:
+            for command in ("hook", "fix", "check"):
+                self.tool(command, path, env=self.identity(), ok=False)
+                self.assertEqual(self.machine.read_bytes(), before)
+
+    def test_xdg_path_resolution_empty_unset_and_relative_rejection(self):
+        fake_home = self.root / "home"
+        with patch.object(Path, "home", return_value=fake_home):
+            with patch.dict(os.environ, {"XDG_CONFIG_HOME": ""}):
+                self.assertEqual(module.machine_policy_path(), fake_home / ".config/git-commit-message/config.json")
+            with patch.dict(os.environ):
+                os.environ.pop("XDG_CONFIG_HOME", None)
+                self.assertEqual(module.machine_policy_path(), fake_home / ".config/git-commit-message/config.json")
+        self.tool("install")
+        before = self.hook.read_bytes()
+        raw = self.message.read_bytes()
+        env = {**self.identity(), "XDG_CONFIG_HOME": "relative/config"}
+        for command in ("install", "uninstall", "hook", "check", "fix"):
+            args = () if command in ("install", "uninstall") else (self.message,)
+            self.tool(command, *args, env=env, ok=False)
+            self.assertEqual(self.hook.read_bytes(), before)
+            self.assertEqual(self.message.read_bytes(), raw)
+
+    def test_real_commit_machine_prefix_opt_in_and_body_preservation(self):
+        self.machine_policy(extra_prefixes=["work"])
+        self.policy(machine_prefix=True, extra_prefixes=["project"])
+        self.tool("install")
+        machine_before = self.machine.read_bytes()
+        policy_before = (self.repo / module.POLICY).read_bytes()
+        self.commit("-F", self.message, env=self.identity())
+        result = self.git("log", "-1", "--format=%B").stdout
+        self.assertTrue(result.startswith(b"[work][project][Test Agent 2.3.4][test-model] fix: login\n"))
+        self.assertIn(b"Body\nSigned-off-by: Test", result)
+        self.assertEqual(self.machine.read_bytes(), machine_before)
+        self.assertEqual((self.repo / module.POLICY).read_bytes(), policy_before)
+        self.policy(machine_prefix=False, repo_prefix=False, ai_prefix=False, extra_prefixes=["project"])
+        self.commit("-m", "human subject")
+        self.assertEqual(self.git("log", "-1", "--format=%s").stdout.strip(), b"human subject")
 
     def test_extra_prefix_order_and_duplicates(self):
         self.policy(extra_prefixes=["PROJ-42", "backend"])
@@ -128,6 +279,7 @@ class CommitMessageTests(unittest.TestCase):
         configs = ["{", "[]", '{"enabled":false,"extra_prefixes":"x"}',
                    '{"enabled":false,"enabled":true}', '{"unknown":true}',
                    '{"enabled":0}', '{"ai_prefix":"false"}', '{"schema_version":true}',
+                   '{"machine_prefix":"true"}', '{"repo_prefix":1}',
                    '{"mode":"oops"}', '{"skip_autosquash":0}',
                    '{"extra_prefixes":["x","x"]}', '{"extra_prefixes":["[x]"]}',
                    '{"extra_prefixes":[null]}']
@@ -362,19 +514,23 @@ class CommitMessageTests(unittest.TestCase):
         self.assertNotIn(b"; comment", result)
 
     def test_standalone_copy_survives_source_deletion(self):
+        self.machine_policy(extra_prefixes=["work"])
+        self.policy(machine_prefix=True)
         source = self.root / "source.py"
         shutil.copyfile(TOOL, source)
         self.run_command([sys.executable, source, "install"])
         source.unlink()
         self.commit("-m", "standalone", env=self.identity())
-        self.assertIn(b"[test-model] standalone", self.git("log", "-1", "--format=%s").stdout)
+        self.assertEqual(self.git("log", "-1", "--format=%s").stdout.strip(),
+                         b"[work][Test Agent 2.3.4][test-model] standalone")
 
     def test_subdirectory_symlink_root_and_linked_worktree(self):
+        self.machine_policy(extra_prefixes=["work"])
         self.tool("install")
         self.commit("-m", "base", env=self.identity())
         linked = self.root / "linked worktree"
         self.git("worktree", "add", "-b", "other", linked)
-        (linked / module.POLICY).write_text('{"ai_prefix":false,"extra_prefixes":["linked"]}')
+        (linked / module.POLICY).write_text('{"machine_prefix":true,"ai_prefix":false,"extra_prefixes":["linked"]}')
         nested = linked / "nested"
         nested.mkdir()
         alias = self.root / "root alias"
@@ -385,7 +541,7 @@ class CommitMessageTests(unittest.TestCase):
         self.run_command([GIT, "config", "user.email"], cwd=nested)
         self.run_command([GIT, "commit", "--allow-empty", "-m", "linked subject"], cwd=nested)
         result = self.run_command([GIT, "log", "-1", "--format=%s"], cwd=linked)
-        self.assertEqual(result.stdout.strip(), b"[linked] linked subject")
+        self.assertEqual(result.stdout.strip(), b"[work][linked] linked subject")
         self.assertTrue(self.hook.exists())
 
     def test_missing_git_fails_before_any_mutation(self):
