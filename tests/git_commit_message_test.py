@@ -140,7 +140,7 @@ class CommitMessageTests(unittest.TestCase):
         self.tool("hook", self.message, env=self.identity())
         self.assertEqual(self.message.read_text(), expected)
 
-    def test_machine_reload_check_only_and_global_disable(self):
+    def test_machine_reload_check_only_and_all_groups_off(self):
         self.machine_policy(extra_prefixes=["work"])
         self.policy(machine_prefix=True, ai_prefix=False, mode="check")
         raw = self.message.read_bytes()
@@ -152,15 +152,46 @@ class CommitMessageTests(unittest.TestCase):
         self.message.write_bytes(raw)
         self.tool("fix", self.message)
         self.assertTrue(self.message.read_bytes().startswith(b"[home] "))
-        self.policy(enabled=False, machine_prefix=True, extra_prefixes=["project"])
+        self.policy(machine_prefix=False, repo_prefix=False, ai_prefix=False, extra_prefixes=["project"])
         self.message.write_bytes(raw)
         self.tool("hook", self.message)
         self.assertEqual(self.message.read_bytes(), raw)
 
+    def test_all_groups_off_preserves_arbitrary_bytes_without_identity(self):
+        self.machine_policy(extra_prefixes=["work"])
+        self.policy(machine_prefix=False, repo_prefix=False, ai_prefix=False,
+                    extra_prefixes=["project"], mode="check")
+        for raw in (b"", b"# comment\n", b"\xff\x00\n", b"subject\r\n\r\nBody\r\n"):
+            self.message.write_bytes(raw)
+            before = self.message.stat().st_mtime_ns
+            for command in ("hook", "fix", "check"):
+                self.tool(command, self.message)
+                self.assertEqual(self.message.read_bytes(), raw)
+                self.assertEqual(self.message.stat().st_mtime_ns, before)
+
+    def test_removed_enabled_rejected_before_every_entry_and_migration_succeeds(self):
+        self.tool("install")
+        before = self.hook.read_bytes()
+        raw = self.message.read_bytes()
+        for old_value in (True, False):
+            self.policy(enabled=old_value, machine_prefix=False, repo_prefix=False, ai_prefix=False)
+            config = (self.repo / module.POLICY).read_bytes()
+            for command in ("install", "uninstall", "hook", "fix", "check"):
+                args = () if command in ("install", "uninstall") else (self.message,)
+                result = self.tool(command, *args, ok=False)
+                self.assertIn(b"unknown", result.stderr)
+                self.assertIn(b"enabled", result.stderr)
+                self.assertEqual(self.hook.read_bytes(), before)
+                self.assertEqual(self.message.read_bytes(), raw)
+                self.assertEqual((self.repo / module.POLICY).read_bytes(), config)
+        self.policy(machine_prefix=False, repo_prefix=False, ai_prefix=False)
+        self.commit("-m", "migrated human message")
+        self.assertEqual(self.git("log", "-1", "--format=%s").stdout.strip(), b"migrated human message")
+
     def test_machine_invalid_configuration_blocks_all_commands_even_disabled(self):
         self.tool("install")
         self.machine.parent.mkdir(parents=True)
-        self.policy(enabled=False, machine_prefix=False)
+        self.policy(machine_prefix=False, repo_prefix=False, ai_prefix=False)
         hook_bytes = self.hook.read_bytes()
         raw = self.message.read_bytes()
         for value in ("{", "[]", '{"extra_prefixes":"work"}', '{"schema_version":true}',
@@ -253,7 +284,7 @@ class CommitMessageTests(unittest.TestCase):
         for config, expected in (
             ({"ai_prefix": False, "extra_prefixes": ["project"]}, b"[project] fix: login\n"),
             ({"ai_prefix": False}, b"fix: login\n"),
-            ({"enabled": False}, b"fix: login\n"),
+            ({"machine_prefix": False, "repo_prefix": False, "ai_prefix": False}, b"fix: login\n"),
         ):
             with self.subTest(config=config):
                 self.policy(**config)
@@ -293,7 +324,7 @@ class CommitMessageTests(unittest.TestCase):
                     self.assertEqual(self.message.read_bytes(), raw)
 
     def test_invalid_config_does_not_create_hooks_directory(self):
-        self.policy(enabled=False, mode="bad")
+        self.policy(machine_prefix=False, repo_prefix=False, ai_prefix=False, mode="bad")
         self.tool("install", ok=False)
         self.assertFalse(self.hook.parent.exists())
 
@@ -471,7 +502,7 @@ class CommitMessageTests(unittest.TestCase):
         self.commit("-m", "bad", env=self.identity(), ok=False)
         self.assertEqual(self.git("rev-parse", "HEAD").stdout, head)
         self.commit("-m", "[Test Agent 2.3.4][test-model] valid", env=self.identity())
-        self.policy(enabled=False)
+        self.policy(machine_prefix=False, repo_prefix=False, ai_prefix=False)
         self.commit("-m", "human commit")
         self.assertEqual(self.git("log", "-1", "--format=%s").stdout.strip(), b"human commit")
 
@@ -487,7 +518,7 @@ class CommitMessageTests(unittest.TestCase):
         self.tool("install")
         self.commit("-m", "must fail", ok=False)
         self.git("rev-parse", "--verify", "HEAD", ok=False)
-        self.policy(enabled=False, mode="invalid")
+        self.policy(machine_prefix=False, repo_prefix=False, ai_prefix=False, mode="invalid")
         self.commit("-m", "must fail", env=self.identity(), ok=False)
         self.git("rev-parse", "--verify", "HEAD", ok=False)
         self.policy(ai_prefix=False, extra_prefixes=["project"])

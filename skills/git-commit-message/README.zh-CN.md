@@ -47,7 +47,6 @@ AI_AGENT_MODEL='example-model' git commit -m 'fix: 修复登录'
 ```json
 {
   "schema_version": 1,
-  "enabled": true,
   "machine_prefix": false,
   "repo_prefix": true,
   "ai_prefix": true,
@@ -59,7 +58,6 @@ AI_AGENT_MODEL='example-model' git commit -m 'fix: 修复登录'
 
 | 配置项 | 含义 |
 | --- | --- |
-| `enabled` | `false` 保留原消息，不要求身份。 |
 | `machine_prefix` | 默认 `false`；设为 `true` 后，将本设备整机前缀放在最前面。 |
 | `repo_prefix` | 默认 `true`；设为 `false` 后，不要求仓库 `extra_prefixes`。 |
 | `ai_prefix` | `false` 不要求 AI 客户端/模型前缀，也不要求身份。 |
@@ -67,7 +65,7 @@ AI_AGENT_MODEL='example-model' git commit -m 'fix: 修复登录'
 | `mode` | `fix` 自动规范前缀；`check` 仅检查，格式不符时拒绝且不修改消息。 |
 | `skip_autosquash` | 默认 `true`，跳过以 `fixup! `、`squash! `、`amend! ` 开头的标题，保留自动压缩的目标匹配。 |
 
-所有配置项均可省略。未知/重复键、错误类型、重复前缀值，以及前缀或身份中的方括号、控制字符、首尾空白都会被拒绝。即使 `enabled` 或某组开关为 false，两个配置文件的错误也不会放行。消息检查和 Hook 安装均不会修改配置文件。
+所有配置项均可省略。未知/重复键、错误类型、重复前缀值，以及前缀或身份中的方括号、控制字符、首尾空白都会被拒绝。即使三个分组开关全部为 false，两个配置文件的错误也不会放行。消息检查和 Hook 安装均不会修改配置文件。
 
 将整机 `work` 与可共享的项目标记叠加：
 
@@ -91,7 +89,15 @@ AI_AGENT_MODEL='example-model' git commit -m 'fix: 修复登录'
 {"ai_prefix": false, "extra_prefixes": ["PROJ-42"]}
 ```
 
-完全不要求前缀：`{"enabled": false}`。也可使用 `{"ai_prefix": false, "extra_prefixes": []}`，仍检查有效标题但不添加前缀。关闭某种前缀只停止要求该前缀，不会自动删除已写入的前缀或改写历史。
+关闭所有消息格式化和身份要求时，将三个分组开关全部关闭：
+
+```json
+{"machine_prefix": false, "repo_prefix": false, "ai_prefix": false}
+```
+
+此时保留消息原始字节，但仍验证配置和文件安全性。也可使用 `{"ai_prefix": false, "extra_prefixes": []}`，仍检查有效标题但不添加前缀。关闭某种前缀只停止要求该前缀，不会自动删除已写入的前缀或改写历史。
+
+原来的 `enabled` 字段已在 1.0.0 删除，继续使用会被视为未知键而报错。旧 `{"enabled": false}` 改为上面的三个开关；旧 `"enabled": true` 直接删除该键，保留其他设置。
 
 ### 命令与已有 Hook
 

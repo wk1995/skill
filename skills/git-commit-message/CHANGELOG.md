@@ -2,6 +2,14 @@
 
 ## [Unreleased]
 
+## [1.0.0] - 2026-11-02
+
+- Change-Type: breaking
+- Summary: Remove the global enabled option. Machine, repository and AI prefix switches independently control formatting; when all three are false, message bytes are preserved and identity is not required.
+- Compatibility: Default machine opt-out, empty repository prefix list, prefix order and per-group behavior are unchanged. Configuration and file-safety validation still run with every group off. The machine configuration file is unchanged.
+- Breaking-Change: Previously, a repository could use {"enabled": false} to bypass message formatting. Now any enabled key is rejected as an unknown configuration key before a message or hook is changed. Existing repositories using that option must update their policy.
+- Migration: Replace enabled:false with machine_prefix:false, repo_prefix:false and ai_prefix:false. For enabled:true, delete enabled and retain the other settings. Update installed standalone hooks explicitly to use this release; no machine-config migration is required.
+
 ## [0.1.0] - 2026-11-02
 
 - Change-Type: feature

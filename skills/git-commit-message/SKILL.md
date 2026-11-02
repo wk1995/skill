@@ -3,7 +3,7 @@ name: git-commit-message
 description: Check and normalize Git commit messages with AI client, optional client version, and model attribution, opt-in machine prefixes, and repository-specific prefixes. Use before executing git commit and when configuring machine or repository policy or installing its commit-msg hook; do not use for Git reads, staging alone, or PR comments.
 metadata:
   sync_id: "git-commit-message"
-  version: "0.1.0"
+  version: "1.0.0"
   triggering:
     include:
       - Before an agent executes git commit, including amend and message-file commits.
@@ -21,8 +21,9 @@ Before a commit, load machine prefixes from
 `.git-commit-message.json`, when present. Machine prefixes default to an empty
 list and require repository `machine_prefix: true` to be used. Repository
 `extra_prefixes` also default to an empty list; `repo_prefix: false` disables
-them. `ai_prefix: false` disables attribution; `enabled: false` disables all
-prefix requirements. Read [README.md](README.md) for configuration and commands.
+them. `ai_prefix: false` disables attribution. When all three switches are
+false, leave message bytes unchanged without requiring identity. There is no
+global switch. Read [README.md](README.md) for configuration and commands.
 The policy may be tracked for team sharing or kept untracked for local use;
 both are read identically. Version control participation is optional.
 

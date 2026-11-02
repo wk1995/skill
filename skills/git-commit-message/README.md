@@ -80,7 +80,6 @@ policy only, never per-session identity. No configuration means these defaults:
 ```json
 {
   "schema_version": 1,
-  "enabled": true,
   "machine_prefix": false,
   "repo_prefix": true,
   "ai_prefix": true,
@@ -92,7 +91,6 @@ policy only, never per-session identity. No configuration means these defaults:
 
 | Key | Meaning |
 | --- | --- |
-| `enabled` | `false` leaves messages unchanged and requires no identity. |
 | `machine_prefix` | Default `false`; `true` adds this device's configured prefixes first. |
 | `repo_prefix` | Default `true`; `false` suppresses the repository's `extra_prefixes`. |
 | `ai_prefix` | `false` omits the AI client/model group and requires no identity. |
@@ -102,8 +100,8 @@ policy only, never per-session identity. No configuration means these defaults:
 
 All keys are optional. Unknown/duplicate keys, invalid types, duplicate prefix
 values, brackets, control characters, or surrounding whitespace in tokens are
-rejected. Both files are validated even when `enabled` or a group switch is
-false. Neither file is modified by message checks or hook installation.
+rejected. Both files are validated even when all group switches are false.
+Neither file is modified by message checks or hook installation.
 
 To combine this device's `work` marker with a shared project marker:
 
@@ -131,10 +129,22 @@ For **only** a project prefix, without AI attribution:
 {"ai_prefix": false, "extra_prefixes": ["PROJ-42"]}
 ```
 
-For no prefix requirements: `{"enabled": false}`. Alternatively,
+To disable all message formatting and identity requirements, turn off all three
+groups:
+
+```json
+{"machine_prefix": false, "repo_prefix": false, "ai_prefix": false}
+```
+
+This preserves the message bytes unchanged; file-safety and configuration
+validation still run. Alternatively,
 `{"ai_prefix": false, "extra_prefixes": []}` retains subject validation without
 adding anything. Disabling a prefix stops requiring it; it does not remove
 previously written prefixes or rewrite history.
+
+The former `enabled` field was removed in 1.0.0 and is rejected as an unknown
+key. Replace `{"enabled": false}` with the three switches above. For
+`"enabled": true`, remove that key and keep the remaining settings.
 
 ### Commands And Existing Hooks
 

@@ -17,7 +17,6 @@ import tempfile
 POLICY = ".git-commit-message.json"
 DEFAULTS = {
     "schema_version": 1,
-    "enabled": True,
     "machine_prefix": False,
     "repo_prefix": True,
     "ai_prefix": True,
@@ -103,7 +102,7 @@ def read_policy(path: Path, defaults: dict) -> dict:
 
 def policy(repo: Path) -> dict:
     result = read_policy(repo / POLICY, DEFAULTS)
-    for key in ("enabled", "machine_prefix", "repo_prefix", "ai_prefix", "skip_autosquash"):
+    for key in ("machine_prefix", "repo_prefix", "ai_prefix", "skip_autosquash"):
         require(type(result[key]) is bool, f"{key} must be boolean")
     require(result["mode"] in ("fix", "check"), "mode must be fix or check")
     machine = read_policy(machine_policy_path(), MACHINE_DEFAULTS)
@@ -142,7 +141,7 @@ def comment_prefix(repo: Path) -> str:
 
 
 def normalized(raw: bytes, repo: Path, config: dict) -> bytes:
-    if not config["enabled"]:
+    if not any(config[key] for key in ("machine_prefix", "repo_prefix", "ai_prefix")):
         return raw
     text = raw.decode("utf-8")
     require("\x00" not in text, "commit message must not contain NUL")
