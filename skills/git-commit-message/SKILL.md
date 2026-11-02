@@ -1,12 +1,13 @@
 ---
 name: git-commit-message
-description: Check and normalize Git commit messages with AI client, optional client version, and model attribution, opt-in machine prefixes, and repository-specific prefixes. Use before executing git commit and when configuring machine or repository policy or installing its commit-msg hook; do not use for Git reads, staging alone, or PR comments.
+description: Mandatory before every agent Git commit in any repository, including commit-and-push tasks, amend, message-file commits, and commits invoked through helpers. Check and normalize AI client/model attribution and optional machine/repository prefixes. Also use to configure policy or install its commit-msg hook; exclude read-only Git, staging alone, and push-only tasks.
 metadata:
   sync_id: "git-commit-message"
-  version: "1.0.0"
+  version: "1.0.1"
   triggering:
     include:
-      - Before an agent executes git commit, including amend and message-file commits.
+      - Before every agent-created Git commit in any repository, including amend, message-file commits, and helper-invoked commits.
+      - A commit step within a larger task, such as fix then commit and push or deploy, even when the user does not name this Skill.
       - Install or configure automatic commit-message checks, machine prefixes, and repository-specific prefixes.
     exclude:
       - Git reads, staging without committing, branch management, and push-only requests.
@@ -14,6 +15,22 @@ metadata:
 ---
 
 # Git Commit Message
+
+## Commit boundary: every repository
+
+Apply this Skill immediately before **each** agent-created commit, including a
+commit step reached later in a larger coding, push, or deployment task. Do not
+wait for the user to name the Skill. Recheck at the commit boundary even if the
+initial task did not mention Git. This applies in new repositories and existing
+clones, through shell commands or helper scripts, and on retries and amendments.
+
+A missing repository policy means the documented defaults apply; a missing Git
+hook means the agent must run the preflight itself. Neither is an exemption.
+Reading this Skill or adding attribution by hand is not a completed check.
+Execute the policy-aware preflight below before committing. Do not silently
+continue if the script is unavailable or the preflight fails.
+
+## Policy and identity
 
 Before a commit, load machine prefixes from
 `$XDG_CONFIG_HOME/git-commit-message/config.json` (default
@@ -53,12 +70,27 @@ when the user asks to enable these checks. Never overwrite another hook or
 change `core.hooksPath`: use the existing hook manager's integration point and
 invoke this script's `hook` command instead. Report any integration still needed.
 
-Before each agent commit, supply the current identity in that command's
-environment, even when a hook is already installed. If persistent installation
-was not requested, prepare the message in a temporary file, run `fix` (or
-`check` when repository mode is `check`), and pass that file to `git commit -F`.
-Do not let a one-off `fix` override a repository's check-only policy. Remove the
-temporary file afterward. Preserve explicitly requested commit semantics.
+## Required preflight before each commit
+
+1. Resolve the target repository, its policy, and the current session identity
+   as above. Prepare the intended subject and body in a temporary message file;
+   preserve requested amend, sign-off, and other commit semantics.
+2. Supply the current identity in the environment and execute
+   `python3 <skill-dir>/scripts/commit_message.py --repo <repository> hook <message-file>`.
+   The `hook` subcommand also works without an installed Git hook and selects
+   `fix` or `check` from repository policy. Run it even when a hook is installed;
+   do not replace it with an unconditional `fix` in a check-only repository.
+3. Only after exit status 0, commit that same file with `git commit -F`, supplying
+   the same current identity in the commit command's environment. If a helper
+   creates the commit, ensure it uses the checked message and identity; an
+   unchecked helper commit does not satisfy this gate.
+4. Remove the temporary file on success or failure. After a successful commit,
+   inspect `git log -1 --format=%B` against the checked message and effective
+   policy before pushing. Do not silently rewrite published history on mismatch.
+
+This preflight does not install a persistent hook. Install or integrate one
+only when automatic Git-level checks have been requested; keep the same
+per-invocation identity requirement.
 
 Configuration errors and missing required identity must stop before changing a
 message or installing a hook. Do not bypass a failed check with `--no-verify`

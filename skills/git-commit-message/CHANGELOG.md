@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+## [1.0.1] - 2026-11-02
+
+- Change-Type: fix
+- Summary: Put the existing every-repository, every-commit trigger first in discovery metadata, explicitly cover commit steps inside larger tasks and helper calls, and require an executed policy-aware preflight even without a Git hook. Add Codex metadata explicitly allowing implicit invocation.
+- Compatibility: Compatible correction to the existing pre-commit requirement. Configuration defaults, prefix formatting, CLI, autosquash exceptions, and explicit opt-in hook installation are unchanged. No identity is persisted and no migration is required. Skill discovery remains client-controlled; this release does not claim Git-level enforcement without hook installation.
+
 ## [1.0.0] - 2026-11-02
 
 - Change-Type: breaking

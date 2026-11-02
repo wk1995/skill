@@ -4,9 +4,11 @@ Language: **English** | [简体中文](README.zh-CN.md)
 
 Check and normalize Git commit messages with AI client, optional client version,
 and model attribution, opt-in machine prefixes, and repository-specific prefixes.
-Use before executing `git commit` and when configuring machine or repository
-policy or installing its `commit-msg` hook; Git reads,
-staging alone, and PR comments are outside its scope.
+Apply before **every agent-created commit in any repository**, including commit
+steps inside a larger fix, push, or deployment task, amendments, and helper
+commands. Also use when configuring machine or repository policy or installing
+its `commit-msg` hook; Git reads, staging alone, and PR comments are outside its
+scope.
 
 ## How To Use It
 
@@ -14,6 +16,35 @@ Ask your agent: “Before committing, apply git-commit-message using this sessio
 client, version when known, and model.” Or: “Enable automatic commit-message
 checks here; add the project prefix PROJ-42.” See [SKILL.md](SKILL.md) for the
 agent workflow and safety boundaries.
+
+Agents must run the preflight for every commit even when neither a repository
+policy nor a Git hook exists. Missing policy uses the defaults. For a one-off
+commit, set `tool` to this Skill's `scripts/commit_message.py`, then use the
+policy-aware `hook` command directly; it does not install anything:
+
+```sh
+(
+  set -eu
+  message_file=$(mktemp)
+  trap 'rm -f "$message_file"' EXIT
+  printf '%s\n' 'fix: repair login' > "$message_file"
+  # Example identity only: replace with trusted current session values.
+  export AI_AGENT_CLIENT='Codex' AI_AGENT_MODEL='example-model'
+  python3 "$tool" --repo "$PWD" hook "$message_file"
+  git commit -F "$message_file"
+)
+```
+
+`hook` respects the repository's `mode`: fix by default, reject without editing
+in check mode. Run it even with an installed hook, pass the checked message and
+current identity to the commit, and inspect the resulting message before pushing.
+A failed preflight stops the commit. See [SKILL.md](SKILL.md) for the required
+procedure and identity rules.
+
+Automatic Skill selection depends on the client loading and selecting the Skill.
+The Codex build explicitly allows implicit invocation; this is not a guarantee
+that a client will select it. An installed Git hook provides a separate local
+commit-time check. Updating this Skill does not install hooks across repositories.
 
 The portable Skill provides instructions; installing it in a Skill directory
 alone does **not** register a Git hook. Install the hook once in each clone for

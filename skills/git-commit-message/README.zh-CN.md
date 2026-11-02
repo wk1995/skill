@@ -2,11 +2,30 @@
 
 语言：**简体中文** | [English](README.md)
 
-在执行 Git 提交前检查并规范提交信息，添加 AI 客户端、可选客户端版本和模型身份前缀，支持按仓库开启的整机前缀、仓库额外前缀、分组开关、仅检查模式及关闭约束。用于执行 git commit 前或配置整机/仓库策略、安装 commit-msg Hook；不用于 Git 只读操作、单独暂存或 PR 评论。
+每个仓库的每次 Agent Git 提交前都必须执行提交信息检查，包括“修复后提交并推送/部署”中的提交步骤、amend 和辅助脚本提交，无需用户点名。支持 AI 客户端/模型署名、可选整机与仓库前缀，以及策略和 commit-msg Hook 配置；不用于 Git 只读操作、单独暂存或只推送已有提交。
 
 ## 如何使用
 
 可以对 Agent 说：“提交前使用 git-commit-message，带上本次会话的客户端、已知版本和模型。”或：“为当前仓库启用提交信息自动检查，再加一个 PROJ-42 前缀。”详细操作与边界见 [SKILL.md](SKILL.md)。
+
+没有仓库策略文件、没有安装 Git Hook，都不能跳过 Agent 提交前检查；缺少策略时按默认值执行。单次提交可将 `tool` 设为本 Skill 的 `scripts/commit_message.py`，直接调用遵循仓库策略的 `hook` 子命令，它不会安装 Hook：
+
+```sh
+(
+  set -eu
+  message_file=$(mktemp)
+  trap 'rm -f "$message_file"' EXIT
+  printf '%s\n' 'fix: 修复登录' > "$message_file"
+  # 这里只是示例身份；须替换为当前会话的可信值。
+  export AI_AGENT_CLIENT='Codex' AI_AGENT_MODEL='example-model'
+  python3 "$tool" --repo "$PWD" hook "$message_file"
+  git commit -F "$message_file"
+)
+```
+
+`hook` 遵循仓库 `mode`：默认修正；仅检查模式下格式不符即失败且不改消息。即使已经安装 Hook，Agent 也须执行这一步，再以同一份消息和当前身份提交，推送前核对实际提交信息。检查失败必须停止提交。完整流程和身份规则见 [SKILL.md](SKILL.md)。
+
+Skill 自动选择依赖客户端加载并选用它。Codex 构建显式允许隐式调用，但不能保证客户端每次都会选中；已安装的 Git Hook 提供独立的本地提交检查。升级 Skill 不会给所有仓库自动安装 Hook。
 
 便携 Skill 提供 Agent 指令；仅将 Skill 放进发现目录，**不会**注册 Git Hook。每个克隆安装一次 Hook 后，终端等方式执行提交也会自动触发。运行环境需要 `PATH` 上可用的 Python 3.10+ 和 Git 2.45+（macOS/Linux，原生 Windows 未验证）。在目标工作区操作，将 `tool` 变量设为本 Skill 内 `scripts/commit_message.py` 的绝对路径：
 
@@ -129,7 +148,8 @@ python3 /absolute/path/to/commit_message.py hook "$1"
 
 ## 何时触发
 
-- Agent 即将执行 `git commit`，包括 `--amend` 和 `-F`。
+- 任何仓库的每次 Agent 提交，包括 `--amend`、`-F` 和通过辅助脚本执行的提交。
+- “修复后提交并推送”“提交后部署”等组合任务中的提交步骤，无需用户显式点名 Skill。
 - 安装、卸载、配置、检查或修正提交信息归属 Hook。
 - 配置整机前缀、按仓库开启整机标记，或分别关闭整机、仓库、AI 前缀组。
 
