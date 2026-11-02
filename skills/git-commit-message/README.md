@@ -47,9 +47,13 @@ also encounter the installed policy: provide appropriate identity, configure
 ### Repository Configuration
 
 Create `.git-commit-message.json` in the worktree root; it is reloaded on every
-invocation, including from subdirectories and linked worktrees. It may be
-committed for the team, but contains policy only, never per-session identity.
-No configuration means these defaults:
+invocation, including from subdirectories and linked worktrees. Version control
+is optional: commit it to share the policy with the team, or keep it untracked
+for local use. Both work identically. For local use, add
+`/.git-commit-message.json` to the local exclude file located by
+`git rev-parse --git-path info/exclude`; a team may instead put that rule in
+`.gitignore`. Ignore rules apply only to untracked files. The file contains
+policy only, never per-session identity. No configuration means these defaults:
 
 ```json
 {

@@ -3,7 +3,7 @@ name: git-commit-message
 description: Check and normalize Git commit messages with AI client, optional client version, and model attribution plus repository-specific prefixes. Use before executing git commit and when configuring or installing its commit-msg hook; do not use for Git reads, staging alone, or PR comments.
 metadata:
   sync_id: "git-commit-message"
-  version: "0.1.0"
+  version: "0.0.1"
   triggering:
     include:
       - Before an agent executes git commit, including amend and message-file commits.
@@ -18,6 +18,8 @@ metadata:
 Before a commit, read the target repository's `.git-commit-message.json` if it
 exists. Repository policy decides whether to add attribution, extra prefixes,
 or neither. Read [README.md](README.md) for configuration and commands.
+The policy may be tracked for team sharing or kept untracked for local use;
+both are read identically. Version control participation is optional.
 
 Resolve the **current** client, its version, and model from trusted session
 metadata or a verified host command. Supply these per invocation through

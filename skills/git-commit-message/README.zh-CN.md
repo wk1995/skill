@@ -30,7 +30,7 @@ AI_AGENT_MODEL='example-model' git commit -m 'fix: 修复登录'
 
 ### 仓库自定义配置
 
-在工作区根目录创建 `.git-commit-message.json`。每次执行都会重新读取，在子目录和关联工作树中同样如此。可将策略提交给团队共享，但不要把会话身份存进去。未配置时使用以下默认值：
+在工作区根目录创建 `.git-commit-message.json`。每次执行都会重新读取，在子目录和关联工作树中同样如此。**这个文件可以入库，也可以不入库**：入库后供团队共享；不入库时仅供本地使用，两种方式的读取和校验行为一致。仅本地使用时，可在 `git rev-parse --git-path info/exclude` 定位的本机忽略文件中加入 `/.git-commit-message.json`；团队也可以将该规则写入 `.gitignore`。忽略规则只影响尚未跟踪的文件。配置中只保存策略，不要存放会话身份。未配置时使用以下默认值：
 
 ```json
 {
