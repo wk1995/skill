@@ -16,7 +16,7 @@ from pathlib import Path, PurePosixPath
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "skills" / "sync-skills" / "scripts"))
-from skill_provenance import git_source, input_digest  # noqa: E402
+from skill_provenance import git_source, ignored_input, input_digest, output_modes  # noqa: E402
 
 SKILLS_DIR = ROOT / "skills"
 PLATFORMS_DIR = ROOT / "platforms"
@@ -176,9 +176,7 @@ def copy_tree(
         if (
             relative.parts[0] in skipped_top
             or any(part in skipped_names for part in relative.parts)
-            or any(part in TRANSIENT_DIRECTORY_NAMES for part in relative.parts[:-1])
-            or path.name in TRANSIENT_FILE_NAMES
-            or path.suffix in TRANSIENT_SUFFIXES
+            or ignored_input(relative)
             or is_local_skill_policy(source, relative)
         ):
             continue
@@ -237,9 +235,7 @@ def digest_tree(root: Path, *, skip_top: set[str] | None = None) -> str:
         relative_path = path.relative_to(root)
         if (
             (skip_top and relative_path.parts[0] in skip_top)
-            or any(part in TRANSIENT_DIRECTORY_NAMES for part in relative_path.parts[:-1])
-            or path.name in TRANSIENT_FILE_NAMES
-            or path.suffix in TRANSIENT_SUFFIXES
+            or ignored_input(relative_path)
             or is_local_skill_policy(root, relative_path)
         ):
             continue
@@ -312,7 +308,7 @@ def build(platform: str, skill_names: list[str], output_arg: str | None, force: 
 
         skills_root = staging / relative_path(config["skills_path"], "skills_path", allow_dot=True)
         skills_root.mkdir(parents=True, exist_ok=True)
-        manifest_skills: list[dict[str, str]] = []
+        manifest_skills: list[dict[str, object]] = []
         for skill_dir, name, sync_id, version in skills:
             target = skills_root / name
             copy_tree(skill_dir, target, skip_top={"agent-builds"})
@@ -348,6 +344,7 @@ def build(platform: str, skill_names: list[str], output_arg: str | None, force: 
                 "portable_digest": digest_tree(skill_dir, skip_top={"agent-builds"}),
                 "output_digest": digest_tree(target),
                 "input_digest": fingerprints[sync_id],
+                "output_modes": output_modes(target, sync_id),
                 "path": (relative_path(config["skills_path"], "skills_path", allow_dot=True) / name).as_posix(),
             })
 

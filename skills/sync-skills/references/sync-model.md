@@ -56,15 +56,17 @@ Install equivalence includes file execute bits, checked separately from the unch
 ## Build Freshness And Test Installs
 
 New manifest-v2 builds add a top-level `source` record (Git URL, commit, branch,
-default branch, dirty state and channel) and per-Skill `input_digest`. This
+default branch, dirty state and channel) and per-Skill `input_digest` plus generated-file `output_modes`. This
 fingerprint includes portable files, Agent overrides, adapter files, builder code and execute
 bits. Source metadata stays in the build manifest and external registry, outside
 portable Skill inputs. `mainline` means a clean configured default-branch checkout;
 it does not certify an official release. Missing Git or unavailable default-branch
 metadata never proves mainline provenance.
 
-Repair verifies current portable and input digests before every mutation,
-including an already-current registry update. Legacy builds remain readable for
+The relationship report exposes optional `input_digest` and `current_input_digest` evidence and marks mismatches `agent-build-stale`, including in strict mode. Malformed input evidence or artifact execute bits differing from `output_modes` invalidate the Agent build before any partial records can be consumed. Recursive `.git`, `.DS_Store`, cache and distribution paths share one exclusion rule across copy, digest, fingerprint and mode checks.
+
+Repair verifies generated modes and current portable and input digests before every mutation,
+including an already-current registry update. Legacy builds without input or mode evidence remain readable for
 inventory but must be rebuilt before repair. A stale build cannot be authorized
 by `--discard-local-changes` or `--allow-development`. Switching branches requires
 checking the selected current source and rebuilding when inputs differ.
@@ -207,3 +209,5 @@ Documentation-only Skills can be copied after validation. Skills with executable
 - binaries or archives in `assets/`
 
 Before enabling or syncing executable content from an untrusted source, report the source path, version, digest, executable entrypoints, and permissions implied by extension metadata.
+
+New Agent snapshots include `original_modes`; snapshot creation verifies copied modes and rollback rejects mode drift before writes. Legacy snapshots without this evidence retain their previous compatibility behavior.

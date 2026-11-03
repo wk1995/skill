@@ -311,6 +311,7 @@ class ReviewRegressions(unittest.TestCase):
     def test_invalid_manifest_fields_report_without_aborting(self):
         original = self.manifest_path.read_text()
         invalid = {"portable_digest": ["not-a-digest", None, [], "A" * 64],
+                   "input_digest": ["not-a-digest", None, [], "A" * 64],
                    "output_digest": [False, ""], "core_version": ["bad", 1],
                    "path": ["../alpha", "", ".", "/tmp/alpha", "skills//alpha", "skills\\alpha", 1],
                    "sync_id": ["Bad ID", []], "name": [None]}
@@ -325,6 +326,170 @@ class ReviewRegressions(unittest.TestCase):
                     self.assertTrue(all(not s["agent_builds"]["codex"]["present"] for s in report["skills"]))
         self.manifest_path.write_text(original)
         self.assertFalse(self.report()["issues"])
+
+    def test_report_and_repair_agree_on_input_freshness(self):
+        skill = self.project / "skills/alpha"
+        for path in [skill / "agent-builds/codex/override.txt",
+                     self.project / "platforms/codex/CHANGELOG.md",
+                     self.project / "scripts/agent_build.py"]:
+            with self.subTest(path=path):
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_text((path.read_text() if path.exists() else "") + "changed\n")
+                report = self.report()
+                alpha = next(s for s in report["skills"] if s["sync_id"] == "alpha")
+                self.assertIn("agent-build-stale", alpha["statuses"])
+                self.assertEqual(self.run_cli("relationships", "--strict")[0], 2)
+                self.assertNotEqual(alpha["agent_builds"]["codex"]["input_digest"],
+                                    alpha["agent_builds"]["codex"]["current_input_digest"])
+                with self.assertRaisesRegex(SystemExit, "stale or legacy"):
+                    self.repair()
+                builder.build("codex", [], None, True)
+                self.repair()
+                self.assertNotIn("agent-build-stale", self.report()["skills"][0]["statuses"])
+                self.assertEqual(self.repair()[1]["status"], "already-current")
+                self.assertEqual(self.run_cli("relationships", "--strict")[0], 0)
+
+        script = skill / "run.sh"
+        script.write_text("#!/bin/sh\nexit 0\n")
+        script.chmod(0o644)
+        builder.build("codex", [], None, True)
+        self.repair()
+        script.chmod(0o755)
+        report = self.report()
+        self.assertIn("agent-build-stale", report["skills"][0]["statuses"])
+        invalid = copy.deepcopy(report)
+        invalid["skills"][0]["statuses"] = ["synced"]
+        with self.assertRaisesRegex(rel.RelationshipError, "must contain agent-build-stale"):
+            rel.validate_contract(invalid)
+        invalid = copy.deepcopy(report)
+        invalid["skills"][0]["agent_builds"]["codex"].pop("input_digest")
+        with self.assertRaisesRegex(rel.RelationshipError, "current_input_digest requires input_digest"):
+            rel.validate_contract(invalid)
+        builder.build("codex", [], None, True)
+        self.repair()
+        self.assertEqual(self.run_cli("relationships", "--strict")[0], 0)
+
+    def test_artifact_execute_bit_corruption_rejected_before_repair_mutation(self):
+        skill = self.project / "skills/alpha"
+        for relative in ["run.sh", "scripts/nested/run.sh", "agent-builds/codex/override.sh"]:
+            src = skill / relative
+            src.parent.mkdir(parents=True, exist_ok=True)
+            src.write_text("#!/bin/sh\nexit 0\n")
+            src.chmod(0o755)
+        builder.build("codex", [], None, True)
+        self.repair()
+        for relative in ["run.sh", "scripts/nested/run.sh", "override.sh"]:
+            artifact = self.project / "dist/codex/skills/alpha" / relative
+            artifact.chmod(0o644)
+            before = (self.state / "registry.json").read_bytes()
+            snapshots = self.snapshot_names()
+            with self.subTest(relative=relative), self.assertRaisesRegex(SystemExit, "no trusted"):
+                self.repair()
+            self.assertEqual((self.state / "registry.json").read_bytes(), before)
+            self.assertEqual(self.snapshot_names(), snapshots)
+            self.assertEqual((self.target / relative).stat().st_mode & 0o111, 0o111)
+            self.assertTrue(any(i["code"] == "agent-build-invalid" for i in self.report()["issues"]))
+            builder.build("codex", [], None, True)
+            self.assertEqual(self.repair()[1]["status"], "already-current")
+
+    def test_recursive_transients_are_excluded_across_build_report_repair_and_rollback(self):
+        override = self.project / "skills/alpha/agent-builds/codex"
+        excluded = [".git", "nested/.git", "other/.git/run.sh", ".DS_Store/run.sh", "nested/.DS_Store/run.sh"]
+        included = [".git-hooks/run.sh", ".DS_Store-data/run.sh", "nested/run.sh"]
+        for relative in excluded + included:
+            path = override / relative
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text("old")
+        builder.build("codex", [], None, True)
+        self.repair()
+        for relative in excluded:
+            self.assertFalse((self.target / relative).exists())
+            (override / relative).write_text("new")
+        self.assertEqual(self.repair()[1]["status"], "already-current")
+        self.assertNotIn("agent-build-stale", self.report()["skills"][0]["statuses"])
+        for relative in included:
+            path = override / relative
+            self.assertEqual((self.target / relative).read_text(), "old")
+            path.write_text("new")
+            before = (self.state / "registry.json").read_bytes()
+            snapshots = self.snapshot_names()
+            with self.subTest(relative=relative), self.assertRaisesRegex(SystemExit, "stale or legacy"):
+                self.repair()
+            self.assertEqual((self.state / "registry.json").read_bytes(), before)
+            self.assertEqual(self.snapshot_names(), snapshots)
+            builder.build("codex", [], None, True)
+            repaired = self.repair()[1]
+            self.assertEqual((self.target / relative).read_text(), "new")
+            self.assertEqual(self.repair()[1]["status"], "already-current")
+            self.run_cli("rollback", "alpha", "--snapshot", repaired["snapshot"], "--roles", "local")
+            self.assertEqual((self.target / relative).read_text(), "old")
+            self.repair()
+
+    def test_later_invalid_mode_record_cannot_supply_partial_builds(self):
+        original = self.manifest_path.read_text()
+        before = (self.state / "registry.json").read_bytes()
+        for value in (None, [], {"SKILL.md": False}, {"SKILL.md": 0o777}):
+            manifest = json.loads(original)
+            manifest["skills"][1]["output_modes"] = value
+            self.manifest_path.write_text(json.dumps(manifest))
+            with self.subTest(value=value), self.assertRaisesRegex(SystemExit, "no trusted"):
+                self.repair()
+            self.assertEqual((self.state / "registry.json").read_bytes(), before)
+            self.assertFalse(self.snapshot_names())
+            self.assertTrue(all(not s["agent_builds"]["codex"]["present"] for s in self.report()["skills"]))
+        self.manifest_path.write_text(original)
+        self.assertEqual(self.repair()[1]["status"], "already-current")
+
+    def test_snapshot_mode_corruption_rejected_before_rollback_mutation(self):
+        src = self.project / "skills/alpha/scripts/run.sh"
+        src.parent.mkdir()
+        src.write_text("#!/bin/sh\nexit 0\n")
+        src.chmod(0o755)
+        builder.build("codex", [], None, True)
+        self.repair()
+        installed = self.target / "scripts/run.sh"
+        installed.chmod(0o644)
+        repaired = self.repair()[1]
+        payload = self.state / "snapshots/alpha" / repaired["snapshot"] / "local-codex/scripts/run.sh"
+        payload.chmod(0o755)
+        before = (self.state / "registry.json").read_bytes()
+        snapshots = self.snapshot_names()
+        argv = ("rollback", "alpha", "--snapshot", repaired["snapshot"], "--roles", "local")
+        with self.assertRaisesRegex(SystemExit, "snapshot failed executable permission verification"):
+            self.run_cli(*argv)
+        self.assertEqual((self.state / "registry.json").read_bytes(), before)
+        self.assertEqual(self.snapshot_names(), snapshots)
+        self.assertEqual(installed.stat().st_mode & 0o111, 0o111)
+        payload.chmod(0o644)
+        self.run_cli(*argv)
+        self.assertEqual(installed.stat().st_mode & 0o111, 0)
+        snapshots = self.snapshot_names()
+        self.assertEqual(self.run_cli(*argv)[1]["status"], "already-current")
+        self.assertEqual(self.snapshot_names(), snapshots)
+
+    def test_new_commands_run_from_every_distributed_adapter_without_git(self):
+        for adapter in sorted((ROOT / "platforms").glob("*/adapter.json")):
+            agent = adapter.parent.name
+            output = self.root / "artifacts" / agent
+            subprocess.run([sys.executable, str(ROOT / "scripts/agent_build.py"), agent,
+                            "--skill", "sync-skills", "--output", str(output)],
+                           check=True, capture_output=True)
+            manifest = json.loads((output / ".agent-build.json").read_text())
+            built = output / manifest["skills"][0]["path"]
+            script = built / "scripts/skill_sync.py"
+            environment = dict(os.environ, PATH="", PYTHONPATH="", PYTHONDONTWRITEBYTECODE="1")
+            (self.target / "LOCAL.txt").write_text(agent)
+            argv = [sys.executable, "-S", str(script), "--project-root", str(self.project),
+                    "--state-dir", str(self.state), "repair-agent-install", "alpha", "--agent", "codex",
+                    "--allow-development", "--discard-local-changes"]
+            first = subprocess.run(argv, cwd=self.root, env=environment, capture_output=True, text=True)
+            self.assertEqual(first.returncode, 0, first.stderr)
+            self.assertEqual(json.loads(first.stdout)["status"], "reinstalled")
+            snapshots = self.snapshot_names()
+            second = subprocess.run(argv, cwd=self.root, env=environment, capture_output=True, text=True)
+            self.assertEqual(second.returncode, 0, second.stderr)
+            self.assertEqual(json.loads(second.stdout)["status"], "already-current")
+            self.assertEqual(self.snapshot_names(), snapshots)
 
     def test_corrupt_manifest_cannot_supply_repair(self):
         (self.target / "LOCAL.txt").write_text("preserve")

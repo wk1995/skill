@@ -16,6 +16,8 @@ from datetime import datetime, timezone
 from pathlib import Path, PurePosixPath
 from typing import Any, Iterable
 
+from skill_provenance import ignored_input, input_digest, modes_match, output_modes
+
 
 SKILL_ROOT = Path(__file__).resolve().parents[1]
 DIGEST = re.compile(r"^[0-9a-f]{64}$")
@@ -111,11 +113,9 @@ def should_ignore(path: Path, root: Path, portable: bool, sync_id: str | None = 
     relative = path.relative_to(root)
     if not include_local_policy and is_local_review_policy(path, root, sync_id):
         return True
-    if any(part in IGNORED_DIRECTORY_NAMES for part in relative.parts[:-1]):
-        return True
     if portable and relative.parts and relative.parts[0] == "agent-builds":
         return True
-    return path.name in IGNORED_FILE_NAMES or path.suffix in BYTECODE_SUFFIXES
+    return ignored_input(relative)
 
 
 def digest_tree(root: Path, *, portable: bool = False, sync_id: str | None = None,
@@ -139,15 +139,12 @@ def digest_tree(root: Path, *, portable: bool = False, sync_id: str | None = Non
 
 def execution_modes(root: Path, *, sync_id: str | None = None) -> dict[str, int]:
     """Compare file execute bits without changing the manifest-v2 byte digest."""
-    if not root.is_dir():
-        raise RelationshipError(f"cannot inspect permissions of a missing directory: {root}")
-    modes: dict[str, int] = {}
-    for path in sorted(root.rglob("*")):
-        if path.is_symlink():
-            raise RelationshipError(f"Skill tree contains a symbolic link: {path}")
-        if path.is_file() and not should_ignore(path, root, portable=False, sync_id=sync_id):
-            modes[path.relative_to(root).as_posix()] = stat.S_IMODE(path.stat().st_mode) & 0o111
-    return modes
+    if sync_id is None and is_local_review_policy(root / "pr-review-loop.yml", root):
+        sync_id = "pr-review-loop"
+    try:
+        return output_modes(root, sync_id)
+    except ValueError as error:
+        raise RelationshipError(str(error)) from error
 
 
 def match_yaml_scalar(text: str, key: str) -> str | None:
@@ -437,6 +434,9 @@ def read_builds(
                 actual_digest = digest_tree(skill_path)
                 if actual_digest != record["output_digest"]:
                     raise RelationshipError(f"skills[{index}] output digest does not match the build directory")
+                if "output_modes" in record:
+                    if not modes_match(record["output_modes"], execution_modes(skill_path, sync_id=sync_id)):
+                        raise RelationshipError(f"skills[{index}] executable modes do not match the build directory")
                 built_metadata = read_skill(skill_path)
                 if built_metadata.get("name") != record["name"]:
                     raise RelationshipError(f"skills[{index}] name does not match the build directory")
@@ -457,6 +457,15 @@ def read_builds(
                     "path": normalized_absolute(skill_path),
                     "manifest_path": normalized_absolute(manifest_path),
                 }
+                if "input_digest" in record:
+                    value = record["input_digest"]
+                    if not isinstance(value, str) or DIGEST.fullmatch(value) is None:
+                        raise RelationshipError(f"skills[{index}].input_digest must be a SHA-256 digest")
+                    accepted[sync_id]["input_digest"] = value
+                    portable = project_root / "skills" / record["name"]
+                    if portable.is_dir():
+                        accepted[sync_id]["current_input_digest"] = input_digest(
+                            portable, project_root / "platforms" / agent_id, sync_id)
             for sync_id, cell in accepted.items():
                 by_sync_id.setdefault(sync_id, {})[agent_id] = cell
             sources.append({"kind": "agent-build", "id": agent_id, "path": normalized_absolute(output), "status": "scanned", "skill_count": len(skills)})
@@ -911,6 +920,9 @@ def build_report(
                 if portable and cell["portable_digest"] != portable["digest"]:
                     statuses.add("agent-build-stale")
                 if portable and cell["core_version"] != portable["core_version"]:
+                    statuses.add("agent-build-stale")
+                if ("current_input_digest" in cell
+                        and cell.get("input_digest") != cell["current_input_digest"]):
                     statuses.add("agent-build-stale")
             build_cells[agent_id] = cell
         if not present_builds:

@@ -306,6 +306,7 @@
       "type": "object",
       "additionalProperties": false,
       "required": ["present", "sync_id", "agent_id"],
+      "dependentRequired": {"current_input_digest": ["input_digest"]},
       "properties": {
         "present": {
           "type": "boolean"
@@ -324,6 +325,12 @@
           "$ref": "#/$defs/semver"
         },
         "portable_digest": {
+          "$ref": "#/$defs/digest"
+        },
+        "input_digest": {
+          "$ref": "#/$defs/digest"
+        },
+        "current_input_digest": {
           "$ref": "#/$defs/digest"
         },
         "adapter_version": {

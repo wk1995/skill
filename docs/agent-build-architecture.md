@@ -138,7 +138,7 @@ As checked on 2026-10-19 against the `@deepseek-ai/dsh-skill-filesystem` provide
 
 ## Development Origin And Install Freshness
 
-Manifest-v2 builds additionally record a top-level `source` object containing Git
+Manifest-v2 builds additionally record generated-file execute bits in `output_modes`, a top-level `source` object containing Git
 origin evidence, and each Skill records `input_digest` over portable source,
 overrides, adapter inputs, builder code and execute bits. These additive fields do not alter
 portable metadata or output digests. Older manifests remain inventory-readable,
@@ -150,3 +150,7 @@ including already-current installs. Development or unknown builds require
 `--allow-development` for a test install; replacing differing files separately
 requires `--discard-local-changes`. The external registry stores build-time and
 installation-time origins and digests, and rollback restores prior provenance.
+
+Relationship reports expose recorded/current input digests and mark mismatches stale. Generated-mode evidence is validated before accepting any records from an Agent build. All content and mode consumers share recursive transient-path exclusions.
+
+New Agent snapshots include `original_modes`; snapshot creation verifies copied modes and rollback rejects mode drift before writes. Legacy snapshots without this evidence retain their previous compatibility behavior.

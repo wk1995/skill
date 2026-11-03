@@ -324,7 +324,8 @@ def validate_report(report: dict[str, Any], schema_path: Path = DEFAULT_SCHEMA) 
                     continue
                 present = build_value.get("present")
                 expected_fields = build_present_fields if present is True else build_base_fields
-                build = validator.object(build_value, build_path, expected_fields, expected_fields)
+                allowed_fields = expected_fields | ({"input_digest", "current_input_digest"} if present is True else set())
+                build = validator.object(build_value, build_path, expected_fields, allowed_fields)
                 if build is None:
                     continue
                 if not isinstance(present, bool):
@@ -345,6 +346,14 @@ def validate_report(report: dict[str, Any], schema_path: Path = DEFAULT_SCHEMA) 
                 actual_portable_digest = validator.digest(build.get("portable_digest"), f"{build_path}.portable_digest")
                 if portable_digest and actual_portable_digest and actual_portable_digest != portable_digest:
                     build_stale = True
+                if "input_digest" in build:
+                    validator.digest(build["input_digest"], f"{build_path}.input_digest")
+                if "current_input_digest" in build:
+                    validator.digest(build["current_input_digest"], f"{build_path}.current_input_digest")
+                    if "input_digest" not in build:
+                        validator.error(build_path, "current_input_digest requires input_digest")
+                    elif build["input_digest"] != build["current_input_digest"]:
+                        build_stale = True
                 adapter_version = validator.semver(build.get("adapter_version"), f"{build_path}.adapter_version")
                 artifact_version = validator.semver(build.get("artifact_version"), f"{build_path}.artifact_version")
                 expected_versions = builder_versions.get(agent_id)

@@ -10,7 +10,33 @@ from pathlib import Path
 from typing import Any
 
 
-IGNORED = {".git", "dist", "node_modules", "__pycache__", ".pytest_cache", ".DS_Store"}
+IGNORED_DIRS = {".git", "dist", "node_modules", "__pycache__", ".pytest_cache"}
+
+
+def ignored_input(relative: Path) -> bool:
+    return (any(part in IGNORED_DIRS | {".DS_Store"} for part in relative.parts)
+            or relative.suffix in {".pyc", ".pyo"})
+
+
+def output_modes(root: Path, sync_id: str | None = None) -> dict[str, int]:
+    if not root.is_dir():
+        raise ValueError(f"cannot inspect permissions of a missing directory: {root}")
+    modes = {}
+    for path in sorted(root.rglob("*")):
+        if path.is_symlink():
+            raise ValueError(f"Skill tree contains a symbolic link: {path}")
+        relative = path.relative_to(root)
+        if (not path.is_file() or ignored_input(relative)
+                or (sync_id == "pr-review-loop" and relative.as_posix() == "pr-review-loop.yml")):
+            continue
+        modes[relative.as_posix()] = path.stat().st_mode & 0o111
+    return modes
+
+
+def modes_match(recorded: Any, actual: dict[str, int]) -> bool:
+    return (isinstance(recorded, dict)
+            and all(isinstance(k, str) and type(v) is int for k, v in recorded.items())
+            and recorded == actual)
 
 
 def input_digest(skill: Path, adapter: Path, sync_id: str) -> str:
@@ -27,7 +53,7 @@ def input_digest(skill: Path, adapter: Path, sync_id: str) -> str:
             raise ValueError(f"build input must be a regular directory: {root}")
         for path in sorted(root.rglob("*")):
             relative = path.relative_to(root)
-            if any(part in IGNORED for part in relative.parts) or path.suffix in {".pyc", ".pyo"}:
+            if ignored_input(relative):
                 continue
             if label == "skill" and sync_id == "pr-review-loop" and relative.as_posix() == "pr-review-loop.yml":
                 continue

@@ -33,7 +33,7 @@ from skill_relationships import (  # noqa: E402
     normalized_absolute,
     read_builds,
 )
-from skill_provenance import git_source, input_digest  # noqa: E402
+from skill_provenance import git_source, ignored_input, input_digest, modes_match  # noqa: E402
 
 
 IGNORE_DIRS = {".git", "node_modules", "dist", "__pycache__", ".pytest_cache"}
@@ -126,11 +126,7 @@ def default_state_dir(
 def should_ignore(path: Path, root: Path | None = None, sync_id: str | None = None) -> bool:
     if root is not None and is_local_review_policy(path, root, sync_id):
         return True
-    if path.name in IGNORE_FILES:
-        return True
-    if path.suffix in BYTECODE_SUFFIXES:
-        return True
-    return any(part in IGNORE_DIRS for part in path.parts)
+    return ignored_input(path.relative_to(root) if root is not None else path)
 
 
 def require_skill_dir(path: str, role: str) -> Path:
@@ -1122,6 +1118,9 @@ def rollback_agent_install(args: argparse.Namespace, registry: dict[str, Any], k
     legacy_digest = relationship_digest_tree(source, sync_id=group_id(key, group), include_local_policy=True)
     if expected_digest not in (managed_digest, legacy_digest):
         raise SystemExit("Agent install snapshot failed digest verification")
+    if ("original_modes" in manifest
+            and not modes_match(manifest["original_modes"], execution_modes(source, sync_id=group_id(key, group)))):
+        raise SystemExit("Agent install snapshot failed executable permission verification")
     original_id = read_skill_metadata(source).get("sync_id")
     if original_id not in (None, group_id(key, group)):
         raise SystemExit("snapshot metadata.sync_id conflicts with the group")
@@ -2026,6 +2025,7 @@ def create_agent_install_snapshot(
             "agent_id": agent_id,
             "original_path": normalized_absolute(local_path),
             "original_digest": relationship_digest_tree(local_path, sync_id=group_key),
+            "original_modes": execution_modes(local_path, sync_id=group_key),
             "derived_from": build["build_id"],
             "build_digest": build["output_digest"],
             "original_provenance": build.get("original_provenance"),
@@ -2036,6 +2036,8 @@ def create_agent_install_snapshot(
         )
         if relationship_digest_tree(snapshot_dir / f"local-{agent_id}", sync_id=group_key) != manifest["original_digest"]:
             raise SystemExit("Agent install snapshot failed digest verification")
+        if execution_modes(snapshot_dir / f"local-{agent_id}", sync_id=group_key) != manifest["original_modes"]:
+            raise SystemExit("Agent install snapshot failed executable permission verification")
         return snapshot_id
     except BaseException:
         shutil.rmtree(snapshot_dir, ignore_errors=True)
@@ -2249,7 +2251,7 @@ def command_repair_agent_install(args: argparse.Namespace) -> int:
     except (OSError, ValueError) as error:
         raise SystemExit(str(error)) from error
     if (build["portable_digest"] != relationship_digest_tree(source_path, portable=True, sync_id=sync_id)
-            or record.get("input_digest") != actual_inputs):
+            or record.get("input_digest") != actual_inputs or "output_modes" not in record):
         raise SystemExit("stale or legacy Agent build: rebuild from the selected current source before installation")
     source = git_source(project)
     build_source = manifest.get("source")

@@ -176,6 +176,8 @@ python3 skills/sync-skills/scripts/skill_sync.py repair-agent-install my-skill-i
 
 明确要求从功能分支、脏工作区、分离 HEAD 或未知来源进行测试安装时，增加 `--allow-development`。它与授权替换本机差异的 `--discard-local-changes` 独立。日常安装使用干净的默认分支构建。外部注册表的安装位置 `provenance` 记录构建及安装核验时的提交、分支、URL、脏状态、指纹和 `test_install`；开发来源信息不会写入通用 Skill 文件。开发变更保留在 `[Unreleased]`，发布收尾时再确定一次版本。
 
+关系报告会比较构建时和当前的输入指纹，即使通用文件字节未变也会标记旧构建。产物文件的执行权限记录在 `output_modes`；执行权限被改动的产物会在安装前被拒绝。新 Agent 快照通过 `original_modes` 记录原权限，回滚会在恢复前核验；旧快照保持兼容。
+
 ### 迁移旧版仓库状态
 
 运行期 registry、快照、报告和锁应放在仓库外、按 checkout 隔离的 XDG 状态目录中。下面的命令会复制并校验旧版 `.skill-sync/` 状态，而不会删除来源：
