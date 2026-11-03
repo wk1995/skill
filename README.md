@@ -104,6 +104,8 @@ Every Skill has a companion README with usage and trigger guidance. This table i
 
 Run `bash tests/pr-review-gate.sh origin/main` from a clean, committed worktree before declaring a PR ready, and follow the independent adversarial passes in the [PR review playbook](docs/pr-review-playbook.md). The `skill-catalog` required GitHub Actions check invokes the same gate before a PR can merge into `main`. It validates the complete PR diff and simulated merge, protects legacy `.skill-sync/` state until its [coordinated migration](docs/skill-sync-state-migration.md) is complete, rejects unexpected tracked ignored files, parses Python sources, and runs every repository validation test. New sync state defaults to an external XDG state directory. A green gate is necessary but does not replace path-identity, direct-entry-point, recursive-rule, dependency-degradation, and failure-state review. For internal branches it can still commit regenerated catalogs when `SKILL_CATALOG_TOKEN` is configured; fork PRs must commit both generated root READMEs themselves.
 
+The [Skill provenance regression suite](tests/skill-provenance.sh) groups the four review findings: report/repair freshness, artifact and snapshot execute bits, recursive exclusions, and publication/recovery failures. Run `bash tests/skill-provenance.sh` for focused checks. It is included in the required gate, and the `Skill provenance regressions` workflow also runs it with Python 3.10 on Ubuntu and macOS for PRs and default-branch pushes. The required `skill-catalog` job waits for both OS jobs. Explicit test IDs make missing regressions fail instead of silently running zero tests.
+
 ## Skill Structure And Versioning
 
 A minimal managed Skill:

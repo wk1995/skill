@@ -9,12 +9,26 @@ permissions:
   contents: read
 
 jobs:
+  provenance:
+    uses: ./.github/workflows/skill-provenance.yml
+
   sync-and-validate:
     name: skill-catalog
+    needs: provenance
+    if: ${{ always() }}
     runs-on: ubuntu-latest
     permissions:
       contents: read
     steps:
+      - name: Require both provenance platforms to pass
+        env:
+          PROVENANCE_RESULT: ${{ needs.provenance.result }}
+        run: |
+          if [[ "$PROVENANCE_RESULT" != "success" ]]; then
+            echo "::error::Skill provenance regressions did not pass on every platform: $PROVENANCE_RESULT"
+            exit 1
+          fi
+
       - name: Check out the pull request branch
         uses: actions/checkout@v4
         with:

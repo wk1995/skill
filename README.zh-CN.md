@@ -106,6 +106,8 @@ Agent Skills 规范只要求 `SKILL.md`，但本仓库额外要求双语使用�
 
 在宣布 PR 可以合并前，应从干净且已提交的工作区运行 `bash tests/pr-review-gate.sh origin/main`，并执行 [PR 审查手册](docs/pr-review-playbook.md)规定的独立对抗性检查。GitHub Actions 的 required check `skill-catalog` 会调用同一门禁：检查完整 PR diff 与模拟合并结果、在[协同迁移](docs/skill-sync-state-migration.md)完成前保护旧版 `.skill-sync/` 状态、拒绝预期范围外的已跟踪忽略文件、解析 Python 源码，并运行仓库全部校验测试。新的同步状态默认保存到仓库外的 XDG state 目录。门禁全绿是必要条件，但不能替代路径身份、直接入口、递归规则、依赖降级和失败后状态检查。内部 PR 在配置 `SKILL_CATALOG_TOKEN` 后仍可自动提交生成目录；fork PR 必须自行提交两份根 README。
 
+[Skill 来源回归测试](tests/skill-provenance.sh)按四类审查发现分组：盘点与修复的新鲜度、产物与快照执行权限、递归排除、发布及恢复失败。可运行 `bash tests/skill-provenance.sh` 做专项检查；原有必需门禁也会执行该套件。`Skill provenance regressions` 工作流在 PR 和默认分支推送时使用 Python 3.10 分别运行 Ubuntu/macOS 检查。必需检查 `skill-catalog` 等待两个系统的专项检查全部通过。测试使用明确用例 ID，缺失用例会失败，不会静默执行零项测试。
+
 ## Skill 结构与版本
 
 最小受管理 Skill：

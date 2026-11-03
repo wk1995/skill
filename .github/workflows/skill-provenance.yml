@@ -1,0 +1,39 @@
+name: Skill provenance regressions
+
+on:
+  workflow_call:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  provenance:
+    name: skill-provenance (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    steps:
+      - name: Check out the exact source revision
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+
+      - name: Set up the minimum supported Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: '3.10'
+
+      - name: Record runtime and filesystem environment
+        run: |
+          python3 --version
+          git --version
+          uname -s
+
+      - name: Check all four finding families
+        run: bash tests/skill-provenance.sh

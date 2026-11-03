@@ -405,6 +405,121 @@ class ReviewRegressions(unittest.TestCase):
         self.repair()
         self.assertEqual(self.run_cli("relationships", "--strict")[0], 0)
 
+    def test_later_invalid_input_evidence_preserves_all_repair_state(self):
+        original = self.manifest_path.read_text()
+        before_state = sync.state_tree_manifest(self.state)
+        before_install = sync.state_tree_manifest(self.target)
+        before_source = sync.state_tree_manifest(self.project / "skills")
+        for value in (None, [], "A" * 64):
+            manifest = json.loads(original)
+            manifest["skills"][1]["input_digest"] = value
+            self.manifest_path.write_text(json.dumps(manifest))
+            with self.subTest(value=value), self.assertRaisesRegex(SystemExit, "no trusted"):
+                self.repair()
+            self.assertEqual(sync.state_tree_manifest(self.state), before_state)
+            self.assertEqual(sync.state_tree_manifest(self.target), before_install)
+            self.assertEqual(sync.state_tree_manifest(self.project / "skills"), before_source)
+        self.manifest_path.write_text(original)
+        self.assertEqual(self.repair()[1]["status"], "already-current")
+        self.assertEqual(self.repair()[1]["status"], "already-current")
+        self.assertFalse(self.snapshot_names())
+
+    def test_added_execute_bits_and_invalid_snapshot_modes_are_rejected(self):
+        source = self.project / "skills/alpha/README.md"
+        source.write_text("non-executable content")
+        source.chmod(0o644)
+        builder.build("codex", [], None, True)
+        self.repair()
+        artifact = self.project / "dist/codex/skills/alpha/README.md"
+        artifact.chmod(0o755)
+        before = sync.state_tree_manifest(self.state)
+        installed = sync.state_tree_manifest(self.target)
+        with self.assertRaisesRegex(SystemExit, "no trusted"):
+            self.repair()
+        self.assertEqual(sync.state_tree_manifest(self.state), before)
+        self.assertEqual(sync.state_tree_manifest(self.target), installed)
+        builder.build("codex", [], None, True)
+        self.assertEqual(self.repair()[1]["status"], "already-current")
+
+        (self.target / "LOCAL.txt").write_text("restore")
+        repaired = self.repair()[1]
+        snapshot = self.state / "snapshots/alpha" / repaired["snapshot"] / "manifest.json"
+        original = snapshot.read_text()
+        invalid_boolean = dict(json.loads(original)["original_modes"], **{"README.md": False})
+        argv = ("rollback", "alpha", "--snapshot", repaired["snapshot"], "--roles", "local")
+        for value in (None, [], invalid_boolean):
+            manifest = json.loads(original)
+            manifest["original_modes"] = value
+            snapshot.write_text(json.dumps(manifest))
+            before = sync.state_tree_manifest(self.state)
+            installed = sync.state_tree_manifest(self.target)
+            with self.subTest(value=value), self.assertRaisesRegex(SystemExit, "snapshot failed executable"):
+                self.run_cli(*argv)
+            self.assertEqual(sync.state_tree_manifest(self.state), before)
+            self.assertEqual(sync.state_tree_manifest(self.target), installed)
+        snapshot.write_text(original)
+        self.run_cli(*argv)
+        self.assertEqual((self.target / "LOCAL.txt").read_text(), "restore")
+        snapshots = self.snapshot_names()
+        self.assertEqual(self.run_cli(*argv)[1]["status"], "already-current")
+        self.assertEqual(self.snapshot_names(), snapshots)
+
+    def test_recursive_exclusions_in_portable_convert_sync_and_rollback(self):
+        source = self.project / "skills/alpha"
+        secret = source / "nested/.DS_Store/ignored.txt"
+        secret.parent.mkdir(parents=True)
+        secret.write_text("source-only transient")
+        (source / "nested/.git").write_text("ignored Git metadata")
+        kept = source / "nested/kept.txt"
+        kept.write_text("old")
+        external = self.root / "external-alpha"
+        self.registry["groups"]["alpha"]["roles"].pop("local")
+        self.save()
+        self.run_cli("convert", "alpha", "--source-path", str(source), "--source-role", "repo",
+                     "--target-path", str(external), "--target-role", "external")
+        self.assertFalse((external / "nested/.DS_Store").exists())
+        self.assertFalse((external / "nested/.git").exists())
+        kept.write_text("new")
+        synced = self.run_cli("sync", "alpha", "--source", "repo")[1]
+        payload = self.state / "snapshots/alpha" / synced["snapshot"] / "external"
+        self.assertFalse((payload / "nested/.DS_Store").exists())
+        self.assertEqual((external / "nested/kept.txt").read_text(), "new")
+        self.run_cli("rollback", "alpha", "--snapshot", synced["snapshot"], "--roles", "external")
+        self.assertEqual((external / "nested/kept.txt").read_text(), "old")
+        self.assertEqual(kept.read_text(), "new")
+        self.assertEqual(secret.read_text(), "source-only transient")
+        self.run_cli("sync", "alpha", "--source", "repo")
+        self.assertEqual((external / "nested/kept.txt").read_text(), "new")
+
+    def test_builder_backup_move_failure_and_first_publication_failure(self):
+        output = self.project / "dist/codex"
+        previous = sync.state_tree_manifest(output)
+        sources = sync.state_tree_manifest(self.project / "skills")
+        replace = os.replace
+        def fail_backup(source, destination):
+            if Path(source) == output and Path(destination).name == "artifact":
+                raise OSError("backup move fault")
+            return replace(source, destination)
+        with patch.object(os, "replace", side_effect=fail_backup):
+            with self.assertRaisesRegex(OSError, "backup move fault"):
+                builder.build("codex", [], None, True)
+        self.assertEqual(sync.state_tree_manifest(output), previous)
+        self.assertEqual(sync.state_tree_manifest(self.project / "skills"), sources)
+        self.assertFalse(list(output.parent.glob(".codex-*-*")))
+        fresh = self.root / "first-build/codex"
+        def fail_first_publication(source, destination):
+            if Path(destination) == fresh:
+                raise OSError("first publication fault")
+            return replace(source, destination)
+        with patch.object(os, "replace", side_effect=fail_first_publication):
+            with self.assertRaisesRegex(OSError, "first publication fault"):
+                builder.build("codex", [], str(fresh), False)
+        self.assertFalse(fresh.exists())
+        self.assertFalse(list(fresh.parent.iterdir()))
+        self.assertEqual(sync.state_tree_manifest(output), previous)
+        builder.build("codex", [], None, True)
+        self.assertEqual(sync.state_tree_manifest(output), previous)
+
     def test_artifact_execute_bit_corruption_rejected_before_repair_mutation(self):
         skill = self.project / "skills/alpha"
         for relative in ["run.sh", "scripts/nested/run.sh", "agent-builds/codex/override.sh"]:
