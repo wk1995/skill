@@ -95,6 +95,8 @@ def configure_builder(project):
 
 
 def run_command(argv):
+    if "repair-agent-install" in argv:
+        argv = [*argv, "--allow-development"]  # Isolated non-Git test fixtures.
     args = skill_sync.build_parser().parse_args(argv)
     output = io.StringIO()
     with contextlib.redirect_stdout(output):

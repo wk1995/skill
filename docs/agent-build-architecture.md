@@ -135,3 +135,24 @@ As checked on 2026-09-17, international `WorkBuddy AI.app` (`com.workbuddy.workb
 ### DeepSeek Harness local roots (adapter 1.0.0)
 
 As checked on 2026-10-19 against the `@deepseek-ai/dsh-skill-filesystem` provider `0.2.0-rc.2` bundled in DeepSeek Harness `0.2.0-rc.2`, the Harness discovers one level of directory-bundle (`<name>/SKILL.md`) and flat Markdown (`<name>.md`) Skills from project roots `<projectRoot>/.dsh/skills` and `<projectRoot>/.agents/skills`, configured custom roots, and user roots `$DSH_HOME/skills` (default `~/.dsh/skills`) and `$DSH_AGENTS_HOME/skills` (default `~/.agents/skills`). Adapter 1.0.0 inventories directory-bundle Skills under the two default user roots for machine-local relationship reporting; project roots belong to the report's explicit project arguments. A physical root shared with Codex and WorkBuddy retains all Agent IDs. Do not attach the `DSH_HOME` or `DSH_AGENTS_HOME` variables to this adapter: `DSH_HOME` is injected into model-facing shells and `DSH_AGENTS_HOME` is an optional process-environment override, so neither is a stable inventory root. A custom directory is not auto-inventoried; add it to the report as an explicit project or external location (or with `--local-root`). Local-install registration and `repair-agent-install` accept only the adapter-declared roots. The adapter writes a plain Skill collection (`skills_path: "."`) because each Skill installs directly under a discovered user root.
+
+## Development Origin And Install Freshness
+
+Manifest-v2 builds additionally record generated-file execute bits in `output_modes`, a top-level `source` object containing Git
+origin evidence, and each Skill records `input_digest` over portable source,
+overrides, adapter inputs, builder code and execute bits. These additive fields do not alter
+portable metadata or output digests. Older manifests remain inventory-readable,
+but repair requires rebuilding to obtain input evidence. A clean configured
+default branch is `mainline`; this is not certification of an official release.
+
+Repair compares current selected inputs before any snapshot or registry write,
+including already-current installs. Development or unknown builds require
+`--allow-development` for a test install; replacing differing files separately
+requires `--discard-local-changes`. The external registry stores build-time and
+installation-time origins and digests, and rollback restores prior provenance.
+
+Relationship reports expose recorded/current input digests and mark mismatches stale. Generated-mode evidence is validated before accepting any records from an Agent build. All content and mode consumers share recursive transient-path exclusions.
+
+New Agent snapshots include `original_modes`; snapshot creation verifies copied modes and rollback rejects mode drift before writes. Legacy snapshots without this evidence retain their previous compatibility behavior.
+
+Build publication moves an existing artifact into a private backup before publishing the staged result. A failed publication restores that backup; if restoration also fails, both previous and new artifacts remain at the reported recovery paths.
