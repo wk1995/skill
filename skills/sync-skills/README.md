@@ -2,7 +2,7 @@
 
 Language: **English** | [中文](README.zh-CN.md)
 
-`sync-skills` manages equivalent copies of one Agent Skill across this repository, other projects, machine-wide Agent installations, generated Agent builds, and explicit external locations. It records stable identity, provenance, versions, digests, snapshots, and audit times; compares or synchronizes copies; inventories Builder relationships; and repairs registered Agent installations from trusted builds.
+`sync-skills` manages equivalent copies of one Agent Skill across this repository, other projects, machine-wide Agent installations, generated Agent builds, and explicit external locations. It records stable identity, provenance, versions, digests, snapshots, and audit times; compares or synchronizes copies; inventories Builder relationships; and repairs registered Agent installations from current builds with source provenance and explicit development-install intent.
 
 ## How To Use It
 
@@ -97,6 +97,7 @@ python3 skills/sync-skills/scripts/skill_sync.py diff my-skill-id \
 ```
 
 - `status` shows registered roles, versions, digests, and divergence. A clean result covers only those roles; use `relationships` for named locations.
+- `status.registered_agent_installs` exposes registered Agent location metadata and saved provenance; `clean` still describes only the role copies.
 - `versions` shows observed versions and their creation/update times.
 - `snapshots` lists recovery points created before mutations.
 - `diff` compares snapshots, current roles, or explicit paths and reports added, removed, modified text, and modified binary files.
@@ -109,7 +110,7 @@ Prefer an explicit source when copies differ:
 python3 skills/sync-skills/scripts/skill_sync.py sync my-skill-id --source repo
 ```
 
-Every existing role copy is snapshotted before `sync` overwrites a role. Named locations registered only by `link-location` are not synchronized or included in these snapshots. If more than one copy changed and no source is specified, synchronization stops and reports the conflict. On the repository's default branch, a version mismatch selects the higher `metadata.version`; on another branch, a version mismatch alone does not authorize synchronization.
+Every existing role copy is snapshotted before `sync` overwrites a role. Named locations registered only by `link-location` are not synchronized or included in these snapshots. If more than one copy changed and no source is specified, synchronization stops and reports the conflict. Version numbers alone do not establish release status or freshness. On the configured default branch, differing versions and content require an explicit `--source` after reviewing provenance and differences. Unresolved divergence never falls back to modification time.
 
 The `pr-review-loop.yml` beside a project or installed Skill stays at that location. It is excluded from sync copies, snapshots, digests, and relationship reports; a target's own policy is preserved during sync, Agent repair, and rollback. To move identical legacy machine policies into the one file shared by every Agent, run:
 
@@ -170,6 +171,10 @@ python3 skills/sync-skills/scripts/skill_sync.py repair-agent-install my-skill-i
 ```
 
 Repair preserves a divergent installation by default. Add `--discard-local-changes` only when replacing it is intended; the current install is still snapshotted first. Repair checks Skill identity, content, and executable file modes, refuses a different non-empty sync ID, and is idempotent when the trusted build is already installed. Use ordinary `sync` only for portable copies, never to copy portable source directly into an Agent installation.
+
+Before repair, rebuild from the selected source. Current portable content, Agent overrides, adapter inputs, builder code and executable bits must match the build fingerprint, even when the installed files already match. Older manifest-v2 builds without this fingerprint remain readable for inventory but must be rebuilt before installation.
+
+For an explicitly requested test install from a feature branch, dirty/detached checkout or unknown origin, add `--allow-development`. This is separate from `--discard-local-changes`, which authorizes replacing differing local files. Normal installs use clean default-branch builds. The external registry stores each installation's `provenance`: build and verified-source commit/branch/URL, dirty state, fingerprints and `test_install`. No development metadata is added to portable Skill files. Keep development edits under `[Unreleased]` and determine one release version when finalizing.
 
 ### Migrate legacy repository state
 

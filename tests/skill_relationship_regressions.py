@@ -69,7 +69,9 @@ class ReviewRegressions(unittest.TestCase):
     def save(self):
         sync.save_registry(self.state, self.registry)
 
-    def run_cli(self, *argv):
+    def run_cli(self, *argv, allow_development=True):
+        if argv and argv[0] == "repair-agent-install" and allow_development:
+            argv = (*argv, "--allow-development")  # Isolated non-Git test fixtures.
         out = io.StringIO()
         with contextlib.redirect_stdout(out):
             code = sync.main(["--project-root", str(self.project), "--state-dir", str(self.state), *argv])
@@ -83,6 +85,202 @@ class ReviewRegressions(unittest.TestCase):
 
     def report(self):
         return rel.build_report(self.project, self.state, sync.load_registry(self.state))
+
+    def git_project(self):
+        def git(*args):
+            return subprocess.check_output(["git", "-C", str(self.project), *args], stderr=subprocess.PIPE).decode().strip()
+        git("init", "-b", "main")
+        (self.project / ".gitignore").write_text("dist/\n")
+        git("add", "skills", "platforms", ".gitignore")
+        git("-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid", "commit", "-m", "fixture")
+        git("remote", "add", "origin", "https://example.invalid/skills.git")
+        git("update-ref", "refs/remotes/origin/main", "HEAD")
+        git("symbolic-ref", "refs/remotes/origin/HEAD", "refs/remotes/origin/main")
+        builder.build("codex", [], None, True)
+        return git
+
+    def test_mainline_install_records_source_without_changing_portable_files(self):
+        git = self.git_project()
+        original = (self.project / "skills/alpha/SKILL.md").read_bytes()
+        code, result = self.run_cli("repair-agent-install", "alpha", "--agent", "codex", allow_development=False)
+        self.assertEqual(code, 0)
+        self.assertEqual(result["status"], "already-current")
+        provenance = result["provenance"]
+        self.assertEqual(provenance["verified_source"]["commit"], git("rev-parse", "HEAD"))
+        self.assertEqual(provenance["verified_source"]["branch"], "main")
+        self.assertFalse(provenance["test_install"])
+        group = sync.load_registry(self.state)["groups"]["alpha"]
+        self.assertEqual(group["locations"]["local:codex"]["provenance"], provenance)
+        self.assertEqual((self.project / "skills/alpha/SKILL.md").read_bytes(), original)
+        self.assertFalse(self.snapshot_names())
+        # Re-registering an identical location must retain origin evidence.
+        self.run_cli("link-location", "alpha", "--location-id", "local:codex", "--kind", "local",
+                     "--agent-id", "codex", "--path", str(self.target))
+        self.assertEqual(sync.load_registry(self.state)["groups"]["alpha"]["locations"]["local:codex"]["provenance"], provenance)
+        self.run_cli("link-location", "alpha", "--location-id", "local:alias", "--kind", "local",
+                     "--agent-id", "codex", "--path", str(self.target), "--replace")
+        self.assertEqual(sync.load_registry(self.state)["groups"]["alpha"]["locations"]["local:alias"]["provenance"], provenance)
+        self.assertEqual(self.run_cli("status", "alpha")[1]["registered_agent_installs"]["local:alias"]["provenance"], provenance)
+
+    def test_development_install_rejection_success_and_idempotency(self):
+        git = self.git_project()
+        git("switch", "-c", "feature/test")
+        source = self.project / "skills/alpha/SKILL.md"
+        source.write_text(source.read_text().replace('version: "1.0.0"', 'version: "1.0.1"'))
+        builder.build("codex", [], None, True)
+        before = (self.state / "registry.json").read_bytes()
+        for _ in range(2):
+            with self.assertRaisesRegex(SystemExit, "--allow-development"):
+                self.run_cli("repair-agent-install", "alpha", "--agent", "codex", "--discard-local-changes", allow_development=False)
+            self.assertEqual((self.state / "registry.json").read_bytes(), before)
+            self.assertFalse(self.snapshot_names())
+        result = self.repair()[1]
+        self.assertTrue(result["provenance"]["test_install"])
+        self.assertEqual(result["provenance"]["build_source"]["branch"], "feature/test")
+        snapshots = self.snapshot_names()
+        self.assertEqual(self.repair()[1]["status"], "already-current")
+        self.assertEqual(self.snapshot_names(), snapshots)
+        self.run_cli("rollback", "alpha", "--snapshot", result["snapshot"], "--roles", "local")
+        self.assertNotIn("provenance", sync.load_registry(self.state)["groups"]["alpha"]["locations"]["local:codex"])
+
+    def test_stale_builds_rejected_before_even_already_current_then_rebuilt(self):
+        skill = self.project / "skills/alpha"
+        script = skill / "run.sh"
+        script.write_text("#!/bin/sh\nexit 0\n")
+        script.chmod(0o644)
+        override = skill / "agent-builds/codex"
+        override.mkdir()
+        extra = override / "AGENT.txt"
+        extra.write_text("first")
+        adapter = self.project / "platforms/codex/adapter.json"
+        config = json.loads(adapter.read_text())
+        config["skill_append"] = "SKILL.append.md"
+        adapter.write_text(json.dumps(config))
+        (adapter.parent / "SKILL.append.md").write_text("initial adaptation")
+        builder.build("codex", [], None, True)
+        self.repair()
+        for path, content in [(skill / "SKILL.md", (skill / "SKILL.md").read_text().replace('1.0.0', '1.0.1')),
+                              (skill / "README.md", "new portable content"), (extra, "new overlay"),
+                              (self.project / "platforms/codex/SKILL.append.md", "new adaptation")]:
+            with self.subTest(path=path):
+                path.write_text(content)
+                before = (self.state / "registry.json").read_bytes()
+                snapshots = self.snapshot_names()
+                installed = rel.digest_tree(self.target)
+                with self.assertRaisesRegex(SystemExit, "stale or legacy"):
+                    self.repair()
+                self.assertEqual((self.state / "registry.json").read_bytes(), before)
+                self.assertEqual(self.snapshot_names(), snapshots)
+                self.assertEqual(rel.digest_tree(self.target), installed)
+                builder.build("codex", [], None, True)
+                self.assertEqual(self.repair()[1]["status"], "reinstalled")
+                self.assertEqual(self.repair()[1]["status"], "already-current")
+        script.chmod(0o755)
+        with self.assertRaisesRegex(SystemExit, "stale or legacy"):
+            self.repair()
+        builder.build("codex", [], None, True)
+        self.repair()
+        self.assertEqual((self.target / "run.sh").stat().st_mode & 0o111, 0o111)
+        manifest = json.loads(self.manifest_path.read_text())
+        manifest["skills"][0].pop("input_digest")
+        self.manifest_path.write_text(json.dumps(manifest))
+        with self.assertRaisesRegex(SystemExit, "stale or legacy"):
+            self.repair()
+
+    def test_default_lower_version_replaces_development_copy_only_after_explicit_choice(self):
+        git = self.git_project()
+        git("switch", "-c", "feature/version")
+        source = self.project / "skills/alpha/SKILL.md"
+        original = source.read_text()
+        source.write_text(original.replace('1.0.0', '1.0.1'))
+        builder.build("codex", [], None, True)
+        self.repair()
+        source.write_text(original)
+        git("switch", "main")
+        # A development build cannot be reused after switching back to main.
+        with self.assertRaisesRegex(SystemExit, "stale or legacy"):
+            self.run_cli("repair-agent-install", "alpha", "--agent", "codex", allow_development=False)
+        builder.build("codex", [], None, True)
+        with self.assertRaisesRegex(SystemExit, "existing copy was preserved"):
+            self.run_cli("repair-agent-install", "alpha", "--agent", "codex", allow_development=False)
+        result = self.run_cli("repair-agent-install", "alpha", "--agent", "codex", "--discard-local-changes", allow_development=False)[1]
+        self.assertEqual(sync.read_skill_metadata(self.target)["version"], "1.0.0")
+        self.assertFalse(result["provenance"]["test_install"])
+        self.assertEqual(self.run_cli("repair-agent-install", "alpha", "--agent", "codex", allow_development=False)[1]["status"], "already-current")
+        # Rollback restores the development copy's provenance as well as its files.
+        self.run_cli("rollback", "alpha", "--snapshot", result["snapshot"], "--roles", "local")
+        location = sync.load_registry(self.state)["groups"]["alpha"]["locations"]["local:codex"]
+        self.assertTrue(location["provenance"]["test_install"])
+        self.assertEqual(sync.read_skill_metadata(self.target)["version"], "1.0.1")
+
+    def test_builder_change_requires_rebuild_even_when_installed_output_is_equal(self):
+        producer = self.project / "scripts/agent_build.py"
+        producer.parent.mkdir()
+        producer.write_text("# changed generator\n")
+        before = (self.state / "registry.json").read_bytes()
+        with self.assertRaisesRegex(SystemExit, "stale or legacy"):
+            self.repair()
+        self.assertEqual((self.state / "registry.json").read_bytes(), before)
+        self.assertFalse(self.snapshot_names())
+        builder.build("codex", [], None, True)
+        self.assertEqual(self.repair()[1]["status"], "already-current")
+        self.assertFalse(self.snapshot_names())
+
+    def test_unknown_detached_and_dirty_sources_require_test_intent_before_writes(self):
+        git = self.git_project()
+        before = (self.state / "registry.json").read_bytes()
+        argv = ("repair-agent-install", "alpha", "--agent", "codex")
+        with patch.dict(os.environ, {"PATH": ""}):
+            with self.assertRaisesRegex(SystemExit, "--allow-development"):
+                self.run_cli(*argv, allow_development=False)
+        git("switch", "--detach")
+        with self.assertRaisesRegex(SystemExit, "--allow-development"):
+            self.run_cli(*argv, allow_development=False)
+        git("switch", "main")
+        (self.project / "notes.txt").write_text("uncommitted")
+        with self.assertRaisesRegex(SystemExit, "--allow-development"):
+            self.run_cli(*argv, allow_development=False)
+        self.assertEqual((self.state / "registry.json").read_bytes(), before)
+        self.assertFalse(self.snapshot_names())
+
+    def test_rollback_repairs_provenance_even_when_content_is_already_current(self):
+        self.git_project()
+        original = self.run_cli("repair-agent-install", "alpha", "--agent", "codex", allow_development=False)[1]["provenance"]
+        (self.target / "LOCAL.txt").write_text("save local state")
+        repaired = self.repair()[1]
+        registry = sync.load_registry(self.state)
+        registry["groups"]["alpha"]["locations"]["local:codex"]["provenance"] = {"test_install": True}
+        sync.save_registry(self.state, registry)
+        # Put snapshot content back without restoring its metadata.
+        (self.target / "LOCAL.txt").write_text("save local state")
+        snapshots = self.snapshot_names()
+        argv = ("rollback", "alpha", "--snapshot", repaired["snapshot"], "--roles", "local")
+        self.assertEqual(self.run_cli(*argv)[1]["status"], "already-current")
+        restored = sync.load_registry(self.state)["groups"]["alpha"]["locations"]["local:codex"]["provenance"]
+        self.assertEqual(restored, original)
+        self.assertEqual(self.run_cli(*argv)[1]["status"], "already-current")
+        self.assertEqual(self.snapshot_names(), snapshots)
+
+    def test_portable_version_conflict_requires_explicit_source_before_snapshots(self):
+        self.git_project()
+        portable = self.project / "skills/alpha"
+        external = self.root / "external-alpha"
+        shutil.copytree(portable, external)
+        entry = external / "SKILL.md"
+        entry.write_text(entry.read_text().replace('1.0.0', '1.0.1'))
+        self.registry["groups"]["alpha"]["roles"] = {"repo": str(portable), "external": str(external)}
+        self.save()
+        before = (self.state / "registry.json").read_bytes()
+        original = entry.read_bytes()
+        with self.assertRaisesRegex(SystemExit, "version order does not establish"):
+            self.run_cli("sync", "alpha")
+        self.assertEqual(entry.read_bytes(), original)
+        self.assertEqual((self.state / "registry.json").read_bytes(), before)
+        self.assertFalse(self.snapshot_names())
+        self.assertEqual(self.run_cli("sync", "alpha", "--source", "repo")[0], 0)
+        self.assertEqual(entry.read_bytes(), (portable / "SKILL.md").read_bytes())
+        self.run_cli("sync", "alpha", "--source", "repo")
+        self.assertEqual(entry.read_bytes(), (portable / "SKILL.md").read_bytes())
 
     def test_invalid_manifest_fields_report_without_aborting(self):
         original = self.manifest_path.read_text()
@@ -898,6 +1096,7 @@ class ReviewRegressions(unittest.TestCase):
         workbuddy_adapter.write_text(json.dumps(workbuddy_data))
         (self.project / "platforms/workbuddy/CHANGELOG.md").write_text("## [1.0.0] - 2026-09-08\n")
         (self.project / "platforms/workbuddy-ai/CHANGELOG.md").write_text("## [1.0.0] - 2026-09-08\n")
+        builder.build("codex", [], None, True)  # Adapter input changed; refresh its fingerprint.
         builder.build("workbuddy", [], None, False)
         legacy = self.root / "home/.agents/skills/alpha"
         product = self.root / "home/.workbuddy/skills/alpha"

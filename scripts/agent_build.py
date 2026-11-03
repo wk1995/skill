@@ -15,6 +15,9 @@ from pathlib import Path, PurePosixPath
 
 
 ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT / "skills" / "sync-skills" / "scripts"))
+from skill_provenance import git_source, input_digest  # noqa: E402
+
 SKILLS_DIR = ROOT / "skills"
 PLATFORMS_DIR = ROOT / "platforms"
 DEFAULT_OUTPUT_DIR = ROOT / "dist"
@@ -294,6 +297,7 @@ def build(platform: str, skill_names: list[str], output_arg: str | None, force: 
     skills = selected_skills(skill_names)
     output = safe_output(Path(output_arg) if output_arg else DEFAULT_OUTPUT_DIR / platform)
     validate_replacement(output, platform, force)
+    source = git_source(ROOT)
     output.parent.mkdir(parents=True, exist_ok=True)
     staging = Path(tempfile.mkdtemp(prefix=f".{output.name}-build-", dir=output.parent))
     try:
@@ -338,6 +342,7 @@ def build(platform: str, skill_names: list[str], output_arg: str | None, force: 
                 "core_version": version,
                 "portable_digest": digest_tree(skill_dir, skip_top={"agent-builds"}),
                 "output_digest": digest_tree(target),
+                "input_digest": input_digest(skill_dir, platform_dir, sync_id),
                 "path": (relative_path(config["skills_path"], "skills_path", allow_dot=True) / name).as_posix(),
             })
 
@@ -347,6 +352,7 @@ def build(platform: str, skill_names: list[str], output_arg: str | None, force: 
             "adapter_version": config["version"],
             "artifact_version": config["artifact_version"],
             "skills": manifest_skills,
+            "source": source,
         }
         (staging / ".agent-build.json").write_text(
             json.dumps(manifest, ensure_ascii=False, indent=2, sort_keys=True) + "\n",

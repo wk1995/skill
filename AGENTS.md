@@ -150,6 +150,19 @@ lower parts, including when one push contains several increments of that part.
   changes in the owning changelog with a UTC date; keep pending changes under
   `[Unreleased]`. Never rewrite a published version to distribute different content.
 
+## Development Builds And Skill Synchronization
+
+- Keep development edits under `[Unreleased]`; determine the component release
+  version once during release finalization. Branch-only version labels do not
+  establish a published release. Never renumber a published release.
+- Default-branch synchronization must inspect provenance and content differences
+  before treating a higher local version as newer. Require an explicit source
+  for unresolved divergence; do not choose by timestamps.
+- Build from the selected current source before installation and verify the
+  source/build/install chain. Development or unknown-origin installs require
+  explicit test intent. Keep Git SHA, branch, channel and digest evidence in
+  external synchronization state or build manifests, not portable Skill inputs.
+
 ## Changelog Requirement
 
 Every Skill must maintain a `CHANGELOG.md` in its own directory, next to `SKILL.md`.

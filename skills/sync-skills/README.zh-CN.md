@@ -2,7 +2,7 @@
 
 语言：[English](README.md) | **中文**
 
-`sync-skills` 用于管理同一个 Agent Skill 在本仓库、其他项目、本机 Agent 安装目录、生成的 Agent 构建产物和明确指定的外部位置中的等价副本。它会记录稳定身份、来源、版本、摘要、快照与审计时间；比较或同步副本；盘点 Builder 关系；并从可信构建修复已登记的 Agent 安装。
+`sync-skills` 用于管理同一个 Agent Skill 在本仓库、其他项目、本机 Agent 安装目录、生成的 Agent 构建产物和明确指定的外部位置中的等价副本。它会记录稳定身份、来源、版本、摘要、快照与审计时间；比较或同步副本；盘点 Builder 关系；并通过来源记录、构建新鲜度检查和显式开发安装意图，从当前构建修复已登记的 Agent 安装。
 
 ## 如何使用
 
@@ -97,6 +97,7 @@ python3 skills/sync-skills/scripts/skill_sync.py diff my-skill-id \
 ```
 
 - `status` 显示已登记角色、版本、摘要与分歧状态。无分歧结果仅覆盖这些角色；命名位置请使用 `relationships` 检查。
+- `status.registered_agent_installs` 展示已登记 Agent 安装位置及保存的来源证据；`clean` 仍只表示角色副本是否一致。
 - `versions` 显示曾观察到的版本及其创建/更新时间。
 - `snapshots` 列出变更前创建的恢复点。
 - `diff` 比较快照、当前角色或明确路径，并报告新增、删除、修改的文本及二进制文件。
@@ -109,7 +110,7 @@ python3 skills/sync-skills/scripts/skill_sync.py diff my-skill-id \
 python3 skills/sync-skills/scripts/skill_sync.py sync my-skill-id --source repo
 ```
 
-`sync` 覆盖角色前会为所有现有角色副本创建快照。仅通过 `link-location` 登记的命名位置不会参与同步，也不会包含在这些快照中。如果多份副本都发生过变化且未指定来源，同步会停止并报告冲突。在仓库默认分支上，版本不一致时会选择较高的 `metadata.version`；在其他分支上，只有版本不一致并不足以授权同步。
+`sync` 覆盖角色前会为所有现有角色副本创建快照。仅通过 `link-location` 登记的命名位置不会参与同步，也不会包含在这些快照中。如果多份副本都发生过变化且未指定来源，同步会停止并报告冲突。版本号本身不能证明正式发布状态或内容新旧。在已配置的默认分支上，版本和内容不同必须先核对来源与差异，再显式指定 `--source`；无法确定来源时不会按修改时间自动选择。
 
 项目或已安装 Skill 旁的 `pr-review-loop.yml` 留在原位置，不参与同步复制、快照、摘要或关系报告；同步、Agent 安装修复和回滚会保留目标原有的配置。要把内容一致的旧整机配置迁入所有 Agent 共用的文件，运行：
 
@@ -170,6 +171,10 @@ python3 skills/sync-skills/scripts/skill_sync.py repair-agent-install my-skill-i
 ```
 
 默认会保留存在分歧的安装。只有确实希望替换时才添加 `--discard-local-changes`，并且替换前仍会创建快照。修复会检查 Skill 身份、内容和文件执行权限；遇到不同的非空 sync ID 会拒绝操作；可信构建已经安装时可安全重复执行。普通 `sync` 只用于便携副本，绝不能用它把便携源码直接复制进 Agent 安装目录。
+
+修复前应从选定源码重新构建。通用内容、Agent 覆盖文件、适配器输入、构建器代码和执行权限必须与构建指纹匹配，即使安装文件已一致也会检查。缺少指纹的旧 manifest-v2 构建仍可用于盘点，但安装前必须重建。
+
+明确要求从功能分支、脏工作区、分离 HEAD 或未知来源进行测试安装时，增加 `--allow-development`。它与授权替换本机差异的 `--discard-local-changes` 独立。日常安装使用干净的默认分支构建。外部注册表的安装位置 `provenance` 记录构建及安装核验时的提交、分支、URL、脏状态、指纹和 `test_install`；开发来源信息不会写入通用 Skill 文件。开发变更保留在 `[Unreleased]`，发布收尾时再确定一次版本。
 
 ### 迁移旧版仓库状态
 

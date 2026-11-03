@@ -33,6 +33,7 @@ from skill_relationships import (  # noqa: E402
     normalized_absolute,
     read_builds,
 )
+from skill_provenance import git_source, input_digest  # noqa: E402
 
 
 IGNORE_DIRS = {".git", "node_modules", "dist", "__pycache__", ".pytest_cache"}
@@ -661,6 +662,7 @@ def build_member_state(group: dict[str, Any]) -> dict[str, dict[str, Any]]:
             "name": metadata["name"],
             "sync_id": metadata["sync_id"],
             "version": metadata["version"],
+            "source": git_source(skill_dir),
         }
     return state
 
@@ -942,6 +944,9 @@ def command_status(args: argparse.Namespace) -> int:
         "name": group_name(key, group),
         "clean": len(digests) <= 1 and not path_issues,
         "members": current,
+        "registered_agent_installs": {location_id: location
+            for location_id, location in group.get("locations", {}).items()
+            if location.get("kind") == "local"},
         "path_issues": path_issues,
         "role_urls": group.get("role_urls", {}),
         "skill_urls": group.get("skill_urls", []),
@@ -1102,7 +1107,7 @@ def rollback_agent_install(args: argparse.Namespace, registry: dict[str, Any], k
     if args.roles and args.roles not in (["local"], [f"local-{agent_id}"]):
         raise SystemExit("Agent install snapshots restore only their local install")
     adapters, roots = adapter_roots_for_project(args)
-    _, target = registered_agent_install(group, agent_id, roots)
+    location_id, target = registered_agent_install(group, agent_id, roots)
     validate_agent_target(agent_id, target, adapters, roots)
     project_root = relationship_project_root(args)
     if path_is_within(target, project_root) or path_is_within(project_root, target):
@@ -1124,15 +1129,28 @@ def rollback_agent_install(args: argparse.Namespace, registry: dict[str, Any], k
         raise SystemExit("snapshot and install must not overlap")
     if target.exists():
         validate_install_identity(target, group_id(key, group))
+    def restore_provenance() -> bool:
+        location = group.get("locations", {}).get(location_id)
+        if location is None:
+            return False
+        previous = location.pop("provenance", None)
+        restored = manifest.get("original_provenance")
+        if isinstance(restored, dict):
+            location["provenance"] = restored
+        return previous != location.get("provenance")
+
     if (target.exists() and relationship_digest_tree(target, sync_id=group_id(key, group)) == managed_digest
             and execution_modes(target, sync_id=group_id(key, group)) == execution_modes(source, sync_id=group_id(key, group))):
+        if restore_provenance():
+            save_registry(Path(args.state_dir).expanduser().resolve(), registry)
         return finish_mutation(args, registry, {"group": key, "rolled_back_to": args.snapshot,
                                                "pre_rollback_snapshot": None, "status": "already-current"})
     state_dir = Path(args.state_dir).expanduser().resolve()
     undo = None
     if target.exists():
         undo = create_agent_install_snapshot(state_dir, key, agent_id, target,
-                                             {"build_id": f"build:{agent_id}", "output_digest": expected_digest})
+                                             {"build_id": f"build:{agent_id}", "output_digest": expected_digest,
+                                              "original_provenance": group.get("locations", {}).get(location_id, {}).get("provenance")})
     try:
         atomic_install_build(source, target, group_id(key, group), managed_digest,
                              allow_missing_sync_id=original_id is None)
@@ -1140,6 +1158,7 @@ def rollback_agent_install(args: argparse.Namespace, registry: dict[str, Any], k
         raise SystemExit(f"{error}; recovery snapshot: {state_dir / 'snapshots' / key / undo if undo else snapshot_dir}") from error
     if undo:
         group.setdefault("snapshots", []).append(undo)
+    restore_provenance()
     group["last_rollback"] = {"at": now_iso(), "snapshot": args.snapshot,
                               "pre_rollback_snapshot": undo, "restored_roles": ["local"]}
     save_registry(state_dir, registry)
@@ -1282,8 +1301,9 @@ def choose_source(group: dict[str, Any], current: dict[str, dict[str, str | None
     if len(changed) > 1:
         raise SystemExit(f"conflict: multiple roles changed since last link/sync: {', '.join(sorted(changed))}; rerun with --source")
 
-    newest_role = max(current, key=lambda role: Path(str(current[role]["path"])).stat().st_mtime)
-    return newest_role
+    if len({info["digest"] for info in current.values()}) > 1:
+        raise SystemExit("conflict: divergent copies have no verified unique source; inspect diff/status and rerun with --source")
+    return "repo" if "repo" in current else sorted(current)[0]
 
 
 def choose_source_by_version_on_mainline(group: dict[str, Any], current: dict[str, dict[str, str | None]]) -> str | None:
@@ -1293,7 +1313,7 @@ def choose_source_by_version_on_mainline(group: dict[str, Any], current: dict[st
     repo_dir = Path(str(repo_path))
     current_branch = git_current_branch(repo_dir)
     default_branch = git_default_branch(repo_dir)
-    if current_branch not in {"master", default_branch}:
+    if not default_branch or current_branch != default_branch:
         return None
 
     versions_by_role = {role: parse_version(info.get("version")) for role, info in current.items() if info.get("version")}
@@ -1301,17 +1321,14 @@ def choose_source_by_version_on_mainline(group: dict[str, Any], current: dict[st
     if len(comparable) < 2 or len(set(comparable.values())) <= 1:
         return None
 
-    highest = max(comparable.values())
-    highest_roles = [role for role, version in comparable.items() if version == highest]
-    if len(highest_roles) == 1:
-        return highest_roles[0]
-
-    highest_digests = {current[role]["digest"] for role in highest_roles}
-    if len(highest_digests) == 1:
-        return sorted(highest_roles)[0]
+    if len({info["digest"] for info in current.values()}) == 1:
+        return "repo"
+    evidence = {role: {"version": info.get("version"), "digest": info.get("digest"),
+                       "path": info.get("path"), "source": info.get("source")}
+                for role, info in current.items()}
     raise SystemExit(
-        "conflict: multiple roles have the highest version with different digests: "
-        f"{', '.join(sorted(highest_roles))}; rerun with --source"
+        "conflict: version order does not establish release provenance or content freshness; "
+        "inspect the differences and rerun with --source: " + json.dumps(evidence, sort_keys=True)
     )
 
 
@@ -1619,6 +1636,10 @@ def command_link_location(args: argparse.Namespace) -> int:
             + ", ".join(malformed_location_ids)
         )
     existing = locations.get(args.location_id)
+    if (isinstance(existing, dict) and existing.get("kind") == "local"
+            and existing.get("agent_id") == args.agent_id
+            and existing.get("path") == location.get("path") and "provenance" in existing):
+        location["provenance"] = existing["provenance"]
     replace = bool(getattr(args, "replace", False))
     same_path_ids = same_path_location_ids(locations, path, args.location_id)
     if args.kind == "local" and not args.derived_from:
@@ -1673,6 +1694,9 @@ def command_link_location(args: argparse.Namespace) -> int:
                     raise SystemExit("--replace cannot change project_id")
                 if args.kind == "external" and recorded.get("source_id") != args.source_id:
                     raise SystemExit("--replace cannot change source_id")
+            if (same_path and args.kind == "local" and recorded.get("agent_id") == args.agent_id
+                    and "provenance" in recorded):
+                location["provenance"] = recorded["provenance"]
         if args.kind == "local" and not args.derived_from:
             for _, recorded in sources:
                 if (
@@ -2006,6 +2030,7 @@ def create_agent_install_snapshot(
             "original_digest": relationship_digest_tree(local_path, sync_id=group_key),
             "derived_from": build["build_id"],
             "build_digest": build["output_digest"],
+            "original_provenance": build.get("original_provenance"),
         }
         (snapshot_dir / "manifest.json").write_text(
             json.dumps(manifest, indent=2, sort_keys=True) + "\n",
@@ -2212,6 +2237,32 @@ def command_repair_agent_install(args: argparse.Namespace) -> int:
             + (f": {details}" if details else "")
         )
     build_path = Path(build["path"])
+    # Validate freshness and test-install intent before even an already-current
+    # branch can persist registry metadata, or a snapshot can be created.
+    project = relationship_project_root(args)
+    manifest = json.loads(Path(build["manifest_path"]).read_text(encoding="utf-8"))
+    record = next(item for item in manifest["skills"] if item["sync_id"] == sync_id)
+    source_path = project / "skills" / record["name"]
+    require_skill_dir(str(source_path), "repo")
+    if read_skill_metadata(source_path).get("sync_id") != sync_id:
+        raise SystemExit("portable source identity does not match the repair group")
+    try:
+        actual_inputs = input_digest(source_path, project / "platforms" / args.agent, sync_id)
+    except (OSError, ValueError) as error:
+        raise SystemExit(str(error)) from error
+    if (build["portable_digest"] != relationship_digest_tree(source_path, portable=True, sync_id=sync_id)
+            or record.get("input_digest") != actual_inputs):
+        raise SystemExit("stale or legacy Agent build: rebuild from the selected current source before installation")
+    source = git_source(project)
+    build_source = manifest.get("source")
+    if (source["channel"] != "mainline" or not isinstance(build_source, dict)
+            or build_source.get("channel") != "mainline") and not getattr(args, "allow_development", False):
+        raise SystemExit("development or unknown build provenance: use --allow-development for an explicit test install")
+    provenance = {"verified_source": source, "build_source": build_source,
+                  "input_digest": actual_inputs, "portable_digest": build["portable_digest"],
+                  "output_digest": build["output_digest"],
+                  "test_install": source["channel"] != "mainline" or not isinstance(build_source, dict)
+                  or build_source.get("channel") != "mainline"}
     if target.exists():
         require_skill_dir(str(target), f"local:{args.agent}")
         validate_install_identity(target, sync_id)
@@ -2224,6 +2275,7 @@ def command_repair_agent_install(args: argparse.Namespace) -> int:
                 "agent_id": args.agent,
                 "derived_from": build["build_id"],
                 "path": normalized_absolute(target),
+                "provenance": provenance,
             }
             group.setdefault("locations", {})[location_id] = location
             registry["schema_version"] = max(2, int(registry.get("schema_version", 1)))
@@ -2235,6 +2287,7 @@ def command_repair_agent_install(args: argparse.Namespace) -> int:
                 "target_path": normalized_absolute(target),
                 "snapshot": None,
                 "status": "already-current",
+                "provenance": provenance,
             })
         if not args.discard_local_changes:
             raise SystemExit(
@@ -2244,7 +2297,8 @@ def command_repair_agent_install(args: argparse.Namespace) -> int:
 
     snapshot_id = None
     if target.exists():
-        snapshot_id = create_agent_install_snapshot(state_dir, key, args.agent, target, build)
+        snapshot_id = create_agent_install_snapshot(state_dir, key, args.agent, target,
+            {**build, "original_provenance": group.get("locations", {}).get(location_id, {}).get("provenance")})
     try:
         atomic_install_build(build_path, target, sync_id, build["output_digest"])
     except (OSError, SystemExit, RelationshipError) as error:
@@ -2255,6 +2309,7 @@ def command_repair_agent_install(args: argparse.Namespace) -> int:
         "agent_id": args.agent,
         "derived_from": build["build_id"],
         "path": normalized_absolute(target),
+        "provenance": provenance,
     }
     group.setdefault("locations", {})[location_id] = location
     if snapshot_id:
@@ -2277,6 +2332,7 @@ def command_repair_agent_install(args: argparse.Namespace) -> int:
         "target_path": normalized_absolute(target),
         "snapshot": snapshot_id,
         "status": "reinstalled",
+        "provenance": provenance,
         "updated_at": operation_at,
     })
 
@@ -2369,6 +2425,8 @@ def build_parser() -> argparse.ArgumentParser:
     )
     repair_install.add_argument("group", help="Existing sync ID, Skill name, or alias.")
     repair_install.add_argument("--agent", required=True, help="Supported Agent Builder ID.")
+    repair_install.add_argument("--allow-development", action="store_true",
+                                help="Explicitly install a development or unknown-origin build for testing; still requires fresh inputs.")
     repair_install.add_argument(
         "--discard-local-changes",
         action="store_true",
