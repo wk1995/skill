@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+- Fix Git output parsing to preserve newline characters belonging to repository paths. All commands now validate and operate on the selected worktree instead of a same-named sibling when its directory ends in a newline.
+
 ## [1.0.0] - 2026-11-03
 
 - Change-Type: initial

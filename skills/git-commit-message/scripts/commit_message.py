@@ -42,7 +42,7 @@ def git(repo: Path, *args: str, optional: bool = False) -> str | None:
         return None
     require(result.returncode == 0,
             f"git {' '.join(args)} failed: {os.fsdecode(result.stderr).strip()}")
-    return os.fsdecode(result.stdout).rstrip("\n")
+    return os.fsdecode(result.stdout).removesuffix("\n")
 
 
 def repository(location: str) -> Path:

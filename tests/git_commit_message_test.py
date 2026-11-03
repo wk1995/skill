@@ -575,6 +575,47 @@ class CommitMessageTests(unittest.TestCase):
         self.assertEqual(result.stdout.strip(), b"[work][linked] linked subject")
         self.assertTrue(self.hook.exists())
 
+    def test_newline_repository_names_select_only_the_requested_worktree(self):
+        self.policy(ai_prefix=False, extra_prefixes=["peer"])
+        for suffix in ("\n", "\n\n"):
+            with self.subTest(suffix=suffix):
+                selected = self.root / ("repo" + suffix)
+                self.run_command([GIT, "init", "--template=", str(selected)])
+                (selected / module.POLICY).write_text('{"ai_prefix":false,"extra_prefixes":["selected"]}')
+                hook = selected / ".git/hooks/commit-msg"
+
+                def invoke(command, *args, **kwargs):
+                    return self.run_command([sys.executable, TOOL, "--repo", selected, command, *args], **kwargs)
+
+                invoke("install")
+                self.assertTrue(hook.exists())
+                self.assertFalse(self.hook.exists(), "must not install into the sibling repository")
+                invoke("install")
+                raw = b"fix: selected\n\nBody\n"
+                self.message.write_bytes(raw)
+                invoke("check", self.message, ok=False)
+                self.assertEqual(self.message.read_bytes(), raw)
+                invoke("fix", self.message)
+                expected = b"[selected] fix: selected\n\nBody\n"
+                self.assertEqual(self.message.read_bytes(), expected)
+                invoke("hook", self.message)
+                invoke("check", self.message)
+                self.assertEqual(self.message.read_bytes(), expected)
+
+                before = hook.read_bytes()
+                (selected / module.POLICY).write_text('{"mode":"invalid"}')
+                for command in ("install", "uninstall", "hook", "fix", "check"):
+                    args = () if command in ("install", "uninstall") else (self.message,)
+                    invoke(command, *args, ok=False)
+                    self.assertEqual(hook.read_bytes(), before)
+                    self.assertEqual(self.message.read_bytes(), expected)
+                    self.assertFalse(self.hook.exists())
+                (selected / module.POLICY).write_text('{"ai_prefix":false}')
+                invoke("uninstall")
+                invoke("uninstall")
+                self.assertFalse(hook.exists())
+                self.assertFalse(self.hook.exists())
+
     def test_missing_git_fails_before_any_mutation(self):
         empty_path = self.root / "empty-path"
         empty_path.mkdir()
