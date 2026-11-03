@@ -3,7 +3,7 @@ name: git-commit-message
 description: Mandatory before every agent Git commit in any repository, including commit-and-push tasks, amend, message-file commits, and commits invoked through helpers. Check and normalize AI client/model attribution and optional machine/repository prefixes. Also use to configure policy or install its commit-msg hook; exclude read-only Git, staging alone, and push-only tasks.
 metadata:
   sync_id: "git-commit-message"
-  version: "1.0.1"
+  version: "1.0.0"
   triggering:
     include:
       - Before every agent-created Git commit in any repository, including amend, message-file commits, and helper-invoked commits.
