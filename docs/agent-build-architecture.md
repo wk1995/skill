@@ -154,3 +154,5 @@ installation-time origins and digests, and rollback restores prior provenance.
 Relationship reports expose recorded/current input digests and mark mismatches stale. Generated-mode evidence is validated before accepting any records from an Agent build. All content and mode consumers share recursive transient-path exclusions.
 
 New Agent snapshots include `original_modes`; snapshot creation verifies copied modes and rollback rejects mode drift before writes. Legacy snapshots without this evidence retain their previous compatibility behavior.
+
+Build publication moves an existing artifact into a private backup before publishing the staged result. A failed publication restores that backup; if restoration also fails, both previous and new artifacts remain at the reported recovery paths.

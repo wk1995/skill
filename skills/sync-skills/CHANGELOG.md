@@ -6,6 +6,8 @@ version, date, and a change summary.
 
 ## [Unreleased]
 
+- Preserve the previous build artifact until publication succeeds; restore it after publication failure and retain both recovery paths if restoration also fails. Add publication and recovery fault regressions.
+
 - Review fixes: compare recorded and current input fingerprints in relationship reports and their contract validator; attest generated file execute bits in manifests and original snapshot modes before trusting an artifact or restoring a snapshot; share recursive transient-path exclusions across builder, fingerprints, digests, snapshots and rollback. Test public repair from all four distributed adapters outside the checkout with Git removed from PATH.
 
 - Require explicit source selection for mainline version/content divergence and unresolved copies; remove timestamp-based selection. Higher local development versions no longer silently win.

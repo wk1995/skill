@@ -252,6 +252,42 @@ class ReviewRegressions(unittest.TestCase):
             builder.build("codex", ["missing"], None, True)
         self.assertEqual(self.manifest_path.read_bytes(), before)
 
+    def test_builder_publication_failure_retains_previous_artifact(self):
+        before = self.manifest_path.read_bytes()
+        replace = os.replace
+        output = self.project / "dist/codex"
+        def fail_publish(source, destination):
+            if Path(source).name.startswith(".codex-build-") and Path(destination) == output:
+                raise OSError("publication fault")
+            return replace(source, destination)
+        with patch.object(os, "replace", side_effect=fail_publish):
+            with self.assertRaisesRegex(OSError, "publication fault"):
+                builder.build("codex", [], None, True)
+        self.assertTrue(self.manifest_path.exists(), "previous artifact was deleted before failed publication")
+        self.assertEqual(self.manifest_path.read_bytes(), before)
+        self.assertFalse(list(output.parent.glob(".codex-build-*")))
+        self.assertFalse(list(output.parent.glob(".codex-previous-*")))
+        builder.build("codex", [], None, True)
+        self.assertEqual([r["sync_id"] for r in json.loads(self.manifest_path.read_text())["skills"]], ["alpha", "gamma"])
+
+    def test_builder_failed_recovery_preserves_both_artifacts(self):
+        before = self.manifest_path.read_bytes()
+        replace = os.replace
+        output = self.project / "dist/codex"
+        def fail_publish_and_restore(source, destination):
+            if Path(destination) == output:
+                raise OSError("publication/recovery fault")
+            return replace(source, destination)
+        with patch.object(os, "replace", side_effect=fail_publish_and_restore):
+            with self.assertRaisesRegex(builder.BuildError, "previous artifact preserved"):
+                builder.build("codex", [], None, True)
+        backups = list(output.parent.glob(".codex-previous-*/artifact/.agent-build.json"))
+        staged = list(output.parent.glob(".codex-build-*/.agent-build.json"))
+        self.assertEqual(len(backups), 1)
+        self.assertEqual(backups[0].read_bytes(), before)
+        self.assertEqual(len(staged), 1)
+        self.assertEqual(json.loads(staged[0].read_text())["platform"], "codex")
+
     def test_unknown_detached_and_dirty_sources_require_test_intent_before_writes(self):
         git = self.git_project()
         before = (self.state / "registry.json").read_bytes()

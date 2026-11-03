@@ -301,6 +301,8 @@ def build(platform: str, skill_names: list[str], output_arg: str | None, force: 
     source = git_source(ROOT)
     output.parent.mkdir(parents=True, exist_ok=True)
     staging = Path(tempfile.mkdtemp(prefix=f".{output.name}-build-", dir=output.parent))
+    backup_root = None
+    preserve_recovery = False
     try:
         root_overlay = config.get("root_overlay")
         if root_overlay:
@@ -365,12 +367,28 @@ def build(platform: str, skill_names: list[str], output_arg: str | None, force: 
             require(input_digest(skill_dir, platform_dir, sync_id) == fingerprints[sync_id],
                     f"build inputs changed while building {sync_id}; rebuild from a stable source")
         if output.exists():
-            shutil.rmtree(output)
-        os.replace(staging, output)
+            backup_root = Path(tempfile.mkdtemp(prefix=f".{output.name}-previous-", dir=output.parent))
+            os.replace(output, backup_root / "artifact")
+        try:
+            os.replace(staging, output)
+        except BaseException as publish_error:
+            if backup_root is not None and (backup_root / "artifact").exists():
+                try:
+                    os.replace(backup_root / "artifact", output)
+                except BaseException as recovery_error:
+                    preserve_recovery = True
+                    raise BuildError(
+                        f"build publication failed ({publish_error}); recovery failed ({recovery_error}); "
+                        f"previous artifact preserved at {backup_root / 'artifact'}; new build at {staging}"
+                    ) from recovery_error
+            raise
         return output
     finally:
-        if staging.exists():
-            shutil.rmtree(staging)
+        if not preserve_recovery:
+            if staging.exists():
+                shutil.rmtree(staging)
+            if backup_root is not None and backup_root.exists():
+                shutil.rmtree(backup_root)
 
 
 def validate_all() -> None:
