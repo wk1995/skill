@@ -1316,9 +1316,7 @@ def choose_source_by_version_on_mainline(group: dict[str, Any], current: dict[st
     if not default_branch or current_branch != default_branch:
         return None
 
-    versions_by_role = {role: parse_version(info.get("version")) for role, info in current.items() if info.get("version")}
-    comparable = {role: version for role, version in versions_by_role.items() if version is not None}
-    if len(comparable) < 2 or len(set(comparable.values())) <= 1:
+    if len({info.get("version") for info in current.values()}) <= 1:
         return None
 
     if len({info["digest"] for info in current.values()}) == 1:

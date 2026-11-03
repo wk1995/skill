@@ -151,7 +151,7 @@ def selected_skills(names: list[str]) -> list[tuple[Path, str, str, str]]:
         if not skill_dir.is_dir() or skill_dir.name.startswith("."):
             continue
         name, sync_id, version = skill_metadata(skill_dir)
-        if not requested or name in requested:
+        if not names or name in requested:
             discovered.append((skill_dir, name, sync_id, version))
             requested.discard(name)
     require(not requested, f"unknown Skill(s): {', '.join(sorted(requested))}")
@@ -297,6 +297,11 @@ def build(platform: str, skill_names: list[str], output_arg: str | None, force: 
     skills = selected_skills(skill_names)
     output = safe_output(Path(output_arg) if output_arg else DEFAULT_OUTPUT_DIR / platform)
     validate_replacement(output, platform, force)
+    try:
+        fingerprints = {sync_id: input_digest(skill_dir, platform_dir, sync_id)
+                        for skill_dir, _, sync_id, _ in skills}
+    except (OSError, ValueError) as error:
+        raise BuildError(str(error)) from error
     source = git_source(ROOT)
     output.parent.mkdir(parents=True, exist_ok=True)
     staging = Path(tempfile.mkdtemp(prefix=f".{output.name}-build-", dir=output.parent))
@@ -342,7 +347,7 @@ def build(platform: str, skill_names: list[str], output_arg: str | None, force: 
                 "core_version": version,
                 "portable_digest": digest_tree(skill_dir, skip_top={"agent-builds"}),
                 "output_digest": digest_tree(target),
-                "input_digest": input_digest(skill_dir, platform_dir, sync_id),
+                "input_digest": fingerprints[sync_id],
                 "path": (relative_path(config["skills_path"], "skills_path", allow_dot=True) / name).as_posix(),
             })
 
@@ -359,6 +364,9 @@ def build(platform: str, skill_names: list[str], output_arg: str | None, force: 
             encoding="utf-8",
         )
 
+        for skill_dir, _, sync_id, _ in skills:
+            require(input_digest(skill_dir, platform_dir, sync_id) == fingerprints[sync_id],
+                    f"build inputs changed while building {sync_id}; rebuild from a stable source")
         if output.exists():
             shutil.rmtree(output)
         os.replace(staging, output)

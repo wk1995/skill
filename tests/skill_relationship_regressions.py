@@ -226,6 +226,32 @@ class ReviewRegressions(unittest.TestCase):
         self.assertEqual(self.repair()[1]["status"], "already-current")
         self.assertFalse(self.snapshot_names())
 
+    def test_builder_preflights_producer_and_preserves_output_if_inputs_change(self):
+        manifest = self.manifest_path.read_bytes()
+        with patch.object(builder, "input_digest", side_effect=["a" * 64, "b" * 64]):
+            with self.assertRaisesRegex(builder.BuildError, "inputs changed while building"):
+                builder.build("codex", ["alpha"], None, True)
+        self.assertEqual(self.manifest_path.read_bytes(), manifest)
+        self.assertFalse(list((self.project / "dist").glob(".codex-build-*")))
+        producer = self.project / "scripts/agent_build.py"
+        producer.parent.mkdir()
+        real = self.root / "producer.py"
+        real.write_text("# do not follow this link")
+        producer.symlink_to(real)
+        output = self.root / "new-output/codex"
+        with self.assertRaisesRegex(builder.BuildError, "producer must not be a symbolic link"):
+            builder.build("codex", ["alpha"], str(output), False)
+        self.assertFalse(output.parent.exists())
+
+    def test_selected_build_does_not_include_following_siblings(self):
+        builder.build("codex", ["alpha"], None, True)
+        manifest = json.loads(self.manifest_path.read_text())
+        self.assertEqual([item["sync_id"] for item in manifest["skills"]], ["alpha"])
+        before = self.manifest_path.read_bytes()
+        with self.assertRaisesRegex(builder.BuildError, "unknown Skill"):
+            builder.build("codex", ["missing"], None, True)
+        self.assertEqual(self.manifest_path.read_bytes(), before)
+
     def test_unknown_detached_and_dirty_sources_require_test_intent_before_writes(self):
         git = self.git_project()
         before = (self.state / "registry.json").read_bytes()
