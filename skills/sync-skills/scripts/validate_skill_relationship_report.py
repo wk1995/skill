@@ -324,7 +324,7 @@ def validate_report(report: dict[str, Any], schema_path: Path = DEFAULT_SCHEMA) 
                     continue
                 present = build_value.get("present")
                 expected_fields = build_present_fields if present is True else build_base_fields
-                allowed_fields = expected_fields | ({"input_digest", "current_input_digest"} if present is True else set())
+                allowed_fields = expected_fields | ({"input_digest", "current_input_digest", "rebuild_required"} if present is True else set())
                 build = validator.object(build_value, build_path, expected_fields, allowed_fields)
                 if build is None:
                     continue
@@ -348,6 +348,11 @@ def validate_report(report: dict[str, Any], schema_path: Path = DEFAULT_SCHEMA) 
                     build_stale = True
                 if "input_digest" in build:
                     validator.digest(build["input_digest"], f"{build_path}.input_digest")
+                if "rebuild_required" in build:
+                    if not isinstance(build["rebuild_required"], bool):
+                        validator.error(build_path, "rebuild_required must be a boolean")
+                    elif build["rebuild_required"]:
+                        build_stale = True
                 if "current_input_digest" in build:
                     validator.digest(build["current_input_digest"], f"{build_path}.current_input_digest")
                     if "input_digest" not in build:

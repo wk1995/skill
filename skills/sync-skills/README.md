@@ -176,7 +176,7 @@ Before repair, rebuild from the selected source. Current portable content, Agent
 
 For an explicitly requested test install from a feature branch, dirty/detached checkout or unknown origin, add `--allow-development`. This is separate from `--discard-local-changes`, which authorizes replacing differing local files. Normal installs use clean default-branch builds. The external registry stores each installation's `provenance`: build and verified-source commit/branch/URL, dirty state, fingerprints and `test_install`. No development metadata is added to portable Skill files. Keep development edits under `[Unreleased]` and determine one release version when finalizing.
 
-The report compares recorded and current input fingerprints and marks stale builds even when portable bytes are unchanged. Generated file execute bits are recorded in `output_modes`; artifacts with changed execute bits are rejected before installation. New Agent snapshots record `original_modes`, which rollback verifies before any restore; legacy snapshots remain readable.
+Legacy manifests missing input or mode evidence are marked `rebuild_required` and stale in strict reports. The report compares recorded and current input fingerprints and marks stale builds even when portable bytes are unchanged. Generated file execute bits are recorded in `output_modes`; artifacts with changed execute bits are rejected before installation. New Agent snapshots record `original_modes`, which rollback verifies before any restore; legacy snapshots remain readable.
 
 ### Migrate legacy repository state
 

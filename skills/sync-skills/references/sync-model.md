@@ -63,7 +63,7 @@ portable Skill inputs. `mainline` means a clean configured default-branch checko
 it does not certify an official release. Missing Git or unavailable default-branch
 metadata never proves mainline provenance.
 
-The relationship report exposes optional `input_digest` and `current_input_digest` evidence and marks mismatches `agent-build-stale`, including in strict mode. Malformed input evidence or artifact execute bits differing from `output_modes` invalidate the Agent build before any partial records can be consumed. Recursive `.git`, `.DS_Store`, cache and distribution paths share one exclusion rule across copy, digest, fingerprint and mode checks.
+Legacy manifests without input or mode evidence set `rebuild_required` and remain inventory-readable while failing strict freshness checks. The relationship report exposes optional `input_digest` and `current_input_digest` evidence and marks mismatches `agent-build-stale`, including in strict mode. Malformed input evidence or artifact execute bits differing from `output_modes` invalidate the Agent build before any partial records can be consumed. Recursive `.git`, `.DS_Store`, cache and distribution paths share one exclusion rule across copy, digest, fingerprint and mode checks.
 
 Repair verifies generated modes and current portable and input digests before every mutation,
 including an already-current registry update. Legacy builds without input or mode evidence remain readable for

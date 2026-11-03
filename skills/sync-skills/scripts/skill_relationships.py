@@ -456,6 +456,7 @@ def read_builds(
                     "output_digest": record["output_digest"],
                     "path": normalized_absolute(skill_path),
                     "manifest_path": normalized_absolute(manifest_path),
+                    "rebuild_required": "input_digest" not in record or "output_modes" not in record,
                 }
                 if "input_digest" in record:
                     value = record["input_digest"]
@@ -923,6 +924,8 @@ def build_report(
                     statuses.add("agent-build-stale")
                 if ("current_input_digest" in cell
                         and cell.get("input_digest") != cell["current_input_digest"]):
+                    statuses.add("agent-build-stale")
+                if cell.get("rebuild_required"):
                     statuses.add("agent-build-stale")
             build_cells[agent_id] = cell
         if not present_builds:

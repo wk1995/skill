@@ -476,6 +476,25 @@ class ReviewRegressions(unittest.TestCase):
         self.manifest_path.write_text(original)
         self.assertEqual(self.repair()[1]["status"], "already-current")
 
+    def test_legacy_build_evidence_requires_rebuild_in_report_and_repair(self):
+        before = (self.state / "registry.json").read_bytes()
+        for field in ("input_digest", "output_modes"):
+            manifest = json.loads(self.manifest_path.read_text())
+            manifest["skills"][0].pop(field)
+            self.manifest_path.write_text(json.dumps(manifest))
+            alpha = self.report()["skills"][0]
+            self.assertTrue(alpha["agent_builds"]["codex"]["rebuild_required"])
+            self.assertIn("agent-build-stale", alpha["statuses"])
+            self.assertEqual(self.run_cli("relationships", "--strict")[0], 2)
+            with self.assertRaisesRegex(SystemExit, "stale or legacy"):
+                self.repair()
+            self.assertEqual((self.state / "registry.json").read_bytes(), before)
+            self.assertFalse(self.snapshot_names())
+            builder.build("codex", [], None, True)
+            self.assertEqual(self.run_cli("relationships", "--strict")[0], 0)
+            self.assertEqual(self.repair()[1]["status"], "already-current")
+            before = (self.state / "registry.json").read_bytes()
+
     def test_snapshot_mode_corruption_rejected_before_rollback_mutation(self):
         src = self.project / "skills/alpha/scripts/run.sh"
         src.parent.mkdir()

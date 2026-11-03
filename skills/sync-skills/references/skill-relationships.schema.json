@@ -333,6 +333,9 @@
         "current_input_digest": {
           "$ref": "#/$defs/digest"
         },
+        "rebuild_required": {
+          "type": "boolean"
+        },
         "adapter_version": {
           "$ref": "#/$defs/semver"
         },
