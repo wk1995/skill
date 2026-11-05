@@ -1,0 +1,4 @@
+interface:
+  display_name: "Fork Repository Maintenance"
+  short_description: "Maintain forks without overwriting personal branches"
+  default_prompt: "Use $fork-repository-maintenance to inspect my fork and plan source synchronization while protecting my personal default branch."

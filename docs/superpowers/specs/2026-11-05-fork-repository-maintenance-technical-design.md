@@ -1,14 +1,14 @@
 # Fork Repository Maintenance Skill 技术设计
 
 日期：2026-11-05
-状态：实施设计提案，尚未创建 Skill 或实现下述命令。
+状态：已实现 0.1.0 实验版本；本文件保留设计依据，并记录实际落地差异。
 需求依据：[Fork Repository Maintenance Skill PRD](2026-07-29-fork-repository-maintenance-skill-prd.md)。
 
 ## 1. 设计范围与约束
 
 本设计以最新版 PRD 的分支隔离模型为准：A 是上游，B 是 Fork；B 的来源分支与 A 严格同名，B 的个人默认分支必须另建。`sync` 只更新来源分支，`integrate` 才能改变个人版本。首版没有定时同步、Webhook 或后台同步服务。
 
-文档中的文件结构、字段、命令和测试名称都是拟议接口。它们不能作为已有可执行工具调用。PRD 第 12.2 节尚未确定的项目，在本文中给出实施建议；建议不构成已发布兼容性承诺，实施前应定稿。
+当前可执行接口以 [运行契约](../../../skills/fork-repository-maintenance/references/runtime-contract.md)及 CLI --help 为准，使用说明见 [README](../../../skills/fork-repository-maintenance/README.zh-CN.md)。下文第 2–14 节保留实施前设计快照，其中的示例字段、拟议布局和简写命令不是当前 CLI 契约；实际差异集中列于 1.1。原文档阶段的检查不代表运行时验证，现有证据见[实施覆盖账本](2026-11-05-fork-repository-maintenance-implementation-review.md)。
 
 | 不变量 | 必须保证的行为 |
 | --- | --- |
@@ -21,7 +21,24 @@
 | I7：入口自校验 | 直接命令、继续和恢复入口都校验角色、计划、路径、并发和依赖，不能依赖先运行 lint。 |
 | I8：离线可恢复 | 本地快照恢复不依赖 A/B 可访问，不携带凭据，不宣称远端默认设置已完成。 |
 
-## 2. 技术选择与模块
+### 1.1 0.1.0 实际实现映射
+
+- 公开入口为 `skills/fork-repository-maintenance/scripts/fork_maintenance.py`；`fm_core.py` 负责路径、Git、GitHub、外部状态，`fm_engine.py` 负责计划、执行和恢复。仅使用 Python 标准库。
+- 运行环境要求 Python 3.11+、Git 2.45+、macOS/Linux；包括 offline inspect 在内都检查 Git。GitHub.com 使用当前 gh 账号及固定 API 2026-03-10；其他托管平台未实现。local 适配器用于显式本地 bare 仓库和隔离测试。
+- 状态布局为 `profiles/<id>.json`、`operations/<id>.json`、`locks/<id>.json`、`cache/<id>/`、`candidates/<operation-id>/` 和 `snapshots/<id>/`。同一 B 地址共享 profile 锁；profile 地址键之外另存并核验不可变仓库 ID。仓库更名和地址重建不自动迁移。
+- profile 显式分开 `sources` 与 `personal`，保存默认基线和已核验来源 SHA。计划保存 kind、仓库身份、actor、protected、entries、profile_digest 和有效期；条目使用 `name/before/after/action`。操作日志包含原计划、发送意图、回执、创建的 B ID、原始/拟更新 profile 和恢复路径，没有另设 pending/NDJSON 事件目录。
+- 所有写操作使用保存的计划和匹配摘要。fork/integrate/preserve/restore 的直接参数只生成 dry-run 计划。显式 `--refresh` 可以与 dry-run 同用，含义是允许准备受控本地对象；`--save-plan` 只写不存在的新文件。不会更新 B。
+- 后续操作必须显式 `--profile`；没有 checkout 自动发现或仓库/全局偏好层叠。integrate 使用 `--source-name`；restore 使用 `--snapshot <目录>` 和 `--destination-path <不存在路径>`。完整参数以运行契约为准。
+- Fork 采用原生仅默认分支初始化，再显式创建所选同名来源及独立默认。只允许删除本次创建、SHA 未变且不再为默认的额外引导分支；异步创建结果不确定时不会重复 POST，需要核验后恢复。
+- sync 仅允许快进加显式旧 SHA lease；来源改写、个人角色、未登记已存在分支、集合或远端漂移均阻塞。多分支逐项发布，不承诺跨分支原子性，成功项保留回执。
+- merge/cherry-pick 停在隔离候选供审查并按仓库规范提交，然后 resume 验证并发布。rebase 仅处理线性个人历史且必须输出到新个人分支；没有授权验证命令则不发布。冲突不自动取舍个人功能。
+- preserve 实现完整 bundle 和可选外部 archive-root，没有 mirror。归档引用使用 `refs/fm-archive/{a,b}/{heads,tags}/...`，支持 annotated tag 对象。清单、摘要、自包含条件和独立对象库校验通过后才排他发布新目录；恢复不访问 A/B。
+- 失败保留日志、锚点和 staging。操作有发送意图而远端已达目标时可重读确认，不重复推送；候选/恢复目录必须有本次操作标记才能识别。没有自动清理或复杂旧仓库迁移命令。
+- 退出 0 仍须读取 status；planned、candidate-review、unverified、verification-failed 都不是远端完成。Git 快照明确排除 LFS 内容、子模块仓库、未提交工作和平台附件。
+
+首版版本选择为新增实验 Skill 0.1.0，无旧版迁移，不变更现有 adapter 或 artifact 发布版本。四种现有 adapter 构建均需独立运行检查；没有自动安装或真实 GitHub 写入认证。
+
+## 2. 技术选择与模块（实施前设计快照）
 
 建议采用 Python 3.11+ 标准库编写控制程序，Git 负责对象、引用、传输与整合，GitHub 适配器通过当前登录的 `gh` 执行平台 API。拟支持 Git 2.45+；这只是实施目标，最低版本与当前版本必须在实现阶段分别验证。GitHub CLI 按所需 API、账号和字段能力预检，缺失时明确停止相关阶段。
 
@@ -388,7 +405,7 @@ restore 不查询远端也能执行：先验证 manifest 全量结构、SHA、�
 
 状态存储、远端写入与恢复契约必须协同设计，但应按上述边界分别评审。上线前确定配置 schema、状态迁移、API 权限、支持版本和错误码；不在实现提交中悄悄改变 PRD 的分支模型。
 
-### 13.2 本轮文档检查范围
+### 13.2 原文档设计阶段的检查范围（历史记录）
 
 本轮对象是配套 PRD 与本技术设计，属于文档变更。精确 Git base/head 和最终 gate 结果在提交后的执行报告中记录，避免在文档内写入其自身提交 SHA。下表的 PASS 仅表示契约一致性检查，运行时测试全部属于后续实现证据。
 
