@@ -98,7 +98,8 @@ origin/main <──> 本地 main（已采纳上游 + 个人改动）
 - 识别当前仓库、Git worktree、当前分支、HEAD、工作区状态和未跟踪文件。
 - 枚举 `origin`、`upstream` 的 fetch/push URL，并输出脱敏后的规范化身份。
 - 发现双方默认分支，支持 `main`、`master` 或显式映射。
-- 健康检查前执行只读的 `fetch origin <default>` 和按需的 `fetch upstream <branch>`；任一 fetch 失败都必须标记为阻塞，不能用陈旧的 remote-tracking ref 判断安全。
+- 在线健康检查应刷新 `origin` 默认分支和按需的 `upstream` 分支，并验证相应 remote-tracking ref 已更新；任一 fetch 失败都必须标记为在线同步及推送的阻塞项，不能用陈旧引用判断远端安全。报告应保留失败原因和最后成功抓取时间。
+- 离线审计和快照恢复不以 fetch 成功为前提：可以使用本地已记录的来源身份和快照清单生成报告，在校验快照、恢复路径和用户授权后恢复到新的空目录。此时远端新鲜度标记为未知，不执行在线同步、推送或覆盖现有工作树。
 - 计算个人 `main` 相对最新 `origin/<default>` 和 `upstream/<branch>` 的 ahead/behind、共同祖先、未推送提交、未提交改动和分支差异。
 - 检查未完成的 merge、rebase、cherry-pick、revert、bisect、worktree 锁和浅克隆限制。
 - 输出稳定的 JSON 和人类可读报告；报告包含完整 SHA、比较范围、脱敏来源、快照状态和阻塞项。
@@ -146,7 +147,7 @@ origin/main <──> 本地 main（已采纳上游 + 个人改动）
 - 每次写操作记录 operation ID、时间、原始 SHA、目标 SHA、策略、脱敏远程身份、快照 ID 和结果。
 - 操作记录、快照清单和锁文件写入外部状态目录；不把凭据或未脱敏 URL 写入仓库。
 - 支持查看最近操作、比较前后差异、从指定快照或锚点恢复，以及导出可放入 PR 描述的报告。
-- 相同 operation ID 重试必须先验证已有分支、锚点、快照和当前远程 SHA；输入未变时继续原操作，不创建重复提交或重复快照。
+- 相同 operation ID 重试必须先验证已有分支、锚点、快照和该阶段的前置条件；在线整合或推送重试还必须刷新并验证当前远程 SHA，离线恢复重试只验证本地快照和恢复目标。输入未变时继续原操作，不创建重复提交或重复快照。
 - 远端分支意外前进、来源身份改变、快照校验失败或恢复前置条件不满足时停止，不默认 force-push、reset 或删除数据。
 
 ## 7. 关键工作流
@@ -158,14 +159,21 @@ flowchart TD
     Start[进入仓库] --> Inspect[审计 worktree、remote、默认分支和 Git 状态]
     Inspect --> Identity{远程身份可验证且未泄露凭据？}
     Identity -- 否 --> Block[阻塞并报告，不写入]
-    Identity -- 是 --> FetchOrigin[刷新 origin 默认分支]
-    FetchOrigin --> FetchUpstream[尝试刷新 upstream 分支]
+    Identity -- 是 --> FetchOrigin[尝试刷新 origin 默认分支]
+    FetchOrigin --> OriginState{origin 刷新成功？}
+    OriginState -- 是 --> FetchUpstream[尝试刷新 upstream 分支]
+    OriginState -- 否 --> OriginUnknown[标记远端新鲜度未知，阻塞在线同步和推送]
+    OriginUnknown --> FetchUpstream
     FetchUpstream --> Reachable{上游可访问？}
-    Reachable -- 是 --> Snapshot[创建并校验独立快照]
+    Reachable -- 是 --> SnapshotPlan[展示快照范围、目标路径和恢复限制]
+    SnapshotPlan --> SnapshotConfirm{用户已授权创建此快照？}
+    SnapshotConfirm -- 否 --> Preview[仅报告预演结果，不创建快照]
+    SnapshotConfirm -- 是 --> Snapshot[重新校验输入和路径，创建并验证独立快照]
     Reachable -- 否 --> Existing{已有可验证快照？}
     Existing -- 否 --> BlockNoSnapshot[标记不可保全，等待用户指定来源]
     Existing -- 是 --> State[标记 unreachable 或 deleted，保留旧快照]
     Snapshot --> Report[输出健康报告和后续计划]
+    Preview --> Report
     State --> Report
 ```
 
@@ -175,14 +183,16 @@ flowchart TD
 
 ```mermaid
 flowchart TD
-    Begin[用户请求同步] --> Preflight[刷新 origin，检查工作区和未完成 Git 操作]
-    Preflight --> Safe{本地 main 与最新 origin/main 一致且状态安全？}
+    Begin[用户请求同步] --> Preflight[尝试刷新 origin，检查工作区和未完成 Git 操作]
+    Preflight --> OriginFresh{origin 刷新成功？}
+    OriginFresh -- 否 --> RestorePlan[生成离线快照检查计划，按 7.3 节确认恢复]
+    OriginFresh -- 是 --> Safe{本地 main 与最新 origin/main 一致且状态安全？}
     Safe -- 否 --> Stop[停止并报告分歧或脏状态]
     Safe -- 是 --> UpstreamFetch[fetch upstream 并比较拓扑]
     UpstreamFetch --> UpstreamState{上游状态}
     UpstreamState -- 无新增 --> Current[报告已是最新，保留快照]
     UpstreamState -- 有新增 --> Plan[生成差异、冲突、策略和 operation ID]
-    UpstreamState -- 不可访问 --> RestorePlan[从最后快照生成离线维护计划]
+    UpstreamState -- 不可访问 --> RestorePlan
     Plan --> Confirm{用户确认写入？}
     Confirm -- 否 --> Preview[保留只读预演结果]
     Confirm -- 是 --> Anchor[创建并校验安全锚点]
@@ -205,11 +215,11 @@ flowchart TD
 
 ### 7.3 上游消失或归档
 
-1. 重新验证远程身份和访问结果；一次网络失败只能标记 `unreachable`。
+1. 使用本地来源记录检查仓库身份，并在网络可用时尝试重新验证远程访问结果；网络不可用或 fetch 失败不能阻塞本地快照验证和离线恢复。一次网络失败只能标记 `unreachable`，远端新鲜度保持未知。
 2. 只有在平台元数据、持续失败和用户确认共同支持时，才标记 `deleted` 或 `archived`。
 3. 选择最近一个完整且校验通过的快照，展示其来源 SHA、快照时间和缺失能力。
-4. 用户确认后从快照恢复到新的工作目录或恢复分支，不能覆盖已有非空目录。
-5. 恢复后的仓库继续使用 `origin` 作为个人维护远程；不把失效的 `upstream` 自动改写成其他 URL。
+4. 展示快照 ID、来源 SHA、目标路径和操作影响；用户授权后重新检查快照完整性和路径安全，再恢复到新的空目录。没有可验证快照或用户未授权时，只报告原因，不创建恢复目录或修改既有工作树。
+5. 恢复后的仓库保留 `origin` 的个人维护角色和原有来源记录，不自动联网或推送；远程配置须通过脱敏和身份校验，不携带快照中的认证信息。恢复网络后必须刷新并验证远程状态，才能进入在线整合或推送流程；不把失效的 `upstream` 自动改写成其他 URL。
 
 ### 7.4 冲突与失败恢复
 
@@ -289,6 +299,9 @@ skills/fork-repository-maintenance/
 12. 只抓取一个上游分支或遗漏 Tag：快照标记为 `partial` 或 `unknown`，不能报告为完整保全。
 13. `origin` 和 `upstream` 的规范化身份相同，或 push URL 指向上游：操作在首次 mutation 前阻塞。
 14. 快照目录位于源工作树内、通过符号链接别名重叠或与恢复目标互相包含：操作被拒绝且已有快照不变。
+15. `origin` 或 `upstream` fetch 失败：在线同步和推送被阻塞，离线审计仍输出最后抓取时间与未知新鲜度；存在完整、校验通过的快照时，经用户授权可恢复到新的空目录。
+16. 离线恢复没有可验证快照、校验失败或用户未授权：不创建恢复目录，不修改既有工作树或快照；重试同一恢复操作不要求远程可访问。
+17. 首次保全的预演未获用户授权：不创建快照、临时目录或操作锁；授权后重新校验输入和目标路径，再创建快照。流程图与直接脚本入口均遵循此边界。
 
 ## 12. 待决策项
 
