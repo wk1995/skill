@@ -78,7 +78,7 @@ were checked against its shared invariant.
 ## Scope and remaining evidence
 
 New component: fork-repository-maintenance; old version: absent; new version:
-0.1.0; Change-Type initial. No prior portable/state compatibility is claimed and
+0.0.1; Change-Type initial. No prior portable/state compatibility is claimed and
 no migration is required. Existing adapter and artifact release versions remain
 unchanged: this builds development artifacts and does not publish a new adapter.
 

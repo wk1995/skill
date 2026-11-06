@@ -3,7 +3,7 @@ name: fork-repository-maintenance
 description: Create selected-branch forks, manually synchronize same-name source branches while protecting an independent personal default branch, integrate upstream versions into personal work, and preserve or restore verified Git snapshots. Use for fork setup, source sync, personal fork upgrades, or code preservation; exclude ordinary Git operations, release trains, and Skill-copy synchronization.
 metadata:
   sync_id: "fork-repository-maintenance"
-  version: "0.1.0"
+  version: "0.0.1"
   triggering:
     include:
       - Create or adopt a fork containing one, selected, or all upstream branches with a separate personal default branch.

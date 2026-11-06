@@ -1,7 +1,7 @@
 # Fork Repository Maintenance Skill PRD
 
 日期：2026-11-05
-状态：已实现 0.1.0 实验版本；真实 GitHub 写入验证待补充。
+状态：已实现 0.0.1 实验版本；真实 GitHub 写入验证待补充。
 
 配套文档：[技术设计](2026-11-05-fork-repository-maintenance-technical-design.md)，包含拟议接口、状态模型、安全边界与实施测试矩阵。
 

@@ -1,7 +1,7 @@
 # Fork Repository Maintenance Skill 技术设计
 
 日期：2026-11-05
-状态：已实现 0.1.0 实验版本；本文件保留设计依据，并记录实际落地差异。
+状态：已实现 0.0.1 实验版本；本文件保留设计依据，并记录实际落地差异。
 需求依据：[Fork Repository Maintenance Skill PRD](2026-07-29-fork-repository-maintenance-skill-prd.md)。
 
 ## 1. 设计范围与约束
@@ -21,7 +21,7 @@
 | I7：入口自校验 | 直接命令、继续和恢复入口都校验角色、计划、路径、并发和依赖，不能依赖先运行 lint。 |
 | I8：离线可恢复 | 本地快照恢复不依赖 A/B 可访问，不携带凭据，不宣称远端默认设置已完成。 |
 
-### 1.1 0.1.0 实际实现映射
+### 1.1 0.0.1 实际实现映射
 
 - 公开入口为 `skills/fork-repository-maintenance/scripts/fork_maintenance.py`；`fm_core.py` 负责路径、Git、GitHub、外部状态，`fm_engine.py` 负责计划、执行和恢复。仅使用 Python 标准库。
 - 运行环境要求 Python 3.11+、Git 2.45+、macOS/Linux；包括 offline inspect 在内都检查 Git。GitHub.com 使用当前 gh 账号及固定 API 2026-03-10；其他托管平台未实现。local 适配器用于显式本地 bare 仓库和隔离测试。
@@ -36,7 +36,7 @@
 - 失败保留日志、锚点和 staging。操作有发送意图而远端已达目标时可重读确认，不重复推送；候选/恢复目录必须有本次操作标记才能识别。没有自动清理或复杂旧仓库迁移命令。
 - 退出 0 仍须读取 status；planned、candidate-review、unverified、verification-failed 都不是远端完成。Git 快照明确排除 LFS 内容、子模块仓库、未提交工作和平台附件。
 
-首版版本选择为新增实验 Skill 0.1.0，无旧版迁移，不变更现有 adapter 或 artifact 发布版本。四种现有 adapter 构建均需独立运行检查；没有自动安装或真实 GitHub 写入认证。
+首版版本选择为新增实验 Skill 0.0.1，无旧版迁移，不变更现有 adapter 或 artifact 发布版本。四种现有 adapter 构建均需独立运行检查；没有自动安装或真实 GitHub 写入认证。
 
 ## 2. 技术选择与模块（实施前设计快照）
 

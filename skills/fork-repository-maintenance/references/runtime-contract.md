@@ -1,4 +1,4 @@
-# Runtime contract — 0.1.0
+# Runtime contract — 0.0.1
 
 The executable interface is `python3 scripts/fork_maintenance.py --help`. Python
 3.11+, Git 2.45+ and macOS/Linux are required, including for offline inspection.

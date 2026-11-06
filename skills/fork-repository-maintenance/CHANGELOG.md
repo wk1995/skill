@@ -4,7 +4,7 @@
 
 - Development validation uses isolated local bare repositories and controlled GitHub adapter fixtures. A live GitHub fork/default-setting workflow remains unverified; no production test repositories are created implicitly.
 
-## [0.1.0] - 2026-11-05
+## [0.0.1] - 2026-11-06
 
 - Change-Type: initial
 - Summary: Introduce selected-branch Fork initialization with an independent personal default, immutable authorized plans, manual same-name fast-forward synchronization, separately reviewed personal integration, and self-contained Git bundle preservation and offline restoration.
