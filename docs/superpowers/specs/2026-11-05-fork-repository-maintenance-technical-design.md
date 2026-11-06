@@ -1,7 +1,7 @@
 # Fork Repository Maintenance Skill 技术设计
 
 日期：2026-11-05
-状态：已实现 0.0.1 实验版本；本文件保留设计依据，并记录实际落地差异。
+状态：开发阶段使用 0.0.1 实验版本；合入默认分支时重新评估正式版本。本文件保留设计依据，并记录实际落地差异。
 需求依据：[Fork Repository Maintenance Skill PRD](2026-07-29-fork-repository-maintenance-skill-prd.md)。
 
 ## 1. 设计范围与约束
@@ -36,7 +36,7 @@
 - 失败保留日志、锚点和 staging。操作有发送意图而远端已达目标时可重读确认，不重复推送；候选/恢复目录必须有本次操作标记才能识别。没有自动清理或复杂旧仓库迁移命令。
 - 退出 0 仍须读取 status；planned、candidate-review、unverified、verification-failed 都不是远端完成。Git 快照明确排除 LFS 内容、子模块仓库、未提交工作和平台附件。
 
-首版版本选择为新增实验 Skill 0.0.1，无旧版迁移，不变更现有 adapter 或 artifact 发布版本。四种现有 adapter 构建均需独立运行检查；没有自动安装或真实 GitHub 写入认证。
+开发阶段版本选择为新增实验 Skill 0.0.1；它不是已发布版本，合入默认分支时重新评估并设定正式版本。无旧版迁移，不变更现有 adapter 或 artifact 发布版本。四种现有 adapter 构建均需独立运行检查；没有自动安装或真实 GitHub 写入认证。
 
 ## 2. 技术选择与模块（实施前设计快照）
 
