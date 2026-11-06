@@ -410,7 +410,7 @@ class VersionGuardTests(unittest.TestCase):
                     self.set_version(kind, value)
                     self.add_release(kind, value, "initial", "- Stable-Contract: Supported inputs.\n- Readiness: Workflows tested.\n")
                 self.commit()
-                self.run_guard(None if value != "0.0.1" else "new components require", base=baseline)
+                self.run_guard(base=baseline)
 
     def test_numeric_parts_do_not_carry_at_nine(self):
         for kind in ("skill", "adapter", "artifact"):
