@@ -30,16 +30,18 @@ Mail-server or tenant-wide administration, DNS/SPF/DKIM/DMARC, marketing campaig
 
 | Mailbox | Workflow backend | Current verification boundary |
 | --- | --- | --- |
-| QQ | QQ Email MCP; Himalaya as an explicit alternative | Single-account MCP isolation and private credential setup required; real-mail tests pending |
+| QQ | QQ Email MCP; Himalaya as an explicit alternative | Limited read-only smoke passed with one isolated QQ MCP connection; Himalaya and mail mutations remain untested |
 | NetEase 163/126 | Himalaya IMAP/SMTP | Separate provider settings and actual protocol/authorization checks required; real-mail tests pending |
 | Gmail / Workspace | gws CLI / Gmail API | Installed schema and OAuth policy checks required; real-mail tests pending |
-| Feishu | lark-cli mail | User identity, mailbox activation and native draft/send flow required; command help inspected, real-mail tests pending |
+| Feishu | lark-cli mail | User identity and limited read-only smoke passed with one connection; native draft/send and management remain untested |
 | Standard work mailbox | Himalaya IMAP/SMTP | Administrator-approved protocols/TLS and per-action capability required; real-mail tests pending |
 
 This is the initial `0.1.0` development implementation. The portable workflow, provider references and POSIX account helper are present; offline helper tests do not establish real account interoperability. Outlook/Microsoft 365, iCloud, enterprise presets, Agently Mail, official Gmail MCP preview and background/extended features remain roadmap items.
 
+The user-authorized [anonymized read-only test record](doc/test-results/2026-11-10-readonly-smoke/report.zh-CN.md) contains 16 current passes across QQ/Feishu and preserves an earlier incomplete collection attempt. It covers selected live samples, not the complete 94-case acceptance design. Underlying account information and raw mailbox evidence remain local.
+
 ## Private Local Information
 
-Keep **all real mailbox information** outside Git and Skill installations, including addresses, aliases, native config, credentials, message data, attachments, logs, test evidence and backups. The default account index is under the local XDG config directory, with state/cache/data separated. Only synthetic definitions and public provider information are distributable. See [local storage](references/local-storage.md) for implemented checks and platform limits.
+Keep **all real mailbox information** outside Git and Skill installations, including addresses, aliases, native config, credentials, message data, attachments, logs, test evidence and backups. The default account index is under the local XDG config directory, with state/cache/data separated. Only synthetic definitions and public provider information are distributable by default; the linked run separately records the user's limited authorization for anonymous outcomes. See [local storage](references/local-storage.md) for implemented checks and platform limits.
 
 Read [SKILL.md](SKILL.md) for the procedure, [operations](references/operations.md) for write and result rules, and [test design](doc/test-plan.zh-CN.md) for the 94 planned acceptance cases. [Implementation and validation](doc/implementation-and-validation.zh-CN.md) separates actual offline checks from pending integration.

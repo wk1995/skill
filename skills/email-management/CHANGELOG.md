@@ -2,6 +2,7 @@
 
 ## [Unreleased]
 
+- Record explicitly authorized, anonymized QQ/Feishu read-only smoke outcomes and their managed execution history; raw mailbox evidence remains private. No core behavior or version change.
 - Accept underscores in native instance/profile selectors while keeping local account IDs strict; this preserves native CLI profile choices without renaming them. Existing valid references remain unchanged.
 - Initial development implementation; no production installation or real-mail acceptance is implied.
 - Preserve the original design and 94-case acceptance definitions; record actual offline verification separately.

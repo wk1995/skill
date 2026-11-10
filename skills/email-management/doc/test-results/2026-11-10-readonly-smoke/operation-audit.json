@@ -1,0 +1,10 @@
+{
+  "native_calls_observed": 21,
+  "all_entrypoints_in_read_allowlist": true,
+  "remote_mutation_entrypoints_observed": 0,
+  "unique_body_messages": {
+    "qq": 1,
+    "feishu": 1
+  },
+  "limits": "Native entrypoint audit plus before/after read-state samples; not a server-wide audit or controlled concurrency test."
+}

@@ -8,6 +8,8 @@
 
 机器可读设计稿：[test-cases.plan.json](test-cases.plan.json)，plan ID 为 `email-management-acceptance-design`，revision 为 `2`。`version=design-b4447b1` 只标识设计基线，不是 Skill 发布版本；`source` 指向需求文档提交，`build` / `pr` 留空。JSON 是本设计中定义字段的原稿，下文用例详情为该 revision 的阅读视图。
 
+后续执行补充：已按用户另行确认的范围完成 QQ/飞书[受限只读冒烟](test-results/2026-11-10-readonly-smoke/report.zh-CN.md)，使用独立的 8 项定义、16 个用例/环境组合；不改写本设计 94 条定义及其未执行状态。用户明确要求本轮匿名记录和结果提交上传，公开内容限通用断言与统计，真实账号、原始请求/响应及邮件样本仍只存本机；此许可不自动扩展到其他材料或未来轮次。
+
 ## 1. 本次交付与数据边界
 
 - 交付通用测试定义、前置条件、步骤、预期、依赖、需求链接和本机证据要求，不交付真实账号、原始邮件、日志、附件或执行记录。

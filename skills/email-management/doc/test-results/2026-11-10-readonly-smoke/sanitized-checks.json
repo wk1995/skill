@@ -1,0 +1,92 @@
+{
+  "qq": {
+    "LIVE-01": {
+      "identity_matches": true,
+      "read_available": true,
+      "write_permissions": false
+    },
+    "LIVE-02": {
+      "folder_listing_valid": true,
+      "inbox_available": true
+    },
+    "LIVE-03": {
+      "returned": 3,
+      "limit": 3,
+      "unique_references": true,
+      "metadata_structure_valid": true
+    },
+    "LIVE-04": {
+      "second_page_count": 3,
+      "nonoverlap": true,
+      "filters_preserved": true,
+      "stable_sample_union_matches_larger_page": true
+    },
+    "LIVE-05": {
+      "returned": 3,
+      "unread_flags_match": true
+    },
+    "LIVE-06": {
+      "positive_known_sample_found": true,
+      "executed_server_side": true,
+      "result_limit": 3
+    },
+    "LIVE-07": {
+      "selected_reference_matches": true,
+      "body_type_valid": true,
+      "character_limit": 2000,
+      "truncation_disclosed": true,
+      "untrusted_marker_present": true,
+      "unique_messages_read": 1
+    },
+    "LIVE-08": {
+      "unread_before": true,
+      "unread_after": true,
+      "same_reference": true,
+      "mutation_tools_called": 0
+    }
+  },
+  "feishu": {
+    "LIVE-01": {
+      "identity_matches": true,
+      "user_identity_verified": true,
+      "existing_grant_reused": true
+    },
+    "LIVE-02": {
+      "folder_listing_valid": true,
+      "inbox_available": true
+    },
+    "LIVE-03": {
+      "returned": 3,
+      "limit": 3,
+      "unique_references": true,
+      "metadata_structure_valid": true
+    },
+    "LIVE-04": {
+      "second_page_count": 3,
+      "nonoverlap": true,
+      "filters_preserved": true,
+      "stable_sample_union_matches_larger_page": true
+    },
+    "LIVE-05": {
+      "returned": 3,
+      "unread_labels_match": true
+    },
+    "LIVE-06": {
+      "positive_known_sample_found": true,
+      "result_limit": 3,
+      "native_subject_filter_used": true
+    },
+    "LIVE-07": {
+      "selected_reference_matches": true,
+      "plain_text_body_valid": true,
+      "html_body_not_requested": true,
+      "unique_messages_read": 1
+    },
+    "LIVE-08": {
+      "unread_before": true,
+      "unread_after": true,
+      "same_reference": true,
+      "mutation_commands_called": 0
+    }
+  }
+}

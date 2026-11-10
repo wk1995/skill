@@ -30,16 +30,18 @@
 
 | 邮箱 | 工作流后端 | 当前验证边界 |
 | --- | --- | --- |
-| QQ | QQ Email MCP；显式选择时可用 Himalaya | 必须隔离单账号实例并验证凭据存储；真实邮箱联调待完成 |
+| QQ | QQ Email MCP；显式选择时可用 Himalaya | 一组隔离 QQ MCP 连接的受限只读冒烟通过；Himalaya 与邮件变更仍未验证 |
 | 网易 163/126 | Himalaya IMAP/SMTP | 分别确认产品配置、协议及授权；真实邮箱联调待完成 |
 | Gmail / Workspace | gws CLI / Gmail API | 核对已安装 schema 和 OAuth 策略；真实邮箱联调待完成 |
-| 飞书 | lark-cli mail | 核对用户身份、邮箱开通及原生草稿/发送流程；已检查命令帮助，真实邮箱联调待完成 |
+| 飞书 | lark-cli mail | 一组连接的用户身份与受限只读冒烟通过；原生草稿/发送和管理仍未验证 |
 | 标准工作邮箱 | Himalaya IMAP/SMTP | 管理员允许的协议/TLS 与逐动作能力；真实邮箱联调待完成 |
 
 这是 `0.1.0` 初次开发实现：可移植流程、供应商说明和 POSIX 账号工具已提供；离线工具测试不代表真实邮箱兼容性已通过。Outlook/Microsoft 365、iCloud、企业邮箱预设、Agently Mail、官方 Gmail MCP 预览及后台增强仍属路线图。
 
+用户明确授权提交的[匿名只读测试记录](doc/test-results/2026-11-10-readonly-smoke/report.zh-CN.md)包含 QQ/飞书共 16 个当前通过结果，并保留较早的一次采集不完整记录。它仅覆盖选定真实样本，不代表完整 94 条设计已经验收。真实账号信息和原始邮箱证据仍只存本机。
+
 ## 真实信息只存本机
 
-**全部真实邮箱信息**放在 Git 和 Skill 安装目录之外，包括地址、别名、原生配置、凭据、邮件内容、附件、日志、测试证据与备份。默认账号索引使用本机 XDG 配置目录，状态/缓存/持久数据分离。只分发虚构定义和公开服务说明。已实现检查与平台限制见[本地存储](references/local-storage.md)。
+**全部真实邮箱信息**放在 Git 和 Skill 安装目录之外，包括地址、别名、原生配置、凭据、邮件内容、附件、日志、测试证据与备份。默认账号索引使用本机 XDG 配置目录，状态/缓存/持久数据分离。默认只分发虚构定义和公开服务说明；本轮匿名结果的有限上传授权单独记录在上述报告中。已实现检查与平台限制见[本地存储](references/local-storage.md)。
 
 详细流程见 [SKILL.md](SKILL.md)，写入与结果规则见[操作约定](references/operations.md)，94 条计划验收用例见[测试设计](doc/test-plan.zh-CN.md)。[实施与验证记录](doc/implementation-and-validation.zh-CN.md)区分实际离线检查与待完成联调。
