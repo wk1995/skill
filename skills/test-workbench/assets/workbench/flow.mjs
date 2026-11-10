@@ -4,7 +4,7 @@ import {nextTest, validateTargets} from './routing.mjs';
 import {locationHint} from './test-location.mjs';
 // Read-only projection used by both browser rendering and AI export.
 export function projectFlow(context,{caseId='',environmentId=''}={}) {
-  const cases=orderCases(context.cases);validateTargets(cases);
+  const cases=orderCases(context.cases);validateTargets(cases, {allowExternal: context.selection !== undefined});
   if(caseId&&!cases.some(item=>item.id===caseId))throw new Error('Flow case not found');
   const round=Object.hasOwn(context,'planId')?context:null;
   const attached=Boolean(round?.environments.some(env=>env.id===environmentId));
@@ -27,7 +27,7 @@ export function projectFlow(context,{caseId='',environmentId=''}={}) {
     for(const from of item.dependsOn??[])edges.push({kind:'dependency',from,to:item.id,outcomes:[],active:false});
     const routes=new Map();
     for(const [outcome,route] of Object.entries(item.next??{})) {
-      if(!['test','retry'].includes(route.action))continue;
+      if(!['test','retry'].includes(route.action)||!cases.some(entry=>entry.id===route.caseId))continue;
       if(!routes.has(route.caseId))routes.set(route.caseId,[]);routes.get(route.caseId).push(outcome);
     }
     for(const [to,outcomes] of routes) {

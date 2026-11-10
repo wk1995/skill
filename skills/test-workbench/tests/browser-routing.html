@@ -20,7 +20,7 @@ try {
   await update(db,original.revision,state=>{
     const next={passed:{action:'test',caseId:'SESSION',reason:'成功后验证登录态'},failed:{action:'test',caseId:'DIAG',reason:'失败后收集诊断'},partial:{action:'retry',caseId:'LOGIN',reason:'补测未验证内容'},blocked:{action:'wait',reason:'等待账号或网络恢复',resumeWhen:'有效账号可用，且测试服务可访问'},skipped:{action:'test',caseId:'OFFLINE',reason:'继续独立的离线测试'}};
     let s=m.importPlan(state,{id:'p',revision:0,version:'fixture',title:'Branch fixture only',source:'fixture-sha',build:'',pr:'',cases:['LOGIN','SESSION','DIAG','OFFLINE'].map((id,i)=>({id,title:`Fixture ${id}`,priority:'P0',types:i?['functional']:['smoke'],preconditions:`Prerequisite ${id}`,steps:`Execute ${id}`,expected:`Expected ${id}`,...(!i?{next}:{})}))});
-    s=m.createRound(s,{id:'r',planId:'p',name:'Conditional fixture',createdAt:at,changedIds:[]});s=m.registerEnvironment(s,{id:'e',label:'Fixture browser',kind:'browser',configuration:'Disposable'});s=m.attachEnvironment(s,'r','e');
+    s=m.createRound(s,{id:'r',planId:'p',name:'Conditional fixture',createdAt:at,selection:{source:'user',planRevision:0,cases:['LOGIN','SESSION','DIAG','OFFLINE']}});s=m.registerEnvironment(s,{id:'e',label:'Fixture browser',kind:'browser',configuration:'Disposable'});s=m.attachEnvironment(s,'r','e');
     s=m.transitionRound(s,'r',{id:'ready',action:'prepare',from:'draft',actor:'Fixture',at});s=m.transitionRound(s,'r',{id:'run',action:'begin',from:'ready',actor:'Fixture',at});s.revision=state.revision+1;return s;
   });
   frame.src=`../assets/workbench/?workspace=${workspace}#plan=p&round=r&case=LOGIN&view=cases`;
@@ -28,7 +28,8 @@ try {
   for(const [caseId,status] of [['OFFLINE','skipped'],['SESSION','blocked']]) {
     go(caseId);const form=doc.getElementById('observation-form');fill(form,'tester','Fixture tester');fill(form,'status',status);form.elements.status.dispatchEvent(new Event('change'));fill(form,'notes','Explicit fixture scope/prerequisite reason');fill(form,'executedAt','');form.querySelector('.primary').click();
     await until(async()=>m.executionState((await read(db)).rounds[0],caseId,'e')===status);
-    const saved=await read(db),record=saved.rounds[0].observations.find(item=>item.caseId===caseId);require(record.executedAt===null&&doc.getElementById('detail').textContent.includes('执行：未执行')&&!saved.rounds[0].workflow.events.some(event=>event.caseId===caseId&&event.action==='start'),'Deferred case fabricated execution');
+    const saved=await read(db),record=saved.rounds[0].observations.find(item=>item.caseId===caseId);require(record.executedAt===null&&!saved.rounds[0].workflow.events.some(event=>event.caseId===caseId&&event.action==='start'),'Deferred case fabricated execution');
+    doc.getElementById('records-view').click();require(doc.getElementById('detail').textContent.includes('执行：未执行'),'Saved record must show missing execution time');doc.getElementById('cases-view').click();
   }
   lines.push('PASS pre-execution blocking/skipping saves reasons with null execution time and no start event');
   for(const [status,target] of [['passed','SESSION'],['failed','DIAG'],['partial','LOGIN'],['blocked',null],['skipped','OFFLINE']]){

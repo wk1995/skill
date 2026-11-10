@@ -12,7 +12,7 @@ try {
   const original=await read(db);
   await update(db,original.revision,state=>{
     let next=m.importPlan(state,{id:'p',revision:0,version:'fixture',title:'Annotation fixture',source:'sha',build:'',pr:'',cases:['A','B'].map(id=>({id,title:`Case ${id}`,priority:'P0',types:['smoke'],preconditions:'Fixture',steps:'Select this exact sentence.',expected:'Expected'}))});
-    for(const id of ['first','second'])next=m.createRound(next,{id,name:id,planId:'p',createdAt:id==='first'?'2026-10-22T01:00:00Z':'2026-10-22T02:00:00Z'});
+    for(const id of ['first','second'])next=m.createRound(next,{id,name:id,planId:'p',createdAt:id==='first'?'2026-10-22T01:00:00Z':'2026-10-22T02:00:00Z',selection:{source:'user',planRevision:0,cases:['A','B']}});
     next.revision=state.revision+1;return next;
   });
   frame.src=`../assets/workbench/?workspace=${workspace}#plan=p&round=first&case=A`;

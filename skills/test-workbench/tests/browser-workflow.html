@@ -14,7 +14,7 @@ try {
   const original=await read(db);
   await update(db,original.revision,state=>{
     let next=m.importPlan(state,{id:'p',revision:0,version:'fixture',title:'Workflow fixture only',source:'fixture-sha',build:'',pr:'',cases:[{id:'S',title:'Smoke fixture',priority:'P0',types:['smoke'],preconditions:'Fixture',steps:'Exercise',expected:'Observe'}]});
-    next=m.createRound(next,{id:'r',name:'State fixture',planId:'p',createdAt:'2026-10-22T01:00:00Z'});
+    next=m.createRound(next,{id:'r',name:'State fixture',planId:'p',createdAt:'2026-10-22T01:00:00Z',selection:{source:'user',planRevision:0,cases:['S']}});
     next=m.registerEnvironment(next,{id:'e',label:'Fixture browser',kind:'browser',configuration:'Disposable'});next=m.attachEnvironment(next,'r','e');next.revision=state.revision+1;return next;
   });
   frame.src=`../assets/workbench/?workspace=${workspace}#plan=p&round=r&case=S&view=cases`;

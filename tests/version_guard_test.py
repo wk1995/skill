@@ -417,6 +417,48 @@ class VersionGuardTests(unittest.TestCase):
                         self.run_guard(expected, base=baseline, mode=mode)
                         self.run_guard(expected, base=baseline, mode=mode)
 
+    def test_first_merge_history_requires_explicit_validated_owner_chain(self):
+        for kind in ("skill", "adapter", "artifact"):
+            with self.subTest(kind=kind):
+                self.reset()
+                owner = self.root / ("skills" if kind == "skill" else "platforms")
+                shutil.rmtree(owner)
+                baseline = self.commit()
+                self.git("checkout", self.base, "--", str(owner.relative_to(self.root)))
+                log = (self.skill if kind == "skill" else self.adapter).with_name("CHANGELOG.md")
+                log.write_text("# Changelog\n\n## [Unreleased]\n\n")
+                for field in (("skill",) if kind == "skill" else ("adapter", "artifact")):
+                    value = "0.0.1" if field == kind else "0.1.0"
+                    self.set_version(field, value)
+                    self.add_release(field, value, "initial")
+                self.set_version(kind, "0.0.3")
+                self.add_release(kind, "0.0.2", "fix")
+                self.add_release(kind, "0.0.3", "fix", "- Initial-Version: 0.0.1\n")
+                valid = log.read_text()
+                self.commit()
+                for mode in ("pr", "push"):
+                    self.run_guard(base=baseline, mode=mode)
+                    self.run_guard(base=baseline, mode=mode)
+                prefix = "artifact " if kind == "artifact" else ""
+                edits = [
+                    (lambda text: text.replace("- Initial-Version: 0.0.1", "- Initial-Version: 0.0.9"), "Initial-Version"),
+                    (lambda text: text.replace("- Initial-Version: 0.0.1", "- Initial-Version: 0.0.1\n- Initial-Version: 0.0.1"), "Initial-Version"),
+                    (lambda text: text.replace(f"## [{prefix}0.0.2]", f"## [{prefix}0.2.0]"), "does not match"),
+                    (lambda text: text.replace(f"## [{prefix}0.0.2] - 2026-01-02", f"## [{prefix}0.0.2] - 2026-01-03"), "chronological"),
+                    (lambda text: text.replace(f"## [{prefix}0.0.2] - 2026-01-02", f"## [{prefix}0.0.2] - 2999-01-01"), "future"),
+                    (lambda text: text.replace("- Initial-Version: 0.0.1", ""), "new components require"),
+                ]
+                for edit, expected in edits:
+                    with self.subTest(kind=kind, rejection=expected):
+                        log.write_text(edit(valid))
+                        self.commit()
+                        for mode in ("pr", "push"):
+                            self.run_guard(expected, base=baseline, mode=mode)
+                log.write_text(valid)
+                self.commit()
+                for mode in ("pr", "push"):
+                    self.run_guard(base=baseline, mode=mode)
+
     def test_small_initial_requires_release_evidence(self):
         for kind in ("skill", "adapter", "artifact"):
             with self.subTest(kind=kind):

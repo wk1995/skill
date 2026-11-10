@@ -1,9 +1,9 @@
 ---
 name: test-workbench
-description: Manage a reusable web testing workbench with standardized cases, execution records and revision-bound summaries. Coordinate dependencies, next-test guidance, environments, Issue evidence, web/native annotations and repeat testing, using GitHub Issues by default or repository files. Connect exact CI packages and PR changes across platforms when requested; external publication requires an explicit request.
+description: Manage a reusable web testing workbench with standardized cases, execution records and revision-bound summaries. Freeze explicitly selected round scope and prerequisite cases; coordinate dependencies, next-test guidance, environments, Issue evidence, web/native annotations and repeat testing, using GitHub Issues by default or repository files. Connect exact CI packages and PR changes across platforms when requested; external publication requires an explicit request.
 metadata:
   sync_id: "android-ci-fir-test"
-  version: "0.0.6"
+  version: "0.0.7"
   triggering:
     include:
       - Build a test package through CI from a selected source ref for any platform or distribution channel.
@@ -80,7 +80,7 @@ Read [references/test-rounds.md](references/test-rounds.md) for cases, environme
 - Display an interactive webpage flow graph from the frozen round and selected environment: distinguish prerequisite edges from outcome routes, show execution phases plus unresolved failures/stale evidence, highlight the selected case and actual `nextTest` target, and allow read-only case navigation. Keep the graph, detail guidance and AI projection consistent; a diagram must not start tests or fabricate results.
 - When useful for direct phone/device operation, provide optional page, entry-path and control-locator hints using [references/test-location.md](references/test-location.md). Show/copy exact test context and declared hints in the webpage and AI handoff. Confirm the live device view before acting, retain actual evidence separately, and leave unknown locations explicitly missing.
 - Support persistent annotations with selected excerpts, definition snapshots, replies and resolved/reopened state. Keep annotations separate from outcomes, pin them to the correct case/round/observation, and include them in archive import/export. Read [references/annotations.md](references/annotations.md) for web comments and browser-native annotation linkage; native host transport is not an automatic website-to-chat API.
-- Each round includes prior failed cases first, all current smoke cases, change-derived cases, then optional unfinished cases, deduplicated by ID. Smoke runs again after previous passes or an empty diff. Define smoke before starting a round if missing.
+- Freeze only the explicitly selected cases and recursive prerequisites. A single-defect request must not select all smoke, failures or the whole plan automatically. Preview requested IDs, dependency additions, exclusions, source and count before confirmation; reprepare after context changes. A full regression requires explicit selection. Outcome routes outside scope stay visible as out-of-scope guidance and never add execution pairs. For a requested regression strategy, propose failures/smoke/change/unfinished candidates, then freeze the confirmed set through `previewRoundSelection` and `createRound` with `selection: {source, planRevision, cases}`. See [test-rounds.md](references/test-rounds.md).
 - Keep the current library authoritative. Preserve PR-updated steps and classifications until a newer explicit edit supersedes them; distinguish stale imports from intentional edits. Freeze each round's selected definitions.
 - Register and select an environment before saving results. For mobile this includes physical device details; for web, desktop, services or libraries it includes browser, OS, runtime, deployment or consumer configuration. A shared model name does not establish identical environments.
 - Reuse one workbench and import/update its data for later packages. Validate single/batch saves, imports, stale revisions and round/environment context before persistence. Preserve historical snapshots and observations.

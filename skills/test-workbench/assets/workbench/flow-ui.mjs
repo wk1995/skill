@@ -2,7 +2,7 @@ import {projectFlow} from './flow.mjs';
 import {locationHint,formatTestLocation} from './test-location.mjs';
 const el=(tag,text,className)=>{const node=document.createElement(tag);if(text!==undefined)node.textContent=text;if(className)node.className=className;return node;};
 const svg=(tag,attributes)=>{const node=document.createElementNS('http://www.w3.org/2000/svg',tag);for(const [key,value] of Object.entries(attributes))node.setAttribute(key,value);return node;};
-const actions={current:'继续当前用例',test:'执行后续用例',retry:'重新验证当前用例',wait:'等待条件恢复',done:'此分支结束',unconfigured:'尚未配置下一步',prerequisite:'先完成前置用例',stale:'依赖已变化，先记录阻塞'};
+const actions={'out-of-scope':'后续用例不在本轮范围',current:'继续当前用例',test:'执行后续用例',retry:'重新验证当前用例',wait:'等待条件恢复',done:'此分支结束',unconfigured:'尚未配置下一步',prerequisite:'先完成前置用例',stale:'依赖已变化，先记录阻塞'};
 export function renderFlow(container,{context,caseId,environmentId,labels,navigate,selectEnvironment}) {
   container.replaceChildren();if(!context)return;
   const flow=projectFlow(context,{caseId,environmentId});

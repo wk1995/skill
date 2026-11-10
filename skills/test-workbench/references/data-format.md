@@ -10,7 +10,7 @@ The executable field contract is `CONTRACT.data` in [workflow.mjs](../assets/wor
 
 | Value | Contract |
 | --- | --- |
-| Skill `metadata.version` | Skill release version, currently `0.0.5`; independent from data versions |
+| Skill `metadata.version` | Skill release version, currently `0.0.7`; independent from data versions |
 | Archive `schemaVersion` | Integer `1` |
 | Round `workflow.version` | Integer `1` for managed execution; omission identifies legacy history only |
 | Conclusion `format` / `version` | `ci-package-test/conclusions` / integer `1` |
@@ -27,7 +27,7 @@ The [execution-quality procedures](execution-quality.md) use supported definitio
 
 ## 1. Test-case definition
 
-A case belongs to a plan. The required plan fields are `id`, `revision`, `version`, `title`, `source`, `build`, `pr` and `cases`. `build`/`pr` may be empty strings; `cases` is an array. New rounds require at least one case classified as smoke. Keep a case definition's outcome separate from every execution result.
+A case belongs to a plan. The required plan fields are `id`, `revision`, `version`, `title`, `source`, `build`, `pr` and `cases`. `build`/`pr` may be empty strings; `cases` is an array. Focused rounds require an explicit nonempty selection and its prerequisite closure; historical rounds without selection retain the smoke requirement. Keep a case definition's outcome separate from every execution result.
 
 | Case field | Required | Type / meaning |
 | --- | --- | --- |
@@ -61,11 +61,11 @@ A case belongs to a plan. The required plan fields are `id`, `revision`, `versio
 }
 ```
 
-`next` actions are `test`, `retry`, `wait`, `done`. All need a nonempty `reason`; test/retry require `caseId`, retry targets the same case; wait requires `resumeWhen`. Wait/done contain no case target. Put prerequisites on the target's `dependsOn`, then evaluate them for this round/environment; next branches do not support cross-case predicates. A missing next stays explicitly unconfigured. See [dependencies](dependencies.md) and [routing](conditional-tests.md).
+`next` actions are `test`, `retry`, `wait`, `done`. Plans require all route targets to exist. Frozen focused rounds may retain external route IDs, which are read-only `out-of-scope` guidance and never execution pairs. All need a nonempty `reason`; test/retry require `caseId`, retry targets the same case; wait requires `resumeWhen`. Wait/done contain no case target. Put prerequisites on the target's `dependsOn`, then evaluate them for this round/environment; next branches do not support cross-case predicates. A missing next stays explicitly unconfigured. See [dependencies](dependencies.md) and [routing](conditional-tests.md).
 
 ## 2. Test-execution record
 
-Records belong to a **frozen round**, not directly to a mutable library case. Required round fields: `id`, `name`, `planId`, `version`, `source`, `build`, `pr`, `createdAt`, `cases`, `environments`, `observations`. New rounds also carry `workflow: {"version":1,"events":[]}`; create them through the model to freeze definitions and select dependencies/smoke/failures correctly. `issueLinks` is optional.
+Records belong to a **frozen round**, not directly to a mutable library case. Required round fields: `id`, `name`, `planId`, `version`, `source`, `build`, `pr`, `createdAt`, `cases`, `environments`, `observations`. New rounds also carry `workflow: {"version":1,"events":[]}`; create them through the model with `selection: {source, planRevision, cases}`. Saved `selection` additionally retains `requestedCases`, and `cases` is the final ordered prerequisite closure. `issueLinks` is optional. See [test-rounds.md](test-rounds.md) for selection validation and reader compatibility.
 
 An execution is identified by `(roundId, caseId, environmentId)`. A record's round, product version, source/build and frozen definition come from its owning round. The registered environment requires `id`, `label`, `kind`, `configuration`; attached/observed snapshots must match it exactly.
 

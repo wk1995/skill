@@ -8,7 +8,7 @@ from datetime import date, datetime, timezone
 import json
 import re
 import sys
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 
 from pr_review_guard import git, merge_tree
 
@@ -208,9 +208,38 @@ def declaration(body: str, field: str, path: str) -> str:
     return value
 
 
-def validate_release(base: Tree, result: Tree, old: Component | None, new: Component) -> None:
+def validate_initial_history(result: Tree, new: Component, initial: str) -> None:
+    """Validate an explicitly declared first-merge development history per owner."""
+    require(initial in {"0.0.1", "0.1.0", "1.0.0"},
+            f"{new.changelog}: Initial-Version must be 0.0.1, 0.1.0 or 1.0.0")
+    content = markdown_prose(result.read(new.changelog))
+    releases = []
+    for heading in re.finditer(r"^## \[([^\]]+)\](.*)$", content, re.MULTILINE):
+        label = heading[1]
+        if label == "Unreleased" or label.startswith("artifact ") != new.artifact:
+            continue
+        value = label.removeprefix("artifact ") if new.artifact else label
+        version_parts(value, new.changelog)
+        parsed = re.fullmatch(r" - (\d{4}-\d{2}-\d{2})", heading[2])
+        require(parsed, f"{new.changelog}: development history entry [{label}] requires a UTC date")
+        releases.append((value, date.fromisoformat(parsed[1])))
+    require(len(releases) >= 2 and releases[0][0] == new.version and releases[-1][0] == initial,
+            f"{new.changelog}: development history must run from current version to Initial-Version")
+    require(len({value for value, _ in releases}) == len(releases),
+            f"{new.changelog}: duplicate development release")
+    previous = None
+    previous_date = None
+    for value, released_at in reversed(releases):
+        require(previous_date is None or released_at >= previous_date,
+                f"{new.changelog}: development release dates must be chronological")
+        current = replace(new, version=value)
+        validate_release(result, result, previous, current, development=True)
+        previous, previous_date = current, released_at
+
+
+def validate_release(base: Tree, result: Tree, old: Component | None, new: Component, *, development: bool = False) -> None:
     label, body = release_entry(result, new)
-    if old:
+    if old and not development:
         previous = markdown_prose(base.read(old.changelog))
         require(not re.search(r"^## \[" + re.escape(label) + r"\]", previous, re.MULTILINE),
                 f"{new.changelog}: cannot reuse existing release [{label}]")
@@ -218,6 +247,10 @@ def validate_release(base: Tree, result: Tree, old: Component | None, new: Compo
     declaration(body, "Summary", new.changelog)
     declaration(body, "Compatibility", new.changelog)
     if old is None:
+        if not development and re.search(r"^- Initial-Version:", body, re.MULTILINE):
+            initial = declaration(body, "Initial-Version", new.changelog)
+            validate_initial_history(result, new, initial)
+            return
         require(change_type == "initial" and new.version in {"0.0.1", "0.1.0", "1.0.0"},
                 f"{new.path}: new components require Change-Type: initial and version 0.0.1, 0.1.0 or 1.0.0")
     else:

@@ -10,6 +10,7 @@ export {nextTest};
 import {CONTRACT, RESULTS, inspectWorkflow, roundActions} from './workflow.mjs';
 export {CONTRACT, RESULTS, inspectWorkflow, roundActions};
 export const TYPES = ['smoke', 'functional', 'performance', 'compatibility', 'stability', 'security', 'usability', 'install-upgrade', 'integration'];
+export const SELECTION_SOURCES = ['user', 'issue', 'change', 'smoke', 'failures', 'full-regression'];
 export const STATUSES = [...RESULTS, 'running', 'untested'];
 export const empty = () => ({schemaVersion: 1, revision: 0, plans: [], environments: [], rounds: [], annotations: []});
 const copy = value => structuredClone(value);
@@ -55,6 +56,35 @@ function validateEnvironment(env) {
   require(object(env), 'environment: object required');
   for (const key of ['id', 'label', 'kind', 'configuration']) text(env[key], `environment.${key}`);
 }
+function validateRoundSelection(round) {
+  if (round.selection === undefined) {
+    // Archives created before focused selection was introduced remain readable.
+    require(round.cases.some(item => item.types.includes('smoke')), 'Round requires smoke coverage');
+    return;
+  }
+  require(object(round.selection), 'round.selection: object required');
+  require(SELECTION_SOURCES.includes(round.selection.source), 'Invalid round selection source');
+  require(Number.isSafeInteger(round.selection.planRevision) && round.selection.planRevision >= 0, 'round.selection: invalid plan revision');
+  list(round.selection.requestedCases, 'round.selection.requestedCases');
+  require(round.selection.requestedCases.length > 0 && new Set(round.selection.requestedCases).size === round.selection.requestedCases.length, 'Invalid requested selection cases');
+  list(round.selection.cases, 'round.selection.cases');
+  require(round.selection.cases.length > 0, 'round.selection.cases: at least one case required');
+  const ids = new Set();
+  for (const id of round.selection.cases) {
+    text(id, 'round.selection.cases.id');
+    require(!ids.has(id), `round.selection.cases: duplicate ID ${id}`);
+    ids.add(id);
+  }
+  require(same(round.selection.cases, round.cases.map(item => item.id)), 'round.selection.cases must match frozen round cases');
+  for (const id of round.selection.requestedCases) { text(id, 'requested case ID'); find(round.cases, id, 'Requested case'); }
+  const reachable = new Set(round.selection.requestedCases);
+  for (const id of reachable) for (const dependency of find(round.cases, id, 'Case').dependsOn ?? []) reachable.add(dependency);
+  require(reachable.size === round.cases.length, 'Frozen round contains cases outside the selected dependency closure');
+  for (const item of round.cases) {
+    require(Array.isArray(item.selectionReasons) && item.selectionReasons.length > 0, `round case selection reasons required: ${item.id}`);
+    require(item.selectionReasons.every(reason => typeof reason === 'string' && reason.trim()), `round case selection reasons invalid: ${item.id}`);
+  }
+}
 export function validate(state) {
   require(object(state) && state.schemaVersion === 1, 'Unsupported archive schema');
   require(Number.isSafeInteger(state.revision) && state.revision >= 0, 'Invalid state revision');
@@ -66,8 +96,8 @@ export function validate(state) {
     const plan = find(state.plans, round.planId, 'Plan');
     require(round.version === plan.version, 'Round version must match its owning plan');
     timestamp(round.createdAt, 'round.createdAt');
-    unique(round.cases, 'round.cases'); round.cases.forEach(validateCase); validateTargets(round.cases);orderCases(round.cases);
-    require(round.cases.some(item => item.types.includes('smoke')), 'Round requires smoke coverage');
+    unique(round.cases, 'round.cases'); round.cases.forEach(validateCase); validateTargets(round.cases, {allowExternal: round.selection !== undefined});orderCases(round.cases);
+    validateRoundSelection(round);
     unique(round.environments, 'round.environments');
     for (const env of round.environments) {
       validateEnvironment(env); require(same(env, find(state.environments, env.id, 'Environment')), 'Environment snapshot conflict');
@@ -210,37 +240,56 @@ export function statusOf(round, caseId) {
   return priority.find(status => statuses.includes(status)) ?? 'untested';
 }
 export const roundsFor = (state, planId) => state.rounds.filter(round => round.planId === planId).sort((a,b) => Date.parse(a.createdAt) - Date.parse(b.createdAt));
-export function createRound(state, input) {
-  validate(state);
-  text(input.id, 'round ID'); text(input.name, 'round name'); timestamp(input.createdAt, 'createdAt');
-  require(!state.rounds.some(item => item.id === input.id), 'Round ID already exists');
+function resolveRoundSelection(state, input) {
   const plan = find(state.plans, input.planId, 'Plan');
-  const previous = roundsFor(state, input.planId).at(-1);
+  const selection = input.selection;
+  require(object(selection), 'Frozen round selection required');
+  require(!['changedIds', 'includeUnfinished'].some(key => Object.hasOwn(input, key)), 'Use explicit selection.cases instead of legacy selection inputs');
+  require(SELECTION_SOURCES.includes(selection.source), 'Invalid selection source');
+  require(Number.isSafeInteger(selection.planRevision) && selection.planRevision >= 0, 'selection: invalid plan revision');
+  require(selection.planRevision === plan.revision, 'Selection is stale; reload the current plan before creating a round');
+  list(selection.cases, 'selection.cases');
+  require(selection.cases.length > 0, 'Select at least one case');
+  const ids = new Set();
+  for (const id of selection.cases) {
+    text(id, 'selection.cases.id');
+    require(!ids.has(id), `selection.cases: duplicate ID ${id}`);
+    ids.add(id);
+    find(plan.cases, id, 'Selected case');
+  }
+  if (selection.source === 'full-regression') require(ids.size === plan.cases.length && plan.cases.every(item => ids.has(item.id)), 'Full regression selection must include every plan case');
   const current = new Map(plan.cases.map(item => [item.id, item]));
   const selected = new Map();
   const add = (item, reason) => {
     if (!selected.has(item.id)) selected.set(item.id, {...copy(current.get(item.id) ?? item), selectionReasons: []});
     const reasons = selected.get(item.id).selectionReasons; if (!reasons.includes(reason)) reasons.push(reason);
   };
-  if (previous) previous.cases.filter(item => statusOf(previous, item.id) === 'failed').forEach(item => add(item, 'previous-failure'));
-  plan.cases.filter(item => item.types.includes('smoke')).forEach(item => add(item, 'smoke'));
-  require(plan.cases.some(item => item.types.includes('smoke')), 'Define smoke cases before starting a round');
-  const changedIds = input.changedIds ?? (previous ? [] : plan.cases.map(item => item.id));
-  list(changedIds, 'changedIds'); changedIds.forEach(id => add(find(plan.cases, id, 'Changed case'), 'change'));
-  if (input.includeUnfinished && previous) previous.cases.filter(item => statusOf(previous, item.id) !== 'passed').forEach(item => add(item, 'unfinished'));
-  // Freeze the complete reachable branch graph; map iteration visits newly added targets once.
-  for(const item of selected.values()) {
-    for(const id of item.dependsOn??[]){const target=current.get(id)??previous?.cases.find(entry=>entry.id===id);require(target,`Dependency case not found: ${id}`);add(target,'dependency');}
-    for(const status of RESULTS) {
-      const route=item.next?.[status];
-      if(route&&['test','retry'].includes(route.action)) {
-        const target=current.get(route.caseId)??previous?.cases.find(entry=>entry.id===route.caseId);
-        require(target,`Next case not found: ${route.caseId}`);add(target,'conditional-next');
-      }
-    }
+  selection.cases.forEach(id => add(find(plan.cases, id, 'Selected case'), 'selected'));
+  // Only prerequisites extend scope. Outcome routes are guidance, never authorization.
+  for (const item of selected.values()) for (const id of item.dependsOn ?? []) {
+    add(find(plan.cases, id, 'Dependency case'), 'dependency');
   }
+  const cases = orderCases([...selected.values()]);
+  return {plan, selection, cases};
+}
+export function previewRoundSelection(state, input) {
+  validate(state);
+  const {selection, cases} = resolveRoundSelection(state, input);
+  return {source: selection.source, planRevision: selection.planRevision, requestedCases: [...selection.cases], cases: cases.map(item => ({id: item.id, reasons: [...item.selectionReasons]}))};
+}
+export function createRound(state, input) {
+  validate(state);
+  text(input.id, 'round ID'); text(input.name, 'round name'); timestamp(input.createdAt, 'createdAt');
+  const {plan, selection, cases} = resolveRoundSelection(state, input);
   const round = {id: input.id, name: input.name, planId: plan.id, version: plan.version, source: plan.source,
-    build: plan.build, pr: plan.pr, createdAt: input.createdAt, cases: orderCases([...selected.values()]), environments: [], observations: [], workflow: {version: CONTRACT.version, events: []}};
+    build: plan.build, pr: plan.pr, createdAt: input.createdAt, selection: {source: selection.source, planRevision: selection.planRevision, requestedCases: [...selection.cases], cases: cases.map(item => item.id)},
+    cases, environments: [], observations: [], workflow: {version: CONTRACT.version, events: []}};
+  const existing = state.rounds.find(item => item.id === input.id);
+  if (existing) {
+    const definition = value => Object.fromEntries(Object.entries(value).filter(([key]) => !['environments', 'observations', 'workflow', 'issueLinks'].includes(key)));
+    require(same(definition(existing), definition(round)), 'Round ID already exists with a different definition');
+    return state;
+  }
   return change(state, next => next.rounds.push(round));
 }
 export function record(state, roundId, observation) {

@@ -12,7 +12,8 @@ export const CONTRACT = {
   data: {
     archive: {schemaVersion:1, required:['schemaVersion','revision','plans','environments','rounds'], collections:['plans','environments','rounds','annotations'], revision:'optimistic concurrency counter',annotations:'optional for older archives'},
     plan: {required:['id','revision','version','title','source','build','pr','cases'],identity:'id; version is an opaque product version, revision is a nonnegative integer',emptyText:['build','pr']},
-    round: {required:['id','name','planId','version','source','build','pr','createdAt','cases','environments','observations'],newRequired:['workflow'],optional:['issueLinks'],identity:'id; planId references its plan and version must match; cases/source/build are frozen'},
+    round: {required:['id','name','planId','version','source','build','pr','createdAt','cases','environments','observations'],newRequired:['workflow'],optional:['issueLinks','selection'],creationRequired:['selection'],identity:'id; planId references its plan and version must match; cases/source/build are frozen'},
+    selection: {field:'round.selection',creation:['source','planRevision','cases'],saved:['source','planRevision','requestedCases','cases'],scope:'Explicit IDs plus recursive prerequisites only; outcome targets outside scope return out-of-scope guidance. Legacy archives without selection keep their original validation.'},
     environment: {required:['id','label','kind','configuration'],identity:'id; attached and observed snapshots must match the registered profile'},
     case: {role:'definition', required:['id','title','priority','types','preconditions','steps','expected'],optional:['dependsOn','next','testLocation'],emptyText:['preconditions'],identity:'id within a plan/frozen round; priority is nonempty project text; types use model.TYPES', outcome:'none; result belongs to execution'},
     observation: {role:'immutable evidence', required:['id','caseId','environmentId','environment','status','executedAt','recordedAt','tester','notes','evidence'], context:'owning round pins plan/version/source/build and case definition',executedAt:'Timezone timestamp for execution; null only for pre-execution blocked/skipped defer' },
@@ -40,7 +41,7 @@ export const CONTRACT = {
     resultRequirements:{partial:['notes']}, requirementScope:'Cases with next branches; flat legacy cases keep their original contract.',
     semantics:{passed:'All required checks in this attempt met expectations.',failed:'An observed behavior violates an expected result; a diagnostic pass cannot clear it.',partial:'Only part was executed/verified; explain completed and unverified work. Any observed failure is failed.',blocked:'A missing prerequisite, account, environment or dependency prevents execution/continuation.',skipped:'An explicit scope/priority decision not to execute; requires reason and is not coverage.'},
     execution:'Guidance only: navigate to the explicit target; never auto-execute, auto-pass or infer skipped outcomes.',
-    closure:'Freeze all reachable target cases in the round. Unvisited branches remain untested until explicitly recorded/skipped.'
+    closure:'Explicit selected scope plus prerequisites. External outcome targets stay out-of-scope and require a new confirmed round. Legacy selection-free rounds retain reachable branch closure.'
   },
   evidenceAlternatives: {field:'observation.evidence',alternative:'Validated round.issueLinks entry for that observation; new webpage records use Issue associations.'},
   resultRequirements: {passed: [], failed: ['notes', 'evidence'], partial: [], blocked: ['notes'], skipped: ['notes']},

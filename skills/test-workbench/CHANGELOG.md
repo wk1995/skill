@@ -4,6 +4,15 @@
 
 - No unreleased changes.
 
+## [0.0.7] - 2026-11-10
+
+- Initial-Version: 0.0.1
+- Change-Type: fix
+- Summary: Correct focused-round scope expansion: freeze explicit selected IDs and recursive prerequisites, keep outcome routes outside scope, require preview/confirmation in the webpage, and show saved scope in conclusions.
+- Compatibility: User-requested corrective version 0.0.6 -> 0.0.7. Older archives remain readable with no invented selection; archive/workflow integers stay 1. Direct callers must replace changedIds/includeUnfinished with selection {source, planRevision, cases}. New focused rounds may omit smoke and retain external route IDs, so older readers cannot consume them; upgrade all shared readers/writers and back up data before use. This requested patch label does not imply old caller or reader compatibility.
+- Preserve requested versus expanded IDs and reasons; validate prerequisite closure on import/write, reject empty/stale/unknown selections and conflicting retries, and accept exact creation retries without changing history.
+- Cover two-case/49-case plans, external branch chains, recursive dependencies, source persistence, preview/reset/stale creation and explicit full regression with disposable fixtures.
+
 ## [0.0.6] - 2026-10-26
 
 - Change-Type: fix

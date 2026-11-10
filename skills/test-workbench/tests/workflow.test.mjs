@@ -6,7 +6,7 @@ const env=id=>({id,label:id,kind:'browser',configuration:'isolated fixture'});
 const event=(id,action,from,extra={})=>({id,action,from,actor:'Tester',at,reason:'',...extra});
 function fixture() {
   let state=m.importPlan(m.empty(),{id:'p',revision:0,version:'v1',title:'Fixture',source:'sha',build:'',pr:'',cases:['A','B'].map(id=>({id,title:id,priority:'P0',types:['smoke'],preconditions:'Ready',steps:'Exercise',expected:'Observe'}))});
-  state=m.createRound(state,{id:'r',name:'Round',planId:'p',createdAt:at});return state;
+  state=m.createRound(state,{id:'r',name:'Round',planId:'p',createdAt:at,selection:{source:'user',planRevision:0,cases:['A','B']}});return state;
 }
 const round=state=>state.rounds[0];
 function running() {
@@ -72,7 +72,7 @@ test('execution identity is round/case/environment; another environment cannot c
   state=m.startExecution(state,'r',{...event('f-start','start','untested'),caseId:'A',environmentId:'f'});
   state=m.record(state,'r',observation('other-pass','A','passed',{environmentId:'f',environment:env('f')}));
   assert.equal(m.statusOf(round(state),'A'),'failed');assert.equal(m.executionState(round(state),'B','e'),'untested');
-  state=m.createRound(state,{id:'next',name:'Next',planId:'p',createdAt:at,changedIds:[]});assert.equal(m.statusOf(state.rounds[1],'A'),'untested');
+  state=m.createRound(state,{id:'next',name:'Next',planId:'p',createdAt:at,selection:{source:'user',planRevision:0,cases:['A','B']}});assert.equal(m.statusOf(state.rounds[1],'A'),'untested');
 });
 
 test('start batch validates atomically and repeats idempotently; wrong identity/from cannot bypass replay',()=>{
@@ -100,7 +100,7 @@ test('legacy archives are explicit, keep observations untouched and use new mana
   const restored=m.importArchive(m.empty(),JSON.parse(JSON.stringify(state)));assert.deepEqual(round(restored),original);
   const projection=m.exportAI(restored).projection.rounds[0];assert.equal(projection.state,'legacy');assert.deepEqual(projection.nextActions,[]);
   rejects(state,s=>m.transitionRound(s,'r',event('x','prepare','draft')),/Legacy/);
-  state=m.createRound(state,{id:'next',name:'Next',planId:'p',createdAt:at,changedIds:[]});assert.equal(m.inspectWorkflow(state.rounds[1]).state,'draft');assert.deepEqual(round(state),original);
+  state=m.createRound(state,{id:'next',name:'Next',planId:'p',createdAt:at,selection:{source:'user',planRevision:0,cases:['A','B']}});assert.equal(m.inspectWorkflow(state.rounds[1]).state,'draft');assert.deepEqual(round(state),original);
 });
 
 test('AI snapshot uses the same contract, exports original evidence and guarded next actions without mutation',()=>{
@@ -119,7 +119,7 @@ test('managed all-pass no-diff rounds rerun smoke, preserve definitions and keep
   assert.equal(m.exportAI(state).projection.annotations[0].state,'resolved');assert.equal(m.statusOf(round(state),'A'),'passed');
   state=m.transitionRound(state,'r',event('done','complete','running'));const old=structuredClone(round(state));
   state=m.editCase(state,'p',{...state.plans[0].cases[0],steps:'Updated procedure'});
-  state=m.createRound(state,{id:'next',name:'Next',planId:'p',createdAt:at,changedIds:[]});
+  state=m.createRound(state,{id:'next',name:'Next',planId:'p',createdAt:at,selection:{source:'user',planRevision:state.plans[0].revision,cases:['A','B']}});
   assert.deepEqual(state.rounds[1].cases.map(item=>item.id),['A','B']);assert.equal(state.rounds[1].cases[0].steps,'Updated procedure');
   assert.equal(m.statusOf(state.rounds[1],'A'),'untested');assert.deepEqual(round(state),old);
 });

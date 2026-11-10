@@ -6,8 +6,13 @@ const time='2026-10-22T04:00:00Z';
 const caseOf=(id,types=['functional'])=>({id,title:`Case ${id}`,priority:'P1',types,preconditions:'Ready',steps:'Exercise behavior',expected:'Expected behavior'});
 const plan=()=>({id:'plan',revision:0,version:'1.2.3',title:'Regression',source:'exact-source-sha',build:'https://example.invalid/run/1',pr:'https://example.invalid/pr/1',cases:[caseOf('constructor',['smoke','functional']),caseOf('FAIL'),caseOf('CHANGE')]});
 const environment=id=>({id,label:'Same model',kind:'browser',configuration:'Same OS/browser; distinct physical instance'});
-// Preserve schema-1 legacy fixtures; workflow.test.mjs covers managed defaults.
-const round=(state,id='r1',extra={})=>{const next=m.createRound(state,{id,name:id,planId:'plan',createdAt:time,...extra});delete next.rounds.at(-1).workflow;return next;};
+// These legacy recording fixtures explicitly select their case IDs.
+const round=(state,id='r1',extra={})=>{
+  const current=state.plans.find(item=>item.id==='plan');
+  const {ids=current.cases.map(item=>item.id),...rest}=extra;
+  const next=m.createRound(state,{id,name:id,planId:'plan',createdAt:time,...rest,selection:{source:'user',planRevision:current.revision,cases:ids}});
+  delete next.rounds.at(-1).workflow;return next;
+};
 function fixture() {
   let state=m.importPlan(m.empty(),plan()); state=round(state);
   state=m.registerEnvironment(state,environment('a'));state=m.attachEnvironment(state,'r1','a');return state;
@@ -24,32 +29,31 @@ test('plan revision updates are explicit, identity-bound and idempotent',()=>{
   state=m.importPlan(state,{...plan(),revision:1,title:'Updated'});
   assert.equal(state.plans[0].title,'Updated');rejectsUnchanged(state,s=>m.importPlan(s,plan()),/revision/);
 });
-test('empty diff still selects smoke after all previous cases passed, with frozen history',()=>{
+test('explicit smoke selection remains focused after all previous cases passed, with frozen history',()=>{
   let state=fixture();state=m.recordBatch(state,'r1',plan().cases.map((item,i)=>observation(`o${i}`,item.id)));
-  const previous=structuredClone(state.rounds[0]); state=round(state,'r2',{changedIds:[]});
+  const previous=structuredClone(state.rounds[0]); state=round(state,'r2',{ids:['constructor']});
   assert.deepEqual(state.rounds[1].cases.map(item=>item.id),['constructor']);assert.deepEqual(state.rounds[0],previous);
   assert.equal(m.statusOf(state.rounds[1],'constructor'),'untested');
 });
-test('prior failure precedes smoke and change cases, IDs including prototype keys are retained',()=>{
+test('explicit selection freezes only requested cases and IDs including prototype keys',()=>{
   let state=fixture();state=m.record(state,'r1',observation('failure','FAIL','a','failed'));
-  state=round(state,'r2',{changedIds:['constructor','FAIL','CHANGE']});
-  assert.deepEqual(state.rounds[1].cases.map(item=>item.id),['FAIL','constructor','CHANGE']);
-  assert.deepEqual(state.rounds[1].cases[0].selectionReasons,['previous-failure','change']);
-  assert.deepEqual(state.rounds[1].cases[1].selectionReasons,['smoke','change']);
+  state=round(state,'r2',{ids:['constructor','FAIL','CHANGE']});
+  assert.deepEqual(state.rounds[1].cases.map(item=>item.id),['constructor','FAIL','CHANGE']);
+  assert.deepEqual(state.rounds[1].cases.map(item=>item.selectionReasons),[['selected'],['selected'],['selected']]);
 });
 test('edited case content and smoke labels persist into later rounds without altering snapshots',()=>{
   let state=fixture(); const old=structuredClone(state.rounds[0]);
   state=m.editCase(state,'plan',{...plan().cases[1],steps:'Updated regression steps',types:['smoke','functional']});
-  state=round(state,'r2',{changedIds:[]});state=round(state,'r3',{changedIds:[]});
+  state=round(state,'r2',{ids:['constructor','FAIL']});state=round(state,'r3',{ids:['constructor','FAIL']});
   assert.equal(state.rounds[2].cases.find(item=>item.id==='FAIL').steps,'Updated regression steps');assert.deepEqual(state.rounds[0],old);
   state=m.editCase(state,'plan',{...state.plans[0].cases.find(item=>item.id==='FAIL'),types:['functional']});
-  state=round(state,'r4',{changedIds:[]});assert.deepEqual(state.rounds[3].cases.map(item=>item.id),['constructor']);
+  state=round(state,'r4',{ids:['constructor']});assert.deepEqual(state.rounds[3].cases.map(item=>item.id),['constructor']);
 });
-test('missing smoke, unknown changed IDs and duplicate round identities reject without mutation',()=>{
+test('missing selection, unknown IDs and duplicate round identities reject without mutation',()=>{
   let state=m.importPlan(m.empty(),{...plan(),cases:[caseOf('NO-SMOKE')]});
-  rejectsUnchanged(state,s=>round(s),/smoke/);state=fixture();
-  rejectsUnchanged(state,s=>round(s,'r2',{changedIds:['missing']}),/Changed case/);
-  rejectsUnchanged(state,s=>round(s),/already exists/);
+  rejectsUnchanged(state,s=>m.createRound(s,{id:'r',name:'Missing selection',planId:'plan',createdAt:time}),/Frozen round selection/);state=fixture();
+  rejectsUnchanged(state,s=>round(s,'r2',{ids:['missing']}),/Selected case/);
+  rejectsUnchanged(state,s=>round(s,'r1',{name:'Conflicting name'}),/already exists/);
 });
 test('single and batch saves require a registered round environment, valid status, tester and time',()=>{
   const state=fixture();
@@ -102,7 +106,7 @@ test('an older round imported last does not replace the most recent round for pr
   state=m.recordBatch(state,'r2',[observation('fixed','FAIL','a','passed'),observation('smoke')]);
   const old={...structuredClone(state.rounds[0]),id:'imported-older',createdAt:'2026-10-22T03:00:00Z'};
   state=m.importArchive(state,{...structuredClone(state),rounds:[old]});
-  state=round(state,'r3',{createdAt:'2026-10-22T04:10:00Z',changedIds:[]});
+  state=round(state,'r3',{createdAt:'2026-10-22T04:10:00Z',ids:['constructor']});
   assert.deepEqual(state.rounds.at(-1).cases.map(item=>item.id),['constructor']);
 });
 test('conflicting historical definitions, observations and environments reject the whole import',()=>{

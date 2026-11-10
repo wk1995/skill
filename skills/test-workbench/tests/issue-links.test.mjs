@@ -7,7 +7,7 @@ const at='2026-10-23T09:00:00Z',url='https://github.com/fixture/project/issues/1
 const link=(extra={})=>({id:'link',observationId:'o',url,actor:'Tester',createdAt:at,...extra});
 function fixture(){
  let s=m.importPlan(m.empty(),{id:'p',version:'1.0.0',revision:0,title:'Fixture',source:'sha',build:'',pr:'',cases:[{id:'S',title:'Smoke',priority:'P0',types:['smoke'],preconditions:'Fixture',steps:'Execute',expected:'Observe'}]});
- s=m.createRound(s,{id:'r',planId:'p',name:'Round',createdAt:at});s=m.registerEnvironment(s,{id:'e',label:'Fixture',kind:'browser',configuration:'Disposable'});s=m.attachEnvironment(s,'r','e');
+ s=m.createRound(s,{id:'r',planId:'p',name:'Round',createdAt:at,selection:{source:'user',planRevision:0,cases:['S']}});s=m.registerEnvironment(s,{id:'e',label:'Fixture',kind:'browser',configuration:'Disposable'});s=m.attachEnvironment(s,'r','e');
  for(const [id,action,from] of [['prepare','prepare','draft'],['begin','begin','ready']])s=m.transitionRound(s,'r',{id,action,from,actor:'Tester',at});
  return m.startExecution(s,'r',{id:'start',from:'untested',caseId:'S',environmentId:'e',actor:'Tester',at});
 }

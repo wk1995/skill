@@ -87,3 +87,7 @@ For the optional end-to-end primary-adapter browser runner, install/provide Play
 ## Issue evidence links
 
 The result form accepts full Issue URLs (one per line); existing record cards support append-only associations even after round completion. Open those links to add screenshots/logs in GitHub. The workbench has no separate attachment entry; original evidence fields remain readable. File mode saves associations inside records and commits them with conclusions through the separate commit control. See [format, validation and API boundaries](data-sources.md#record-to-issue-associations).
+
+### Focused round acceptance (0.0.7)
+
+Enter exact case IDs and their selection source, or explicitly select full regression. Preview lists requested IDs, prerequisite additions and exclusions; confirmation is mandatory and invalidates after selection or archive changes. Outcome routes never expand scope. Summary displays the saved selection source and frozen IDs. Run `tests/browser-focused.mjs` with the same Playwright/Chrome environment as `browser-primary.mjs`; it exercises both source modes, read-only preview, confirmation reset, a 49-case branch chain, persistent scope, stale-save rejection and explicit full regression.

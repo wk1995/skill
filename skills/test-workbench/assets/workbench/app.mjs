@@ -31,7 +31,7 @@ let pendingAction=false,queuedHash=null;
 async function busy(action){
   if(pendingAction)throw new Error('正在处理上一次操作，请等待结果');pendingAction=true;document.documentElement.dataset.busy='true';
   const controls=[...document.querySelectorAll('button,input,select,textarea')].map(node=>[node,node.disabled]);for(const [node] of controls)node.disabled=true;
-  try{return await action();}finally{for(const [node,disabled] of controls)if(node.isConnected)node.disabled=disabled;pendingAction=false;document.documentElement.dataset.busy='false';if(queuedHash!==null){const target=queuedHash;queuedHash=null;queueMicrotask(()=>{if(location.hash!==target)location.hash=target;else window.dispatchEvent(new HashChangeEvent('hashchange'));});}}
+  try{return await action();}finally{for(const [node,disabled] of controls)if(node.isConnected)node.disabled=disabled;pendingAction=false;document.documentElement.dataset.busy='false';updateRoundPreview();if(queuedHash!==null){const target=queuedHash;queuedHash=null;queueMicrotask(()=>{if(location.hash!==target)location.hash=target;else window.dispatchEvent(new HashChangeEvent('hashchange'));});}}
 }
 async function save(action,onSuccess=()=>{}) {
   try {return await busy(async()=>{message('正在保存，请等待主数据源确认…');state=await update(db,state.revision,action);onSuccess();if(linkError)readLocation();render();message(db.info?.mode==='github-issues'?'已核验保存到 GitHub Issues':db.info?.mode==='repository-files'?'已保存到仓库工作区 · 尚未提交 Git':'已保存至浏览器预览 · 尚未同步主数据源');return true;}); }
@@ -88,6 +88,7 @@ function render() {
   }
   renderWorkflow(round);$('workflow').hidden=view!=='cases';
   $('round-setup').hidden=view!=='cases';$('environment-setup').hidden=view!=='cases';
+  updateRoundPreview();
   $('stats').hidden=!['cases','records'].includes(view);$('workspace').hidden=view==='summary';$('case-sidebar').hidden=view==='annotations';
   $('flow').hidden=view!=='cases';$('test-conclusion').hidden=view!=='summary';$('copy-results').hidden=view!=='summary'||!round;
   const titles={cases:'测试用例',records:'测试记录',summary:'测试总结',annotations:'批注'};
@@ -146,7 +147,7 @@ function render() {
   detail.dataset.planId=planId;detail.dataset.roundId=roundId;detail.dataset.caseId=item.id;
   detail.append(el('span',`${item.id} · ${round?.name??'当前方案定义'}`,'eyebrow'),markTarget(el('h2',item.title),caseScope,'case'));
   for(const type of item.types) detail.append(pill(labels[type],type));
-  if(round) for(const reason of item.selectionReasons??[]) detail.append(pill(({'previous-failure':'失败复测',smoke:'每轮冒烟',change:'变更纳入',unfinished:'上轮未完成','conditional-next':'条件分支纳入',dependency:'前置依赖纳入'})[reason]??reason));
+  if(round) for(const reason of item.selectionReasons??[]) detail.append(pill(({'selected':'本轮选定','previous-failure':'失败复测',smoke:'每轮冒烟',change:'变更纳入',unfinished:'上轮未完成','conditional-next':'条件分支纳入',dependency:'前置依赖纳入'})[reason]??reason));
   for(const [label,value,field] of [['前置条件',item.preconditions,'preconditions'],['测试步骤',item.steps,'steps'],['预期结果',item.expected,'expected']]) detail.append(el('h3',label),markTarget(el('div',value||'','prose'),caseScope,field));
   const locationEnv=round?.environments.find(env=>env.id===environmentId);
   const locationExecution=locationEnv&&round.workflow?model.inspectWorkflow(round).executions.find(entry=>entry.caseId===item.id&&entry.environmentId===locationEnv.id):null;
@@ -247,7 +248,7 @@ function renderExecution(detail,round,item) {
 function renderNextTest(detail,round,item,env,targetView='cases') {
   const advice=model.nextTest(round,item.id,env.id),panel=el('section');panel.id='next-test';
   panel.append(el('h3','下一步测什么'));
-  const actionLabels={current:'继续当前用例',test:'执行后续用例',retry:'重新验证当前用例',wait:'等待条件恢复',done:'此分支结束',unconfigured:'尚未配置下一步',unavailable:'当前流程不支持分支',prerequisite:'先完成前置用例',stale:'依赖已变化，先记录阻塞'};
+  const actionLabels={'out-of-scope':'后续用例不在本轮范围',current:'继续当前用例',test:'执行后续用例',retry:'重新验证当前用例',wait:'等待条件恢复',done:'此分支结束',unconfigured:'尚未配置下一步',unavailable:'当前流程不支持分支',prerequisite:'先完成前置用例',stale:'依赖已变化，先记录阻塞'};
   panel.append(el('strong',actionLabels[advice.action]),el('p',({current:'请先执行或继续当前用例，再根据实际结果选择后续测试。',unconfigured:'该用例尚未配置结果分支，请完善定义，不能自动猜测下一项。',unavailable:'旧流程请准备新轮次后使用按环境分支。',prerequisite:'请先在本轮、本环境完成下方前置用例，再返回目标测试。',stale:'执行期间依赖证据已变化；请记录阻塞，确认前置条件后重新开始。'})[advice.action]??advice.reason,'context'));
   if(advice.resumeWhen)panel.append(el('p',`恢复条件：${advice.resumeWhen}`,'context'));
   if(advice.unresolvedFailureId)panel.append(el('p',`仍有未解决失败：${advice.unresolvedFailureId}。部分执行、阻塞或跳过均不会清除此失败；需在本环境重测通过。`,'error'));
@@ -294,7 +295,40 @@ $('json-form').onsubmit=async event=>{event.preventDefault();try{const value=JSO
 $('export').onclick=()=>download(state,'test-workbench-archive.json');
 $('export-ai').onclick=()=>{try{download(model.exportAI(state),'test-workbench-ai-state.json');message('AI 快照包含状态机契约、原始归档、当前状态及允许的下一步；恢复数据请使用归档。');}catch(error){message(error.message,true);}};
 $('reload').onclick=async()=>{try{await busy(async()=>{state=await read(db);if(linkError)readLocation();render();message('已读取最新数据；未保存的草稿保留。');});}catch(error){message(error.message,true);}};
-$('round-form').onsubmit=event=>{event.preventDefault();const data=new FormData(event.target),id=uuid(),targetPlanId=planId,changed=data.get('changed').trim();save(state=>model.createRound(state,{id,name:data.get('name'),planId:targetPlanId,createdAt:now(),changedIds:changed?changed.split(',').map(value=>value.trim()).filter(Boolean):undefined,includeUnfinished:data.has('unfinished')})).then(()=>{if(!$('message').classList.contains('error')){roundId=id;showView('records',{reset:true});}});};
+let preparedRound = null;
+function caseIds(value){return [...new Set(String(value??'').split(',').map(item=>item.trim()).filter(Boolean))];}
+function roundSelectionInput(){
+  const form=$('round-form'),plan=state.plans.find(item=>item.id===planId);if(!plan)throw new Error('请选择测试方案');
+  const full=form.elements.fullRegression.checked;
+  let ids=full?plan.cases.map(item=>item.id):caseIds(form.elements.cases.value);
+  const previous=model.roundsFor(state,planId).at(-1);
+  if(form.elements.unfinished.checked&&previous)ids.push(...previous.cases.filter(item=>plan.cases.some(current=>current.id===item.id)&&model.statusOf(previous,item.id)!=='passed').map(item=>item.id));
+  return {planId,selection:{source:full?'full-regression':form.elements.source.value,planRevision:plan.revision,cases:[...new Set(ids)]}};
+}
+function updateRoundPreview(){
+  const form=$('round-form');form.elements.cases.required=!form.elements.fullRegression.checked&&!form.elements.unfinished.checked;
+  let key='';try{key=JSON.stringify(roundSelectionInput());}catch{}
+  if(preparedRound&&(preparedRound.key!==key||preparedRound.revision!==state.revision))preparedRound=null;
+  form.elements.confirmed.disabled=!preparedRound;
+  if(!preparedRound){form.elements.confirmed.checked=false;$('round-preview').textContent='请预览并确认本轮范围；选择或数据变化后需要重新预览。';}
+}
+$('round-form').oninput=event=>{if(event.target.name!=='confirmed'&&event.target.name!=='name'){preparedRound=null;updateRoundPreview();}};
+$('preview-round').onclick=()=>{
+  try{
+    const input=roundSelectionInput(),preview=model.previewRoundSelection(state,input),plan=state.plans.find(item=>item.id===input.planId);
+    preparedRound={input,key:JSON.stringify(input),revision:state.revision};
+    const frozenIds=new Set(preview.cases.map(item=>item.id)),added=preview.cases.filter(item=>!preview.requestedCases.includes(item.id)),excluded=plan.cases.filter(item=>!frozenIds.has(item.id));
+    const panel=$('round-preview');panel.replaceChildren(el('strong',`本轮冻结 ${preview.cases.length} 个用例 · 来源：${input.selection.source}`),el('p',`选中：${preview.requestedCases.join(', ')}`),el('p',`补充前置依赖：${added.map(item=>item.id).join(', ')||'无'}`),el('p',`排除（${excluded.length}）：${excluded.map(item=>item.id).join(', ')||'无'}`));
+    if(input.selection.source==='full-regression')panel.append(el('p','完整回归将纳入整个方案，请确认本次任务确实需要。','error'));
+    $('round-form').elements.confirmed.checked=false;updateRoundPreview();
+  }catch(error){preparedRound=null;updateRoundPreview();message(error.message,true);}
+};
+$('round-form').onsubmit=async event=>{
+  event.preventDefault();updateRoundPreview();const form=event.target;
+  if(!preparedRound||!form.elements.confirmed.checked){message('请先预览并确认本轮冻结范围',true);return;}
+  const input=structuredClone(preparedRound.input),id=uuid(),name=form.elements.name.value;
+  if(await save(state=>model.createRound(state,{...input,id,name,createdAt:now()}))){preparedRound=null;roundId=id;showView('cases',{reset:true});}
+};
 $('environment-form').onsubmit=event=>{event.preventDefault();const data=Object.fromEntries(new FormData(event.target)),id=uuid();save(state=>model.registerEnvironment(state,{id,...data})).then(()=>{if(!$('message').classList.contains('error')){environmentId=id;render();}});};
 window.addEventListener('hashchange',async()=>{if(pendingAction){queuedHash=location.hash;return;}if(!db)return;try{await busy(async()=>{state=await read(db);readLocation();render();});}catch(error){message(error.message,true);}});
 try {db=await openWorkspace();state=await read(db);readLocation();render(); } catch(error) {message(`无法载入数据：${error.message}。请保留原数据库并导出可用备份，不要清空。`,true);}
@@ -310,6 +344,7 @@ $('commit-source').onclick=async()=>{try{await busy(async()=>{message('正在提
 
 function renderConclusion(round){
  const panel=$('test-conclusion');panel.replaceChildren();if(!round){panel.append(el('h2','尚未选择测试轮次'),el('p','请选择一个轮次查看与其记录绑定的测试总结。','empty'));return;}
+ if(round.selection)panel.append(el('p',`本轮冻结范围：${round.selection.cases.join(', ')} · ${round.cases.length} 个用例 · 来源：${round.selection.source}`,'context'));
  const report=testConclusions(state).rounds.find(item=>item.roundId===round.id),names={passed:'通过',failed:'未通过',blocked:'阻塞',partial:'部分执行',incomplete:'尚未完成',legacy:'旧流程，未推断结论'};
  panel.append(el('h2',`本轮测试结论：${names[report.verdict]}`),el('p',`${round.version} / ${round.name} · ${round.source}`,'context'));
  panel.append(el('p','根据本轮、各环境的实际记录计算。结论与执行记录一同保存；文件模式需提交后才算入库。结论不代表发布批准。','muted'));

@@ -52,7 +52,7 @@ Use a project GitHub adapter to read the actual PR base/head and compare the pre
 
 Read complete changes, including renamed/deleted files and affected callers. Empty/truncated patches, API limits or divergent history need a complete comparison or explicit review, not an empty-diff assumption. Bind the review to the PR, exact base/head, previous round/revision and current definition/classification baseline.
 
-After meaningful analysis, save concrete cases with their change reasons and changed-file references. Revalidate the context before creating the round; head, prior results or library edits invalidate stale preparation. Do not invent change cases when the commits are identical. Always retain the failure/smoke/change/optional-unfinished ordering and current-library rules in [test-rounds.md](test-rounds.md), plus declared dependencies and branch targets.
+After meaningful analysis, save concrete cases with their change reasons and changed-file references. Revalidate the context before creating the round; head, prior results or library edits invalidate stale preparation. Do not invent change cases when the commits are identical. Offer failure/smoke/change/optional-unfinished candidates only within the requested scope, then freeze the confirmed set under [test-rounds.md](test-rounds.md). Add recursive prerequisites, while leaving external outcome targets out of scope.
 
 The starter accepts declared change selections but does not fetch or analyze live GitHub PR diffs. An AI tool or button called "prepare next round" must report whether the real comparison and analysis are ready; reading filenames alone is not completed behavioral analysis.
 

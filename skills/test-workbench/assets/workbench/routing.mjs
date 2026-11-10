@@ -18,17 +18,17 @@ export function validateNext(item) {
     if(route.action==='wait')require(text(route.resumeWhen),'wait branch requires a concrete resumeWhen condition');
   }
 }
-export function validateTargets(cases) {
+export function validateTargets(cases, {allowExternal = false} = {}) {
   const ids=new Set(cases.map(item=>item.id));
   for(const item of cases) {
     validateNext(item);
-    for(const route of Object.values(item.next??{}))if(['test','retry'].includes(route.action))require(ids.has(route.caseId),`Next case not found: ${route.caseId}`);
+    for(const route of Object.values(item.next??{}))if(['test','retry'].includes(route.action))require(allowExternal || ids.has(route.caseId),`Next case not found: ${route.caseId}`);
   }
 }
 export function nextTest(round,caseId,environmentId) {
   const item=round.cases.find(entry=>entry.id===caseId);
   require(item,'Next-test case not found');require(round.environments.some(env=>env.id===environmentId),'Next-test environment not attached');
-  validateTargets(round.cases);
+  validateTargets(round.cases, {allowExternal: round.selection !== undefined});
   if(!round.workflow)return {action:'unavailable',reason:'Legacy round: prepare a managed round for environment-bound routing.'};
   const view=inspectWorkflow(round),execution=view.executions.find(entry=>entry.caseId===caseId&&entry.environmentId===environmentId);
   const observation=round.observations.find(entry=>entry.id===execution.observationId);
@@ -50,6 +50,7 @@ export function nextTest(round,caseId,environmentId) {
   }
   if(!item.next)return {...context,action:'unconfigured',reason:'No next-test branch is defined for this case; do not infer the next test.'};
   const route=item.next[execution.state];
+  if(['test','retry'].includes(route.action)&&!byId.has(route.caseId))return {...context,action:'out-of-scope',reason:`Next case ${route.caseId} is outside this frozen round; explicitly prepare a new selection to test it.`,target:null,targetCaseId:null,excludedCaseId:route.caseId,available:false};
   if(['test','retry'].includes(route.action)&&!byId.get(route.caseId).dependenciesSatisfied)return prerequisiteAdvice(route.caseId,route.caseId);
   const target=['test','retry'].includes(route.action)?structuredClone(round.cases.find(entry=>entry.id===route.caseId)):null;
   return {...context,action:route.action,reason:route.reason,...(route.action==='wait'?{resumeWhen:route.resumeWhen}:{}),target,available:view.state==='running'&&Boolean(target),targetCaseId:target?.id??null,

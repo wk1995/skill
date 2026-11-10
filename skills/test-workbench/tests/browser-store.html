@@ -19,7 +19,7 @@ try {
   require(eq(repeat,current)&&eq(await read(db),current),'Idempotent import changed revision');lines.push('PASS identical import preserves revision');
   const reader=await openStore(db.name);require(eq(await read(reader),current),'Reopened connection lost data');reader.close();lines.push('PASS separate database connection retains data');
   let archive=m.importPlan(m.empty(),{id:'p',revision:0,version:'1.0.0',title:'Version fixture',source:'fixture-sha',build:'',pr:'',cases:[{id:'S',title:'Smoke',priority:'P0',types:['smoke'],preconditions:'',steps:'Run',expected:'Observe'}]});
-  archive=m.createRound(archive,{id:'r',name:'Version fixture',planId:'p',createdAt:'2026-10-23T08:00:00Z'});
+  archive=m.createRound(archive,{id:'r',name:'Version fixture',planId:'p',createdAt:'2026-10-23T08:00:00Z',selection:{source:'user',planRevision:0,cases:['S']}});
   for(const managed of [true,false]) {
     const mismatch=structuredClone(archive);mismatch.rounds[0].version='9.9.9';if(!managed)delete mismatch.rounds[0].workflow;
     rejected=false;try{await update(db,current.revision,state=>m.importArchive(state,mismatch));}catch(error){rejected=/Round version/.test(error.message);}

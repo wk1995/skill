@@ -16,9 +16,9 @@ async function ready() {
 try {
   const original=await read(db);
   await update(db,original.revision,state=>{
-    let next=m.importPlan(state,{id:'p',revision:0,version:'fixture',title:'Isolated UI regression',source:'fixture',build:'',pr:'',cases:[{id:'S',title:'Smoke fixture',priority:'P0',types:['smoke'],preconditions:'Fixture only',steps:'Fixture',expected:'Fixture'}]});
-    next=m.createRound(next,{id:'first',name:'First',planId:'p',createdAt:'2026-10-22T01:00:00Z'});
-    next=m.createRound(next,{id:'second',name:'Second',planId:'p',createdAt:'2026-10-22T02:00:00Z'});
+    let next=m.importPlan(state,{id:'p',revision:0,version:'fixture',title:'Isolated UI regression',source:'user',build:'',pr:'',cases:[{id:'S',title:'Smoke fixture',priority:'P0',types:['smoke'],preconditions:'Fixture only',steps:'Fixture',expected:'Fixture'}]});
+    next=m.createRound(next,{id:'first',name:'First',planId:'p',createdAt:'2026-10-22T01:00:00Z',selection:{source:'user',planRevision:0,cases:['S']}});
+    next=m.createRound(next,{id:'second',name:'Second',planId:'p',createdAt:'2026-10-22T02:00:00Z',selection:{source:'user',planRevision:0,cases:['S']}});
     // One persistence transaction; model sequence is a single proposed workspace.
     next.revision=state.revision+1;return next;
   });

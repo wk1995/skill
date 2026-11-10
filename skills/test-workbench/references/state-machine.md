@@ -20,7 +20,7 @@ Issue references use optional append-only `round.issueLinks` entries identifying
 
 | Action | From | To | Guard |
 | --- | --- | --- | --- |
-| `prepare` | `draft` | `ready` | At least one registered environment attached; frozen cases include smoke |
+| `prepare` | `draft` | `ready` | At least one registered environment attached; explicit frozen selection and prerequisite closure are valid (old selection-free archives retain smoke validation) |
 | `begin` | `ready` | `running` | Valid event with actor, timezone timestamp and expected from-state |
 | `complete` | `running` | `completed` | Every selected case on every attached environment has a terminal result |
 | `reopen` | `completed` | `running` | Explicit reason |
@@ -33,7 +33,7 @@ Issue references use optional append-only `round.issueLinks` entries identifying
 
 Every event has an immutable ID, scope, action, expected `from`, computed `to`, actor, timestamp `at` and reason text. Execution events also identify case/environment and, for a result, the exact observation ID. `attemptId` in the projection is the corresponding start-event ID. Original attempt and result events stay in the archive.
 
-Event-array order is authoritative. Replay validates every transition and observation reference before persistence; wall-clock timestamps do not reorder workflow history. Summaries use each environment's current execution state. A failed environment takes priority over blocked, partial, running, untested, skipped, then passed, so another device passing cannot clear a failure. A new round begins untested and must rerun smoke.
+Event-array order is authoritative. Replay validates every transition and observation reference before persistence; wall-clock timestamps do not reorder workflow history. Summaries use each environment's current execution state. A failed environment takes priority over blocked, partial, running, untested, skipped, then passed, so another device passing cannot clear a failure. A new round begins untested within its explicitly frozen scope. Smoke is included only when selected or required as a prerequisite.
 
 ## Prerequisite cases
 
@@ -45,7 +45,9 @@ Read [conditional-tests.md](conditional-tests.md) for `case.next`, outcome meani
 
 ## Direct model use and AI handoff
 
-`model.mjs` exports `createRound`, `transitionRound`, `startExecution`, `startExecutionBatch`, `record`, `recordBatch`, `validate`, `linkRecordIssues` and `exportAI`. They validate direct invocation; UI-only guards are insufficient. Model functions return a new archive without writing. Persist through `store.update` or the project's authenticated revision-checked API. Batch transitions/results validate atomically.
+`model.mjs` exports read-only `previewRoundSelection`, `createRound`, `transitionRound`, `startExecution`, `startExecutionBatch`, `record`, `recordBatch`, `validate`, `linkRecordIssues` and `exportAI`. They validate direct invocation; UI-only guards are insufficient. Model functions return a new archive without writing. Persist through `store.update` or the project's authenticated revision-checked API. Batch transitions/results validate atomically.
+
+New round creation requires the [explicit selection contract](test-rounds.md); legacy `changedIds`/`includeUnfinished` inputs reject. Historical archives remain readable; upgrade shared readers before writing focused rounds.
 
 An example round event input to `transitionRound(state, roundId, input)`:
 

@@ -6,7 +6,7 @@ const item=(id,types=['functional'])=>({id,title:`Test ${id}`,priority:'P0',type
 const next=()=>({passed:{action:'test',caseId:'SESSION',reason:'Verify session persists'},failed:{action:'test',caseId:'DIAG',reason:'Collect login failure diagnostics'},partial:{action:'retry',caseId:'LOGIN',reason:'Complete unverified login checks; retain prior evidence'},blocked:{action:'wait',reason:'Restore account/network prerequisite before retesting',resumeWhen:'A valid account and reachable test service are available'},skipped:{action:'test',caseId:'OFFLINE',reason:'Continue independent offline coverage'}});
 const plan=()=>({id:'p',revision:0,version:'v',title:'Routing fixture',source:'sha',build:'',pr:'',cases:[{...item('LOGIN',['smoke']),next:next()},item('SESSION'),item('DIAG'),item('OFFLINE')]});
 const environment=id=>({id,label:id,kind:'browser',configuration:'isolated'});
-function fixture(){let s=m.importPlan(m.empty(),plan());s=m.createRound(s,{id:'r',planId:'p',name:'Round',createdAt:at,changedIds:[]});s=m.registerEnvironment(s,environment('e'));s=m.attachEnvironment(s,'r','e');s=m.transitionRound(s,'r',{id:'ready',action:'prepare',from:'draft',actor:'Tester',at});return m.transitionRound(s,'r',{id:'run',action:'begin',from:'ready',actor:'Tester',at});}
+function fixture(){let s=m.importPlan(m.empty(),plan());s=m.createRound(s,{id:'r',planId:'p',name:'Round',createdAt:at,selection:{source:'user',planRevision:0,cases:['LOGIN','SESSION','DIAG','OFFLINE']}});s=m.registerEnvironment(s,environment('e'));s=m.attachEnvironment(s,'r','e');s=m.transitionRound(s,'r',{id:'ready',action:'prepare',from:'draft',actor:'Tester',at});return m.transitionRound(s,'r',{id:'run',action:'begin',from:'ready',actor:'Tester',at});}
 const start=(s,caseId='LOGIN',environmentId='e',suffix='')=>m.startExecution(s,'r',{id:`start-${caseId}-${environmentId}${suffix}`,caseId,environmentId,actor:'Tester',at,from:m.executionState(s.rounds[0],caseId,environmentId)});
 const observation=(id,status,extra={})=>({id,caseId:'LOGIN',environmentId:'e',environment:environment('e'),status,tester:'Tester',executedAt:at,recordedAt:at,notes:'Observed evidence; completed input check, remaining session check',evidence:'fixture screenshot',...extra});
 function rejects(state,fn,pattern){const before=structuredClone(state);assert.throws(()=>fn(state),pattern);assert.deepEqual(state,before);}
@@ -25,20 +25,20 @@ test('invalid or incomplete routing rejects plan import/edit/archive before muta
   const s=fixture();const bads=[n=>delete n.failed,n=>n.unknown={action:'done',reason:'typo'},n=>n.passed.action='invented',n=>n.passed.reason='',n=>n.passed.caseId='missing',n=>n.partial.caseId='DIAG',n=>n.blocked.caseId='hidden',n=>n.skipped=null,n=>delete n.blocked.resumeWhen,n=>n.passed.environmentId='other',n=>n.failed.unresolvedFailureId=null,n=>n.partial.state='passed'];
   for(const change of bads){const p=plan();change(p.cases[0].next);p.revision=1;rejects(s,x=>m.importPlan(x,p));rejects(s,x=>m.editCase(x,'p',p.cases[0]));const incoming=structuredClone(s);incoming.plans[0]=p;rejects(s,x=>m.importArchive(x,incoming));}
   rejects(s,x=>m.importPlan(x,{...plan(),revision:1,cases:[{...plan().cases[0],next:null}]}));
-  const bad=structuredClone(s);bad.rounds[0].cases[0].next.failed.caseId='missing';rejects(s,x=>m.importArchive(x,bad),/Next case not found/);
+  const bad=structuredClone(s);bad.rounds[0].cases[0].next.failed.caseId='missing';rejects(s,x=>m.importArchive(x,bad),/historical/);
 });
 
-test('reachable targets freeze recursively, cycles terminate and new rounds do not infer outcomes',()=>{
+test('explicitly selected branch targets remain frozen, cycles terminate and new rounds do not infer outcomes',()=>{
   const p=plan();p.cases[1].next=Object.fromEntries(m.RESULTS.map(status=>[status,{action:'test',caseId:'LOGIN',reason:'Review original login again'}]));
-  let s=m.importPlan(m.empty(),p);s=m.createRound(s,{id:'r',planId:'p',name:'Round',createdAt:at,changedIds:[]});
-  assert.deepEqual(s.rounds[0].cases.map(entry=>entry.id),['LOGIN','SESSION','DIAG','OFFLINE']);assert(s.rounds[0].cases[0].selectionReasons.includes('smoke'));
-  assert(s.rounds[0].cases.slice(1).every(entry=>entry.selectionReasons.includes('conditional-next')));assert.equal(s.rounds[0].observations.length,0);assert.equal(s.rounds[0].workflow.events.length,0);
+  let s=m.importPlan(m.empty(),p);s=m.createRound(s,{id:'r',planId:'p',name:'Round',createdAt:at,selection:{source:'user',planRevision:0,cases:['LOGIN','SESSION','DIAG','OFFLINE']}});
+  assert.deepEqual(s.rounds[0].cases.map(entry=>entry.id),['LOGIN','SESSION','DIAG','OFFLINE']);assert(s.rounds[0].cases[0].selectionReasons.includes('selected'));
+  assert(s.rounds[0].cases.every(entry=>entry.selectionReasons.includes('selected')));assert.equal(s.rounds[0].observations.length,0);assert.equal(s.rounds[0].workflow.events.length,0);
   const original=structuredClone(s.rounds[0]);s=m.editCase(s,'p',{...p.cases[1],steps:'New session procedure'});assert.deepEqual(s.rounds[0],original);
-  s=m.createRound(s,{id:'r2',planId:'p',name:'Round 2',createdAt:at,changedIds:[]});assert.equal(s.rounds[1].cases.find(entry=>entry.id==='SESSION').steps,'New session procedure');
+  s=m.createRound(s,{id:'r2',planId:'p',name:'Round 2',createdAt:at,selection:{source:'user',planRevision:s.plans[0].revision,cases:['LOGIN','SESSION','DIAG','OFFLINE']}});assert.equal(s.rounds[1].cases.find(entry=>entry.id==='SESSION').steps,'New session procedure');
 });
 
 test('diagnostic and another environment passing never clear original failure or change its branch',()=>{
-  let s=m.importPlan(m.empty(),plan());s=m.createRound(s,{id:'r',planId:'p',name:'Round',createdAt:at,changedIds:[]});
+  let s=m.importPlan(m.empty(),plan());s=m.createRound(s,{id:'r',planId:'p',name:'Round',createdAt:at,selection:{source:'user',planRevision:0,cases:['LOGIN','SESSION','DIAG','OFFLINE']}});
   for(const id of ['e','f']){s=m.registerEnvironment(s,environment(id));s=m.attachEnvironment(s,'r',id);}s=m.transitionRound(s,'r',{id:'ready',action:'prepare',from:'draft',actor:'Tester',at});s=m.transitionRound(s,'r',{id:'run',action:'begin',from:'ready',actor:'Tester',at});
   s=m.record(start(s),'r',observation('failure','failed'));s=m.record(start(s,'DIAG'),'r',observation('diag-pass','passed',{caseId:'DIAG'}));s=m.record(start(s,'LOGIN','f'),'r',observation('other-pass','passed',{environmentId:'f',environment:environment('f')}));
   assert.equal(m.statusOf(s.rounds[0],'LOGIN'),'failed');assert.equal(m.nextTest(s.rounds[0],'LOGIN','e').targetCaseId,'DIAG');assert.equal(m.nextTest(s.rounds[0],'LOGIN','f').targetCaseId,'SESSION');
@@ -70,7 +70,7 @@ test('partial, blocking or skipping a retest cannot clear a known failure',()=>{
     s=m.record(s,'r',observation(`retest-${status}`,status));assert.equal(m.statusOf(s.rounds[0],'LOGIN'),'failed');
     const advice=m.nextTest(s.rounds[0],'LOGIN','e');assert.equal(advice.state,status);assert.equal(advice.unresolvedFailureId,'known-failure');
   }
-  const later=m.createRound(s,{id:'after-skip',planId:'p',name:'Failure retained',createdAt:at,changedIds:[]});assert(later.rounds.at(-1).cases.find(item=>item.id==='LOGIN').selectionReasons.includes('previous-failure'));
+  const later=m.createRound(s,{id:'after-skip',planId:'p',name:'Failure retained',createdAt:at,selection:{source:'user',planRevision:s.plans[0].revision,cases:['LOGIN','SESSION','DIAG','OFFLINE']}});assert(later.rounds.at(-1).cases.find(item=>item.id==='LOGIN').selectionReasons.includes('selected'));
   s=m.record(start(s,'LOGIN','e','actual-fix'),'r',observation('verified-fix','passed'));
   assert.equal(m.statusOf(s.rounds[0],'LOGIN'),'passed');assert.equal(m.nextTest(s.rounds[0],'LOGIN','e').unresolvedFailureId,null);assert.equal(s.rounds[0].observations.length,5);
   }
@@ -78,18 +78,18 @@ test('partial, blocking or skipping a retest cannot clear a known failure',()=>{
 
 test('done and missing routes stay explicit; unvisited branches require deliberate outcomes',()=>{
   const p=plan();p.cases[0].next.passed={action:'done',reason:'Required login scope is complete'};
-  let s=m.importPlan(m.empty(),p);s=m.createRound(s,{id:'r',planId:'p',name:'Round',createdAt:at,changedIds:[]});s=m.registerEnvironment(s,environment('e'));s=m.attachEnvironment(s,'r','e');s=m.transitionRound(s,'r',{id:'ready',action:'prepare',from:'draft',actor:'Tester',at});s=m.transitionRound(s,'r',{id:'run',action:'begin',from:'ready',actor:'Tester',at});
+  let s=m.importPlan(m.empty(),p);s=m.createRound(s,{id:'r',planId:'p',name:'Round',createdAt:at,selection:{source:'user',planRevision:0,cases:['LOGIN','SESSION','DIAG','OFFLINE']}});s=m.registerEnvironment(s,environment('e'));s=m.attachEnvironment(s,'r','e');s=m.transitionRound(s,'r',{id:'ready',action:'prepare',from:'draft',actor:'Tester',at});s=m.transitionRound(s,'r',{id:'run',action:'begin',from:'ready',actor:'Tester',at});
   s=m.record(start(s),'r',observation('pass','passed'));const advice=m.nextTest(s.rounds[0],'LOGIN','e');assert.equal(advice.action,'done');assert.equal(advice.target,null);
   assert.equal(m.importArchive(s,structuredClone(s)),s);assert.equal(m.statusOf(s.rounds[0],'DIAG'),'untested');
   rejects(s,x=>m.transitionRound(x,'r',{id:'end',action:'complete',from:'running',actor:'Tester',at}),/unfinished/);
 });
 
-test('branches with prototype-looking IDs are data; removed failed cases retain reachable historical targets',()=>{
+test('prototype-looking IDs are data and new explicit scope preserves removed cases only in historical rounds',()=>{
   const p=plan();p.cases[1].id='constructor';p.cases[0].next.passed.caseId='constructor';
-  let s=m.importPlan(m.empty(),p);s=m.createRound(s,{id:'r',planId:'p',name:'Round',createdAt:at,changedIds:[]});assert(s.rounds[0].cases.some(entry=>entry.id==='constructor'));
+  let s=m.importPlan(m.empty(),p);s=m.createRound(s,{id:'r',planId:'p',name:'Round',createdAt:at,selection:{source:'user',planRevision:0,cases:['LOGIN','constructor','DIAG','OFFLINE']}});assert(s.rounds[0].cases.some(entry=>entry.id==='constructor'));
   s=m.registerEnvironment(s,environment('e'));s=m.attachEnvironment(s,'r','e');s=m.transitionRound(s,'r',{id:'ready',action:'prepare',from:'draft',actor:'Tester',at});s=m.transitionRound(s,'r',{id:'run',action:'begin',from:'ready',actor:'Tester',at});s=m.record(start(s),'r',observation('failed','failed'));
-  s=m.importPlan(s,{...p,revision:1,cases:[item('NEW',['smoke'])]});s=m.createRound(s,{id:'r2',planId:'p',name:'Round 2',createdAt:at,changedIds:[]});
-  assert.deepEqual(s.rounds[1].cases.map(entry=>entry.id),['LOGIN','NEW','constructor','DIAG','OFFLINE']);assert.equal(m.statusOf(s.rounds[1],'LOGIN'),'untested');
+  s=m.importPlan(s,{...p,revision:1,cases:[item('NEW',['smoke'])]});s=m.createRound(s,{id:'r2',planId:'p',name:'Round 2',createdAt:at,selection:{source:'user',planRevision:s.plans[0].revision,cases:['NEW']}});
+  assert.deepEqual(s.rounds[1].cases.map(entry=>entry.id),['NEW']);assert.equal(m.statusOf(s.rounds[1],'NEW'),'untested');
 });
 
 test('pre-execution blocking/skipping records no fabricated start or execution time; failures still require execution',()=>{

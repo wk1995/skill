@@ -27,14 +27,24 @@ Use [execution-quality.md](execution-quality.md) to make that boundary explicit:
 
 Use version → plan → round, permitting multiple plans per version and repeated rounds per plan. Reuse the existing template/data format when present; do not create another site for each case list. Requests to implement a complete test process or visualization include a working web workbench; a case-only request may return a document or structured data. Assessment, explanation and design requests deliver their requested findings/examples/proposal without starting implementation or execution.
 
-Prepare each round as an ordered union by stable case ID:
+Prepare a round from an **explicit selection**, never from a default copy of the complete plan. A focused defect retest includes only its selected cases plus recursive `dependsOn` prerequisites; smoke cases and prior failures outside that scope are excluded. Outcome `next` targets do not authorize adding cases. Targets outside the frozen scope report `out-of-scope` in the webpage/AI; prepare a new confirmed round to test them.
 
-1. Previous failed cases, retaining unresolved failure context.
-2. All current smoke cases, even if passed previously or no code changed.
-3. Cases derived from the selected release PR diff.
-4. Optional unfinished cases when within the requested scope.
+When the user requests regression coverage, propose prior failures, smoke, change-derived cases and optional unfinished cases. Confirm that candidate scope before creating it. Full regression must be explicitly selected; empty input rejects. Keep the original unresolved failures visible in their historical round even when they are outside the new scope.
 
-Retain all selection reasons when deduplicating. Include recursive [case prerequisites](dependencies.md) and place them before dependents; this precedence may move prerequisites ahead of failed/smoke cases. Require current same-round/environment passes, preserving history and revalidating dependent results when upstream evidence changes. If no smoke definition exists, define the core smoke set before starting a round. Never silently omit failures or smoke due to a stale library, inherited object keys, filtering, or a changed display category.
+The direct APIs share validation:
+
+```javascript
+const selection = {source: 'issue', planRevision: plan.revision, cases: ['CASE01', 'CASE02']};
+const preview = previewRoundSelection(state, {planId: plan.id, selection}); // read-only
+// Present preview.requestedCases, preview.cases and excluded plan cases; confirm the exact scope.
+const next = createRound(state, {id, name, planId: plan.id, createdAt, selection});
+```
+
+Sources are `user`, `issue`, `change`, `smoke`, `failures` or `full-regression`. Sources describe the actual selection; they do not fetch or verify an Issue/diff. Full regression requires every current plan case ID explicitly. `planRevision` must match at creation; no old `changedIds`/`includeUnfinished` shortcut is accepted. The webpage requires a read-only preview followed by confirmation and invalidates preparation on selection/workspace changes. API integrations must present and confirm the same scope themselves; a source string alone is not proof that an external analysis occurred.
+
+The saved `round.selection` retains `source`, `planRevision`, `requestedCases` and the ordered final `cases` IDs. Frozen definitions retain `selected` and/or `dependency` reasons. Recursive prerequisites precede dependents; no smoke classification is required for a focused round. The same round ID and exact definition are idempotent; conflicting reuse rejects. Imports/source writes preserve the immutable selection and reject mismatched IDs or extra cases outside its prerequisite closure.
+
+Historical archives without `selection` keep their existing smoke and branch-closure validation; never invent a selection for old evidence. Version 0.0.7 accepts older archives, but the 0.0.6 reader cannot read new focused rounds without smoke or with external routes. Upgrade all readers/writers sharing an archive before creating focused rounds, retain a backup, and update direct callers to the explicit selection API. Archive schema/workflow integers stay 1; the Skill release is the user-selected 0.0.7 correction.
 
 Resolve case content and classification independently: carry forward PR-updated steps and smoke promotions until a newer explicit edit supersedes them. A stale library must not revert them. An explicit current removal of a smoke label is authoritative. Preserve the previous library baseline or equivalent revision evidence to distinguish old data from intentional edits. Freeze the selected definition/classification in each round; later library edits affect future rounds and the current definition view, not old snapshots. Refresh stale preparation after relevant PR/library revisions change.
 
