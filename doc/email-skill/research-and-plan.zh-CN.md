@@ -4,6 +4,8 @@
 
 工作分支：`codex/email-skill-plan`，从拉取后的默认分支 `origin/main` 创建，起点为 `12851e8c9186755207f89e659ff5b8a21b0036d4`。
 
+配套文档：[技术方案、业务逻辑与图示](technical-design.zh-CN.md)，包含架构图、任务流程、账号接入流程、发送状态图，以及查询、草稿发送和异常核对时序图。
+
 ## 1. 建议结论
 
 新增一个可扩展的 `email-management` Skill，统一处理“哪个账号、做什么、该账号能否执行”，按需调用现有 CLI、MCP 或平台原生 API。首期优先接入 **QQ 个人邮箱、网易 163/126、Gmail、飞书邮箱和允许 IMAP/SMTP 的工作邮箱**；第二阶段补充 Outlook/Microsoft 365、iCloud 和企业邮箱专用配置。
@@ -156,10 +158,11 @@ skills/email-management/
 |   |-- feishu.md
 |   `-- microsoft.md          # 随 P2 加入
 `-- doc/
-    `-- research-and-plan.zh-CN.md
+    |-- research-and-plan.zh-CN.md
+    `-- technical-design.zh-CN.md
 ```
 
-本阶段只有方案，不创建半成品 `skills/` 目录或可被发现的 Skill。方案暂存仓库级 `doc/email-skill/`，实施时迁入所属 Skill 的 `doc/` 并修复引用，不保留重复副本。
+本阶段只有方案，不创建半成品 `skills/` 目录或可被发现的 Skill。方案和技术设计暂存仓库级 `doc/email-skill/`，实施时一起迁入所属 Skill 的 `doc/` 并修复引用，不保留重复副本。
 
 `SKILL.md` 只放通用路由、授权与结果判断。CLI 命令差异放供应商参考文档，Agent 的安装路径、MCP 配置文件和 UI 元数据放适当的 `agent-builds/<agent>/` 或平台适配层，不混入可移植入口。
 
@@ -268,9 +271,9 @@ skills/email-management/
 
 ### 9.2 本次文档变更覆盖账本
 
-范围：新增本方案一个 Markdown 文件；没有新增或修改任何运行入口、Skill 元数据、Agent adapter、同步状态或根目录目录表。
+范围：本方案及配套技术设计两个 Markdown 文件；没有新增或修改任何运行入口、Skill 元数据、Agent adapter、同步状态或根目录目录表。
 
-基线：`12851e8c9186755207f89e659ff5b8a21b0036d4`。本次检查对象为工作区方案稿，不宣称完成 PR 审查；若后续创建 PR，需按仓库 playbook 对精确 base/head 和干净提交树执行完整 gate。
+原始方案基线：`12851e8c9186755207f89e659ff5b8a21b0036d4`；技术设计补充基于方案提交 `d2bec6c9d8c4c0722a55622c9122df7793bce325`。检查对象为设计文档，不宣称完成 PR 审查；若后续创建 PR，需按仓库 playbook 对精确 base/head 和干净提交树执行完整 gate。
 
 | 不变量 | 入口与首次写入 | 场景/证据 | 本次状态 | 残余风险 |
 | --- | --- | --- | --- | --- |
@@ -280,6 +283,8 @@ skills/email-management/
 | 既有 Skill 目录不漂移 | 目录检查器 | `python3 scripts/skill_catalog.py --check` | PASS：Skill 结构和双语目录有效 | 不证明新邮箱功能可执行 |
 | 路径、状态序列、缺失依赖等运行矩阵 | 无改动的运行入口 | 本次只有文档 | 不适用；保留 9.1 作为实施验收计划 | 实施后须逐入口补证据 |
 | 版本和构建边界 | 无组件变更 | 未发布 Skill、未改变 adapter | 不需要版本递增或构建新产物 | 发布时另作版本影响评估 |
+
+技术设计补充的图文一致性、Mermaid 渲染和链接检查记录见[配套技术设计第八节](technical-design.zh-CN.md#8-实施顺序与本次文档验证)。
 
 ## 10. 调研来源与版本边界
 
