@@ -24,6 +24,7 @@ BACKENDS = {
 }
 FIELDS = {"id", "address", "provider", "backend", "instance", "config_path"}
 ID = re.compile(r"[a-z0-9][a-z0-9-]{0,62}\Z")
+INSTANCE = re.compile(r"[a-z0-9][a-z0-9_-]{0,62}\Z")
 ADDRESS = re.compile(r"[A-Za-z0-9.!#$%&'*+/=?^_`{|}~-]+@[A-Za-z0-9](?:[A-Za-z0-9.-]*[A-Za-z0-9])?\.[A-Za-z]{2,}\Z")
 
 
@@ -132,8 +133,8 @@ def profile(value):
     require(set(value) >= FIELDS - {"config_path"}, "Missing required account reference fields")
     require(all(isinstance(v, str) and 0 < len(v) <= 4096 and not any(ord(c) < 32 for c in v)
                 for v in value.values()), "Account reference fields must be nonempty text without controls")
-    require(ID.fullmatch(value["id"]) and ID.fullmatch(value["instance"]),
-            "Account and instance IDs must use lowercase letters, digits and hyphens")
+    require(ID.fullmatch(value["id"]) and INSTANCE.fullmatch(value["instance"]),
+            "Account IDs use lowercase letters, digits and hyphens; native instance IDs also allow underscores")
     require(ADDRESS.fullmatch(value["address"]), "A supported ASCII email address is required")
     user, domain = value["address"].rsplit("@", 1)
     require(len(value["address"]) <= 254 and len(user) <= 64 and

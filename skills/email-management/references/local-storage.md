@@ -45,7 +45,7 @@ Profile fields:
 | `address` | Actual ASCII email address, checked again against the backend before use |
 | `provider` | `qq`, `netease`, `gmail`, `feishu`, `imap-smtp` |
 | `backend` | An allowed choice from the provider table |
-| `instance` | Explicit local native account/profile or MCP-instance choice; same ID syntax |
+| `instance` | Explicit local native account/profile or MCP-instance choice; lowercase letters/digits/hyphens/underscores, at most 63 characters |
 | `config_path` | Optional absolute private native file/directory reference; mandatory for Himalaya and QQ MCP |
 
 All other keys reject, including password/token/authorization-code/credential fields and asserted capabilities. Address duplicates across local IDs reject conservatively. Changing an existing ID's content requires `--replace`; registering the same content is a no-op. QQ MCP accounts cannot share the same instance or native config reference. This checks references, not whether native credential or attachment files are truly isolated: verify those separately using the provider procedure.

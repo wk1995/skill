@@ -108,6 +108,20 @@ class AccountStorageTests(unittest.TestCase):
                 with self.assertRaises(accounts.AccountError):
                     self.store.put(value)
 
+    def test_native_profile_underscores_are_preserved_without_relaxing_account_ids(self):
+        entry = dict(self.alpha, provider="feishu", backend="lark-cli", instance="cli_example")
+        result = self.cli("put", data=entry)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(self.store.read()["accounts"]["alpha"]["instance"], "cli_example")
+        self.assertFalse(self.store.put(entry))
+        original = (self.store.directory / "accounts.json").read_bytes()
+        for changes in ({"id": "local_id"}, {"instance": "../native"}, {"instance": "has space"},
+                        {"instance": "Upper"}, {"instance": "x" * 64}):
+            with self.subTest(changes=changes):
+                with self.assertRaises(accounts.AccountError):
+                    self.store.put(dict(entry, **changes), replace=True)
+                self.assertEqual((self.store.directory / "accounts.json").read_bytes(), original)
+
     def test_relative_root_and_xdg_paths_rejected(self):
         with self.assertRaises(accounts.AccountError):
             accounts.Store("relative")
