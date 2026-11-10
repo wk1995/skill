@@ -1,0 +1,3868 @@
+{
+  "id": "email-management-acceptance-design",
+  "revision": 1,
+  "version": "design-b4447b1",
+  "title": "多邮箱 Skill 验收用例设计（未执行）",
+  "source": "https://github.com/wk1995/skill/tree/b4447b136b171fa26f7fe53c320970c426420988/doc/email-skill ; 需求与技术设计基线，非运行包",
+  "build": "",
+  "pr": "",
+  "cases": [
+    {
+      "id": "EM-BASE-001",
+      "title": "确认待测 Skill、分发产物和后端确实可执行",
+      "priority": "P0",
+      "types": [
+        "smoke",
+        "install-upgrade",
+        "compatibility"
+      ],
+      "preconditions": "阶段：首期；适用：隔离 / 对应供应商联调。\n依据：[需求方案](research-and-plan.zh-CN.md#8-触发使用示例与交付阶段)；[技术设计](technical-design.zh-CN.md#7-不变量与验证到首次副作用)。\n前置：有未来实现的选定提交、构建/安装材料；无材料时保持未执行，不把本设计 SHA 当运行包。",
+      "steps": "1. 记录选定实现 SHA、工作树是否干净、Agent/OS 与后端版本、实际 CLI 帮助或 MCP schema。\n2. 在仓库外检查安装的 SKILL.md、参考文件及必要脚本，核对构建与安装内容摘要。\n3. 确认所选功能实际存在，并区分本地帮助检查与真实邮箱联调资格。",
+      "expected": "1. 安装内容可追溯到选定实现；未准备待测产物/所选阶段尚无实现时阻塞，标称支持的产物缺文件或入口则属于失败。\n2. 版本和特性来自实际运行读回；不把源码声明代替已安装能力。\n证据（仅本地）：本机源/构建/安装摘要对照、版本/schema 记录；真实安装路径不入仓库。",
+      "dependsOn": [],
+      "next": {
+        "passed": {
+          "action": "test",
+          "caseId": "EM-BASE-002",
+          "reason": "继续验证“建立独立夹具、哨兵和副作用观测基线”；仅在该目标已被本轮明确选中且其依赖当前通过时继续，不自动扩展范围。"
+        },
+        "failed": {
+          "action": "retry",
+          "caseId": "EM-BASE-001",
+          "reason": "保留该用例原始失败及本机证据；确认根因修复后，显式重测同一环境与本用例，不自动重复写操作。"
+        },
+        "partial": {
+          "action": "retry",
+          "caseId": "EM-BASE-001",
+          "reason": "记录已完成与未核对的具体步骤，补齐本用例剩余断言；已知违约必须记 failed，不以 partial 隐藏。"
+        },
+        "blocked": {
+          "action": "wait",
+          "reason": "本用例前置条件或当前依赖证据不足，尚不能形成有效执行。",
+          "resumeWhen": "有未来实现的选定提交、构建/安装材料；无材料时保持未执行，不把本设计 SHA 当运行包。 同轮同环境的依赖用例须有当前有效通过记录。"
+        },
+        "skipped": {
+          "action": "done",
+          "reason": "仅在明确排除本用例时记录原因；不代表覆盖、通过或清除原有失败，其他已选范围继续独立处理。"
+        }
+      }
+    },
+    {
+      "id": "EM-BASE-002",
+      "title": "建立独立夹具、哨兵和副作用观测基线",
+      "priority": "P0",
+      "types": [
+        "smoke",
+        "integration",
+        "security"
+      ],
+      "preconditions": "阶段：首期；适用：隔离 / 对应供应商联调。\n依据：[需求方案](research-and-plan.zh-CN.md#8-触发使用示例与交付阶段)；[技术设计](technical-design.zh-CN.md#7-不变量与验证到首次副作用)。\n前置：已获准在仓库外创建一次性测试根目录；有模拟服务或专用测试邮箱，禁止使用个人业务邮件。",
+      "steps": "1. 按所选用例准备最少账号材料及独立配置/状态/缓存/下载/证据目录和哨兵；单账号只需 A，多账号场景再准备 B/C，未登录场景保留空配置。\n2. 准备本轮实际需要的已知主题、线程、时区边界、同名附件、摘要答案及内容哈希；模拟地址仅用 .invalid。\n3. 在操作前启动调用/网络/文件观测，用隔离替身作正控制验证可区分草稿、发送、标记和写盘；不为验证观测器发真实邮件。",
+      "expected": "1. 夹具和证据全部在仓库外；受保护输入目录基线可回读；本基线不要求成功登录或自动注册所有账号。\n2. 观测器有正控制，不能以空日志或未启动观测器证明零副作用；未改变非本次数据。\n证据（仅本地）：本机夹具清单、受保护目录摘要/权限基线和观测正控制；不提交真实 fixture。",
+      "dependsOn": [
+        "EM-BASE-001"
+      ],
+      "next": {
+        "passed": {
+          "action": "done",
+          "reason": "本用例的检查完成；其他已选用例仍需独立结果，本分支不结束整个测试轮。"
+        },
+        "failed": {
+          "action": "retry",
+          "caseId": "EM-BASE-002",
+          "reason": "保留该用例原始失败及本机证据；确认根因修复后，显式重测同一环境与本用例，不自动重复写操作。"
+        },
+        "partial": {
+          "action": "retry",
+          "caseId": "EM-BASE-002",
+          "reason": "记录已完成与未核对的具体步骤，补齐本用例剩余断言；已知违约必须记 failed，不以 partial 隐藏。"
+        },
+        "blocked": {
+          "action": "wait",
+          "reason": "本用例前置条件或当前依赖证据不足，尚不能形成有效执行。",
+          "resumeWhen": "已获准在仓库外创建一次性测试根目录；有模拟服务或专用测试邮箱，禁止使用个人业务邮件。 同轮同环境的依赖用例须有当前有效通过记录。"
+        },
+        "skipped": {
+          "action": "done",
+          "reason": "仅在明确排除本用例时记录原因；不代表覆盖、通过或清除原有失败，其他已选范围继续独立处理。"
+        }
+      }
+    },
+    {
+      "id": "EM-ROUTE-001",
+      "title": "纯文案起草无需登录或远端写入",
+      "priority": "P1",
+      "types": [
+        "functional",
+        "usability"
+      ],
+      "preconditions": "阶段：首期；适用：隔离优先。\n依据：[需求方案](research-and-plan.zh-CN.md#8-触发使用示例与交付阶段)；[技术设计](technical-design.zh-CN.md#3-业务逻辑)。\n前置：未配置邮箱；准备普通“写一封通知邮件”的请求，不要求保存或发送。",
+      "steps": "1. 提交纯文案请求。\n2. 检查回复与所有后端调用。",
+      "expected": "1. 返回可编辑文案，不强制登录。\n2. 创建草稿、发送和配置写入调用均为零；不冒称已保存。\n证据（仅本地）：对话与调用计数。",
+      "dependsOn": [
+        "EM-BASE-001",
+        "EM-BASE-002"
+      ],
+      "next": {
+        "passed": {
+          "action": "done",
+          "reason": "本用例的检查完成；其他已选用例仍需独立结果，本分支不结束整个测试轮。"
+        },
+        "failed": {
+          "action": "retry",
+          "caseId": "EM-ROUTE-001",
+          "reason": "保留该用例原始失败及本机证据；确认根因修复后，显式重测同一环境与本用例，不自动重复写操作。"
+        },
+        "partial": {
+          "action": "retry",
+          "caseId": "EM-ROUTE-001",
+          "reason": "记录已完成与未核对的具体步骤，补齐本用例剩余断言；已知违约必须记 failed，不以 partial 隐藏。"
+        },
+        "blocked": {
+          "action": "wait",
+          "reason": "本用例前置条件或当前依赖证据不足，尚不能形成有效执行。",
+          "resumeWhen": "未配置邮箱；准备普通“写一封通知邮件”的请求，不要求保存或发送。 同轮同环境的依赖用例须有当前有效通过记录。"
+        },
+        "skipped": {
+          "action": "done",
+          "reason": "仅在明确排除本用例时记录原因；不代表覆盖、通过或清除原有失败，其他已选范围继续独立处理。"
+        }
+      }
+    },
+    {
+      "id": "EM-ROUTE-002",
+      "title": "未选账号或多个候选时补齐选择",
+      "priority": "P0",
+      "types": [
+        "functional",
+        "security"
+      ],
+      "preconditions": "阶段：首期；适用：隔离优先。\n依据：[需求方案](research-and-plan.zh-CN.md#8-触发使用示例与交付阶段)；[技术设计](technical-design.zh-CN.md#3-业务逻辑)。\n前置：分别准备无账号及 A/B 均可用两种快照；请求未指明邮箱。",
+      "steps": "1. 分别请求查看未读邮件。\n2. 观察是否先明确账号；选 A 后继续。",
+      "expected": "1. 未确定前不查询或修改任何候选邮箱，不把无账号报告为零邮件。\n2. 选择 A 后仅访问 A；不默认遍历全部账号。\n证据（仅本地）：选择前后分实例调用记录与未选账号快照。",
+      "dependsOn": [
+        "EM-BASE-001",
+        "EM-BASE-002"
+      ],
+      "next": {
+        "passed": {
+          "action": "done",
+          "reason": "本用例的检查完成；其他已选用例仍需独立结果，本分支不结束整个测试轮。"
+        },
+        "failed": {
+          "action": "retry",
+          "caseId": "EM-ROUTE-002",
+          "reason": "保留该用例原始失败及本机证据；确认根因修复后，显式重测同一环境与本用例，不自动重复写操作。"
+        },
+        "partial": {
+          "action": "retry",
+          "caseId": "EM-ROUTE-002",
+          "reason": "记录已完成与未核对的具体步骤，补齐本用例剩余断言；已知违约必须记 failed，不以 partial 隐藏。"
+        },
+        "blocked": {
+          "action": "wait",
+          "reason": "本用例前置条件或当前依赖证据不足，尚不能形成有效执行。",
+          "resumeWhen": "分别准备无账号及 A/B 均可用两种快照；请求未指明邮箱。 同轮同环境的依赖用例须有当前有效通过记录。"
+        },
+        "skipped": {
+          "action": "done",
+          "reason": "仅在明确排除本用例时记录原因；不代表覆盖、通过或清除原有失败，其他已选范围继续独立处理。"
+        }
+      }
+    },
+    {
+      "id": "EM-ROUTE-003",
+      "title": "尊重指定后端并防止静默换账号",
+      "priority": "P0",
+      "types": [
+        "functional",
+        "integration"
+      ],
+      "preconditions": "阶段：首期；适用：隔离优先。\n依据：[需求方案](research-and-plan.zh-CN.md#8-触发使用示例与交付阶段)；[技术设计](technical-design.zh-CN.md#3-业务逻辑)。\n前置：A 有两个候选后端；B 也可用；用户指定 A 的某个后端。",
+      "steps": "1. 使用指定后端查询。\n2. 令其返回可识别错误；另做一次写入结果不明的隔离场景。",
+      "expected": "1. 优先指定且身份正确的连接。\n2. 错误不触发静默换到 B；写入开始后不换后端重做。\n证据（仅本地）：各后端调用顺序与零替代写入证据。",
+      "dependsOn": [
+        "EM-BASE-001",
+        "EM-BASE-002"
+      ],
+      "next": {
+        "passed": {
+          "action": "done",
+          "reason": "本用例的检查完成；其他已选用例仍需独立结果，本分支不结束整个测试轮。"
+        },
+        "failed": {
+          "action": "retry",
+          "caseId": "EM-ROUTE-003",
+          "reason": "保留该用例原始失败及本机证据；确认根因修复后，显式重测同一环境与本用例，不自动重复写操作。"
+        },
+        "partial": {
+          "action": "retry",
+          "caseId": "EM-ROUTE-003",
+          "reason": "记录已完成与未核对的具体步骤，补齐本用例剩余断言；已知违约必须记 failed，不以 partial 隐藏。"
+        },
+        "blocked": {
+          "action": "wait",
+          "reason": "本用例前置条件或当前依赖证据不足，尚不能形成有效执行。",
+          "resumeWhen": "A 有两个候选后端；B 也可用；用户指定 A 的某个后端。 同轮同环境的依赖用例须有当前有效通过记录。"
+        },
+        "skipped": {
+          "action": "done",
+          "reason": "仅在明确排除本用例时记录原因；不代表覆盖、通过或清除原有失败，其他已选范围继续独立处理。"
+        }
+      }
+    },
+    {
+      "id": "EM-ROUTE-004",
+      "title": "自定义工作邮箱按托管事实选择",
+      "priority": "P1",
+      "types": [
+        "functional",
+        "compatibility"
+      ],
+      "preconditions": "阶段：首期；适用：隔离优先。\n依据：[需求方案](research-and-plan.zh-CN.md#8-触发使用示例与交付阶段)；[技术设计](technical-design.zh-CN.md#3-业务逻辑)。\n前置：使用 person@company.invalid 及不含托管信息的合成账号。",
+      "steps": "1. 请求接入该工作邮箱；暂不提供服务器。\n2. 补充经过确认的模拟托管方式后重试接入。",
+      "expected": "1. 不按域名猜 Gmail/QQ 或协议地址。\n2. 缺信息时只补齐必要参数；不关闭 TLS 或写猜测配置。\n证据（仅本地）：路由说明与本机配置前后差异。",
+      "dependsOn": [
+        "EM-BASE-001",
+        "EM-BASE-002"
+      ],
+      "next": {
+        "passed": {
+          "action": "done",
+          "reason": "本用例的检查完成；其他已选用例仍需独立结果，本分支不结束整个测试轮。"
+        },
+        "failed": {
+          "action": "retry",
+          "caseId": "EM-ROUTE-004",
+          "reason": "保留该用例原始失败及本机证据；确认根因修复后，显式重测同一环境与本用例，不自动重复写操作。"
+        },
+        "partial": {
+          "action": "retry",
+          "caseId": "EM-ROUTE-004",
+          "reason": "记录已完成与未核对的具体步骤，补齐本用例剩余断言；已知违约必须记 failed，不以 partial 隐藏。"
+        },
+        "blocked": {
+          "action": "wait",
+          "reason": "本用例前置条件或当前依赖证据不足，尚不能形成有效执行。",
+          "resumeWhen": "使用 person@company.invalid 及不含托管信息的合成账号。 同轮同环境的依赖用例须有当前有效通过记录。"
+        },
+        "skipped": {
+          "action": "done",
+          "reason": "仅在明确排除本用例时记录原因；不代表覆盖、通过或清除原有失败，其他已选范围继续独立处理。"
+        }
+      }
+    },
+    {
+      "id": "EM-ROUTE-005",
+      "title": "非邮箱任务和显式专用 Skill 不被重复接管",
+      "priority": "P1",
+      "types": [
+        "functional",
+        "usability"
+      ],
+      "preconditions": "阶段：首期；适用：隔离优先。\n依据：[需求方案](research-and-plan.zh-CN.md#8-触发使用示例与交付阶段)；[技术设计](technical-design.zh-CN.md#3-业务逻辑)。\n前置：准备 IM、日历、DNS/邮件服务器运维、营销群发及用户显式指定专用 Skill 的请求。",
+      "steps": "1. 逐项提交请求，观察 Skill 选择和工具调用。",
+      "expected": "1. 排除范围不由本 Skill 执行。\n2. 尊重显式专用 Skill；同一邮件动作不被两个流程重复提交。\n证据（仅本地）：逐项路由记录和副作用调用计数。",
+      "dependsOn": [
+        "EM-BASE-001",
+        "EM-BASE-002"
+      ],
+      "next": {
+        "passed": {
+          "action": "done",
+          "reason": "本用例的检查完成；其他已选用例仍需独立结果，本分支不结束整个测试轮。"
+        },
+        "failed": {
+          "action": "retry",
+          "caseId": "EM-ROUTE-005",
+          "reason": "保留该用例原始失败及本机证据；确认根因修复后，显式重测同一环境与本用例，不自动重复写操作。"
+        },
+        "partial": {
+          "action": "retry",
+          "caseId": "EM-ROUTE-005",
+          "reason": "记录已完成与未核对的具体步骤，补齐本用例剩余断言；已知违约必须记 failed，不以 partial 隐藏。"
+        },
+        "blocked": {
+          "action": "wait",
+          "reason": "本用例前置条件或当前依赖证据不足，尚不能形成有效执行。",
+          "resumeWhen": "准备 IM、日历、DNS/邮件服务器运维、营销群发及用户显式指定专用 Skill 的请求。 同轮同环境的依赖用例须有当前有效通过记录。"
+        },
+        "skipped": {
+          "action": "done",
+          "reason": "仅在明确排除本用例时记录原因；不代表覆盖、通过或清除原有失败，其他已选范围继续独立处理。"
+        }
+      }
+    },
+    {
+      "id": "EM-ROUTE-006",
+      "title": "区分工具支持、账号权限和本次授权",
+      "priority": "P0",
+      "types": [
+        "functional",
+        "security"
+      ],
+      "preconditions": "阶段：首期；适用：隔离优先。\n依据：[需求方案](research-and-plan.zh-CN.md#8-触发使用示例与交付阶段)；[技术设计](technical-design.zh-CN.md#3-业务逻辑)。\n前置：可分别控制后端缺功能、功能存在但未授权、已授权但本次仅查询三个条件。",
+      "steps": "1. 分别请求对应动作并观察原因。\n2. 在仅查询场景检查是否自动安装工具或扩大权限。",
+      "expected": "1. 不同缺项给出准确原因；均不伪造成功。\n2. 不自动安装/升级、换身份或把查询许可当发送许可。\n证据（仅本地）：三个条件的能力证据及零越权调用。",
+      "dependsOn": [
+        "EM-BASE-001",
+        "EM-BASE-002"
+      ],
+      "next": {
+        "passed": {
+          "action": "done",
+          "reason": "本用例的检查完成；其他已选用例仍需独立结果，本分支不结束整个测试轮。"
+        },
+        "failed": {
+          "action": "retry",
+          "caseId": "EM-ROUTE-006",
+          "reason": "保留该用例原始失败及本机证据；确认根因修复后，显式重测同一环境与本用例，不自动重复写操作。"
+        },
+        "partial": {
+          "action": "retry",
+          "caseId": "EM-ROUTE-006",
+          "reason": "记录已完成与未核对的具体步骤，补齐本用例剩余断言；已知违约必须记 failed，不以 partial 隐藏。"
+        },
+        "blocked": {
+          "action": "wait",
+          "reason": "本用例前置条件或当前依赖证据不足，尚不能形成有效执行。",
+          "resumeWhen": "可分别控制后端缺功能、功能存在但未授权、已授权但本次仅查询三个条件。 同轮同环境的依赖用例须有当前有效通过记录。"
+        },
+        "skipped": {
+          "action": "done",
+          "reason": "仅在明确排除本用例时记录原因；不代表覆盖、通过或清除原有失败，其他已选范围继续独立处理。"
+        }
+      }
+    },
+    {
+      "id": "EM-LOCAL-001",
+      "title": "账号成功接入后仅在仓库外持久保存",
+      "priority": "P0",
+      "types": [
+        "smoke",
+        "functional",
+        "security"
+      ],
+      "preconditions": "阶段：首期；适用：隔离文件系统；按平台分开。\n依据：[需求方案](research-and-plan.zh-CN.md#7-授权凭据与操作边界)；[技术设计](technical-design.zh-CN.md#2-数据对象与边界)。\n前置：有效的隔离测试账号 A；本机私有根目录可写；已授权接入，未授权发送。",
+      "steps": "1. 从无本机账号文件开始接入 A。\n2. 读取创建后的账号索引和后端配置引用，验证真实路径；检查仓库树和发送计数。",
+      "expected": "1. 账号文件仅位于已验证的本机私有根目录，包含非秘密连接信息及凭据引用。\n2. 不存明文 token/密码；仓库无私有文件；只读连通成功后保存，发送次数为零。\n证据（仅本地）：文件实际位置、权限、字段检查与仓库前后差异；不公开文件内容。",
+      "dependsOn": [
+        "EM-BASE-001",
+        "EM-BASE-002"
+      ],
+      "next": {
+        "passed": {
+          "action": "test",
+          "caseId": "EM-LOCAL-002",
+          "reason": "继续验证“结束会话后可从本机配置恢复账号”；仅在该目标已被本轮明确选中且其依赖当前通过时继续，不自动扩展范围。"
+        },
+        "failed": {
+          "action": "retry",
+          "caseId": "EM-LOCAL-001",
+          "reason": "保留该用例原始失败及本机证据；确认根因修复后，显式重测同一环境与本用例，不自动重复写操作。"
+        },
+        "partial": {
+          "action": "retry",
+          "caseId": "EM-LOCAL-001",
+          "reason": "记录已完成与未核对的具体步骤，补齐本用例剩余断言；已知违约必须记 failed，不以 partial 隐藏。"
+        },
+        "blocked": {
+          "action": "wait",
+          "reason": "本用例前置条件或当前依赖证据不足，尚不能形成有效执行。",
+          "resumeWhen": "有效的隔离测试账号 A；本机私有根目录可写；已授权接入，未授权发送。 同轮同环境的依赖用例须有当前有效通过记录。"
+        },
+        "skipped": {
+          "action": "done",
+          "reason": "仅在明确排除本用例时记录原因；不代表覆盖、通过或清除原有失败，其他已选范围继续独立处理。"
+        }
+      }
+    },
+    {
+      "id": "EM-LOCAL-002",
+      "title": "结束会话后可从本机配置恢复账号",
+      "priority": "P0",
+      "types": [
+        "smoke",
+        "functional",
+        "stability"
+      ],
+      "preconditions": "阶段：首期；适用：隔离文件系统；按平台分开。\n依据：[需求方案](research-and-plan.zh-CN.md#7-授权凭据与操作边界)；[技术设计](technical-design.zh-CN.md#2-数据对象与边界)。\n前置：本轮本环境 LOCAL-001 已通过；不更换原配置或凭据。",
+      "steps": "1. 结束并重新启动 Agent/后端会话。\n2. 请求使用账号 A，校验配置和实际身份。",
+      "expected": "1. 不重新询问已保存的非秘密设置，不在仓库重建配置。\n2. 身份仍为 A；旧发送确认不恢复、不自动发送。\n证据（仅本地）：两次会话身份与同一配置摘要，零发送证据。",
+      "dependsOn": [
+        "EM-LOCAL-001"
+      ],
+      "next": {
+        "passed": {
+          "action": "done",
+          "reason": "本用例的检查完成；其他已选用例仍需独立结果，本分支不结束整个测试轮。"
+        },
+        "failed": {
+          "action": "retry",
+          "caseId": "EM-LOCAL-002",
+          "reason": "保留该用例原始失败及本机证据；确认根因修复后，显式重测同一环境与本用例，不自动重复写操作。"
+        },
+        "partial": {
+          "action": "retry",
+          "caseId": "EM-LOCAL-002",
+          "reason": "记录已完成与未核对的具体步骤，补齐本用例剩余断言；已知违约必须记 failed，不以 partial 隐藏。"
+        },
+        "blocked": {
+          "action": "wait",
+          "reason": "本用例前置条件或当前依赖证据不足，尚不能形成有效执行。",
+          "resumeWhen": "本轮本环境 LOCAL-001 已通过；不更换原配置或凭据。 同轮同环境的依赖用例须有当前有效通过记录。"
+        },
+        "skipped": {
+          "action": "done",
+          "reason": "仅在明确排除本用例时记录原因；不代表覆盖、通过或清除原有失败，其他已选范围继续独立处理。"
+        }
+      }
+    },
+    {
+      "id": "EM-LOCAL-003",
+      "title": "显式本机文件优先且不回退错误账号",
+      "priority": "P0",
+      "types": [
+        "functional",
+        "security"
+      ],
+      "preconditions": "阶段：首期；适用：隔离文件系统；按平台分开。\n依据：[需求方案](research-and-plan.zh-CN.md#7-授权凭据与操作边界)；[技术设计](technical-design.zh-CN.md#2-数据对象与边界)。\n前置：默认文件指向 A，显式绝对路径文件指向 B，均在仓库外。",
+      "steps": "1. 显式选择 B 文件执行读取。\n2. 随后令显式文件缺失，再次读取。",
+      "expected": "1. 首次仅使用 B。\n2. 缺失时报错，不默默回退默认 A 或创建替代账号。\n证据（仅本地）：配置选择与分账号调用计数。",
+      "dependsOn": [
+        "EM-BASE-001",
+        "EM-BASE-002"
+      ],
+      "next": {
+        "passed": {
+          "action": "done",
+          "reason": "本用例的检查完成；其他已选用例仍需独立结果，本分支不结束整个测试轮。"
+        },
+        "failed": {
+          "action": "retry",
+          "caseId": "EM-LOCAL-003",
+          "reason": "保留该用例原始失败及本机证据；确认根因修复后，显式重测同一环境与本用例，不自动重复写操作。"
+        },
+        "partial": {
+          "action": "retry",
+          "caseId": "EM-LOCAL-003",
+          "reason": "记录已完成与未核对的具体步骤，补齐本用例剩余断言；已知违约必须记 failed，不以 partial 隐藏。"
+        },
+        "blocked": {
+          "action": "wait",
+          "reason": "本用例前置条件或当前依赖证据不足，尚不能形成有效执行。",
+          "resumeWhen": "默认文件指向 A，显式绝对路径文件指向 B，均在仓库外。 同轮同环境的依赖用例须有当前有效通过记录。"
+        },
+        "skipped": {
+          "action": "done",
+          "reason": "仅在明确排除本用例时记录原因；不代表覆盖、通过或清除原有失败，其他已选范围继续独立处理。"
+        }
+      }
+    },
+    {
+      "id": "EM-LOCAL-004",
+      "title": "损坏、空内容或冲突配置不被覆盖",
+      "priority": "P0",
+      "types": [
+        "functional",
+        "security"
+      ],
+      "preconditions": "阶段：首期；适用：隔离文件系统；按平台分开。\n依据：[需求方案](research-and-plan.zh-CN.md#7-授权凭据与操作边界)；[技术设计](technical-design.zh-CN.md#2-数据对象与边界)。\n前置：准备无效 TOML、重复账号 ID、身份不符等独立隔离文件及有效默认 A。",
+      "steps": "1. 逐一将显式文件设为上述状态并调用加载/接入。\n2. 比较原文件、备份和其他账号。",
+      "expected": "1. 给出具体错误，拒绝不明确身份。\n2. 不重置、迁移或替换问题文件，不切换默认账号；必要诊断仅在私有证据目录。\n证据（仅本地）：每种输入及受保护文件摘要前后对照。",
+      "dependsOn": [
+        "EM-BASE-001",
+        "EM-BASE-002"
+      ],
+      "next": {
+        "passed": {
+          "action": "done",
+          "reason": "本用例的检查完成；其他已选用例仍需独立结果，本分支不结束整个测试轮。"
+        },
+        "failed": {
+          "action": "retry",
+          "caseId": "EM-LOCAL-004",
+          "reason": "保留该用例原始失败及本机证据；确认根因修复后，显式重测同一环境与本用例，不自动重复写操作。"
+        },
+        "partial": {
+          "action": "retry",
+          "caseId": "EM-LOCAL-004",
+          "reason": "记录已完成与未核对的具体步骤，补齐本用例剩余断言；已知违约必须记 failed，不以 partial 隐藏。"
+        },
+        "blocked": {
+          "action": "wait",
+          "reason": "本用例前置条件或当前依赖证据不足，尚不能形成有效执行。",
+          "resumeWhen": "准备无效 TOML、重复账号 ID、身份不符等独立隔离文件及有效默认 A。 同轮同环境的依赖用例须有当前有效通过记录。"
+        },
+        "skipped": {
+          "action": "done",
+          "reason": "仅在明确排除本用例时记录原因；不代表覆盖、通过或清除原有失败，其他已选范围继续独立处理。"
+        }
+      }
+    },
+    {
+      "id": "EM-LOCAL-005",
+      "title": "私有根目录拒绝相对路径和所有仓库内位置",
+      "priority": "P0",
+      "types": [
+        "security",
+        "functional"
+      ],
+      "preconditions": "阶段：首期；适用：隔离文件系统；按平台分开。\n依据：[需求方案](research-and-plan.zh-CN.md#7-授权凭据与操作边界)；[技术设计](technical-design.zh-CN.md#2-数据对象与边界)。\n前置：一次性 repo/嵌套 worktree/Skill 源码/安装目录及外部私有目录；支持直接调用配置、缓存和下载入口。",
+      "steps": "1. 参数化传入相对路径、当前目录、repo 子目录、嵌套工作树、Skill 安装目录及其尚不存在的子目录。\n2. 对每个直接入口执行校验，并在创建目录/锁前检查拒绝。\n3. 以外部绝对路径作为正控制。",
+      "expected": "1. 所有禁止路径在首次写入前拒绝，受保护树无新增锁/临时文件。\n2. 正控制可用；不因 Git 忽略或目录未存在而放行。\n证据（仅本地）：入口×路径清单、调用顺序及目录/权限摘要。",
+      "dependsOn": [
+        "EM-BASE-001",
+        "EM-BASE-002"
+      ],
+      "next": {
+        "passed": {
+          "action": "done",
+          "reason": "本用例的检查完成；其他已选用例仍需独立结果，本分支不结束整个测试轮。"
+        },
+        "failed": {
+          "action": "retry",
+          "caseId": "EM-LOCAL-005",
+          "reason": "保留该用例原始失败及本机证据；确认根因修复后，显式重测同一环境与本用例，不自动重复写操作。"
+        },
+        "partial": {
+          "action": "retry",
+          "caseId": "EM-LOCAL-005",
+          "reason": "记录已完成与未核对的具体步骤，补齐本用例剩余断言；已知违约必须记 failed，不以 partial 隐藏。"
+        },
+        "blocked": {
+          "action": "wait",
+          "reason": "本用例前置条件或当前依赖证据不足，尚不能形成有效执行。",
+          "resumeWhen": "一次性 repo/嵌套 worktree/Skill 源码/安装目录及外部私有目录；支持直接调用配置、缓存和下载入口。 同轮同环境的依赖用例须有当前有效通过记录。"
+        },
+        "skipped": {
+          "action": "done",
+          "reason": "仅在明确排除本用例时记录原因；不代表覆盖、通过或清除原有失败，其他已选范围继续独立处理。"
+        }
+      }
+    },
+    {
+      "id": "EM-LOCAL-006",
+      "title": "符号链接和大小写别名不能绕过路径边界",
+      "priority": "P0",
+      "types": [
+        "security",
+        "compatibility"
+      ],
+      "preconditions": "阶段：首期；适用：隔离文件系统；按平台分开。\n依据：[需求方案](research-and-plan.zh-CN.md#7-授权凭据与操作边界)；[技术设计](technical-design.zh-CN.md#2-数据对象与边界)。\n前置：可创建链接；有原生大小写不敏感文件系统或独立受控替代实验。",
+      "steps": "1. 以外部链接指向 repo，再以已有祖先链接指向 repo 中不存在的目标。\n2. 测试同 inode 的大小写别名及嵌套别名；对合法外部路径作正控制。",
+      "expected": "1. 按真实位置/身份检查，禁止位置不产生任何首次写入。\n2. 仅字符串比较不足以通过；原生和受控替代结果分开记录，缺平台不能当全通过。\n证据（仅本地）：链接解析与 inode/身份记录、原生或替代范围及零变更对照。",
+      "dependsOn": [
+        "EM-BASE-001",
+        "EM-BASE-002"
+      ],
+      "next": {
+        "passed": {
+          "action": "done",
+          "reason": "本用例的检查完成；其他已选用例仍需独立结果，本分支不结束整个测试轮。"
+        },
+        "failed": {
+          "action": "retry",
+          "caseId": "EM-LOCAL-006",
+          "reason": "保留该用例原始失败及本机证据；确认根因修复后，显式重测同一环境与本用例，不自动重复写操作。"
+        },
+        "partial": {
+          "action": "retry",
+          "caseId": "EM-LOCAL-006",
+          "reason": "记录已完成与未核对的具体步骤，补齐本用例剩余断言；已知违约必须记 failed，不以 partial 隐藏。"
+        },
+        "blocked": {
+          "action": "wait",
+          "reason": "本用例前置条件或当前依赖证据不足，尚不能形成有效执行。",
+          "resumeWhen": "可创建链接；有原生大小写不敏感文件系统或独立受控替代实验。 同轮同环境的依赖用例须有当前有效通过记录。"
+        },
+        "skipped": {
+          "action": "done",
+          "reason": "仅在明确排除本用例时记录原因；不代表覆盖、通过或清除原有失败，其他已选范围继续独立处理。"
+        }
+      }
+    },
+    {
+      "id": "EM-LOCAL-007",
+      "title": "配置、状态、缓存和备份采用本机私有权限",
+      "priority": "P0",
+      "types": [
+        "security",
+        "compatibility"
+      ],
+      "preconditions": "阶段：首期；适用：隔离文件系统；按平台分开。\n依据：[需求方案](research-and-plan.zh-CN.md#7-授权凭据与操作边界)；[技术设计](technical-design.zh-CN.md#2-数据对象与边界)。\n前置：隔离 POSIX 或 Windows 环境；可用其他测试身份验证读取权限。",
+      "steps": "1. 正常保存账号并触发必要状态、临时文件及备份。\n2. 检查 POSIX 模式或 Windows ACL，并从另一测试身份验证访问。",
+      "expected": "1. POSIX 私有目录 0700、文件 0600；Windows 仅预期用户可访问。\n2. 备份、锁与临时内容不出现更宽的权限；权限检查失败不宣称安全保存。\n证据（仅本地）：模式/ACL 与独立读取拒绝证据；不记录密文内容。",
+      "dependsOn": [
+        "EM-BASE-001",
+        "EM-BASE-002"
+      ],
+      "next": {
+        "passed": {
+          "action": "done",
+          "reason": "本用例的检查完成；其他已选用例仍需独立结果，本分支不结束整个测试轮。"
+        },
+        "failed": {
+          "action": "retry",
+          "caseId": "EM-LOCAL-007",
+          "reason": "保留该用例原始失败及本机证据；确认根因修复后，显式重测同一环境与本用例，不自动重复写操作。"
+        },
+        "partial": {
+          "action": "retry",
+          "caseId": "EM-LOCAL-007",
+          "reason": "记录已完成与未核对的具体步骤，补齐本用例剩余断言；已知违约必须记 failed，不以 partial 隐藏。"
+        },
+        "blocked": {
+          "action": "wait",
+          "reason": "本用例前置条件或当前依赖证据不足，尚不能形成有效执行。",
+          "resumeWhen": "隔离 POSIX 或 Windows 环境；可用其他测试身份验证读取权限。 同轮同环境的依赖用例须有当前有效通过记录。"
+        },
+        "skipped": {
+          "action": "done",
+          "reason": "仅在明确排除本用例时记录原因；不代表覆盖、通过或清除原有失败，其他已选范围继续独立处理。"
+        }
+      }
+    },
+    {
+      "id": "EM-LOCAL-008",
+      "title": "不可写、无效根目录与磁盘故障不回退 CWD",
+      "priority": "P0",
+      "types": [
+        "functional",
+        "security"
+      ],
+      "preconditions": "阶段：首期；适用：隔离文件系统；按平台分开。\n依据：[需求方案](research-and-plan.zh-CN.md#7-授权凭据与操作边界)；[技术设计](technical-design.zh-CN.md#2-数据对象与边界)。\n前置：独立只读目录、普通文件作为根、断开的路径和可注入的写盘失败。",
+      "steps": "1. 逐个指定为本机私有根并接入或落盘。\n2. 检查 CWD、repo、默认账号和日志。",
+      "expected": "1. 明确失败；不改用 CWD、repo 或其他账号文件。\n2. 失败后原账号仍可恢复，仓库内无降级输出。\n证据（仅本地）：各失败点与受保护目录前后摘要。",
+      "dependsOn": [
+        "EM-BASE-001",
+        "EM-BASE-002"
+      ],
+      "next": {
+        "passed": {
+          "action": "done",
+          "reason": "本用例的检查完成；其他已选用例仍需独立结果，本分支不结束整个测试轮。"
+        },
+        "failed": {
+          "action": "retry",
+          "caseId": "EM-LOCAL-008",
+          "reason": "保留该用例原始失败及本机证据；确认根因修复后，显式重测同一环境与本用例，不自动重复写操作。"
+        },
+        "partial": {
+          "action": "retry",
+          "caseId": "EM-LOCAL-008",
+          "reason": "记录已完成与未核对的具体步骤，补齐本用例剩余断言；已知违约必须记 failed，不以 partial 隐藏。"
+        },
+        "blocked": {
+          "action": "wait",
+          "reason": "本用例前置条件或当前依赖证据不足，尚不能形成有效执行。",
+          "resumeWhen": "独立只读目录、普通文件作为根、断开的路径和可注入的写盘失败。 同轮同环境的依赖用例须有当前有效通过记录。"
+        },
+        "skipped": {
+          "action": "done",
+          "reason": "仅在明确排除本用例时记录原因；不代表覆盖、通过或清除原有失败，其他已选范围继续独立处理。"
+        }
+      }
+    },
+    {
+      "id": "EM-LOCAL-009",
+      "title": "本机配置原子替换失败可恢复",
+      "priority": "P0",
+      "types": [
+        "functional",
+        "stability"
+      ],
+      "preconditions": "阶段：首期；适用：隔离文件系统；按平台分开。\n依据：[需求方案](research-and-plan.zh-CN.md#7-授权凭据与操作边界)；[技术设计](technical-design.zh-CN.md#2-数据对象与边界)。\n前置：A/B 已有隔离配置，可在暂存、替换和保存后核验处注入失败。",
+      "steps": "1. 仅修改 A，并在每个失败点分别中断。\n2. 重启读取，核对旧配置、可恢复副本及 B。\n3. 无故障完成修改并再次执行相同修改。",
+      "expected": "1. 失败不丢失所有可恢复副本；B 始终不变。\n2. 成功后可读回新 A；重复相同配置不产生冲突或重复注册。\n证据（仅本地）：各失败注入点、恢复路径及拒绝/成功/重复执行对照。",
+      "dependsOn": [
+        "EM-BASE-001",
+        "EM-BASE-002"
+      ],
+      "next": {
+        "passed": {
+          "action": "done",
+          "reason": "本用例的检查完成；其他已选用例仍需独立结果，本分支不结束整个测试轮。"
+        },
+        "failed": {
+          "action": "retry",
+          "caseId": "EM-LOCAL-009",
+          "reason": "保留该用例原始失败及本机证据；确认根因修复后，显式重测同一环境与本用例，不自动重复写操作。"
+        },
+        "partial": {
+          "action": "retry",
+          "caseId": "EM-LOCAL-009",
+          "reason": "记录已完成与未核对的具体步骤，补齐本用例剩余断言；已知违约必须记 failed，不以 partial 隐藏。"
+        },
+        "blocked": {
+          "action": "wait",
+          "reason": "本用例前置条件或当前依赖证据不足，尚不能形成有效执行。",
+          "resumeWhen": "A/B 已有隔离配置，可在暂存、替换和保存后核验处注入失败。 同轮同环境的依赖用例须有当前有效通过记录。"
+        },
+        "skipped": {
+          "action": "done",
+          "reason": "仅在明确排除本用例时记录原因；不代表覆盖、通过或清除原有失败，其他已选范围继续独立处理。"
+        }
+      }
+    },
+    {
+      "id": "EM-LOCAL-010",
+      "title": "新增或修改账号只影响所选账号",
+      "priority": "P0",
+      "types": [
+        "functional",
+        "security"
+      ],
+      "preconditions": "阶段：首期；适用：隔离文件系统；按平台分开。\n依据：[需求方案](research-and-plan.zh-CN.md#7-授权凭据与操作边界)；[技术设计](technical-design.zh-CN.md#2-数据对象与边界)。\n前置：A/B/C 分离配置、凭据引用、日志和附件目录。",
+      "steps": "1. 新增 A，修改 A 的显示设置或后端引用；对重复/冲突 ID 再调用。\n2. 比较 B/C 与默认后端原生文件。",
+      "expected": "1. 不覆盖其他账号或共用单账号后端默认凭据文件。\n2. 冲突在写前拒绝；同一合法输入重复执行不新增第二份账号。\n证据（仅本地）：账号清单和配置/副本集合前后差异。",
+      "dependsOn": [
+        "EM-BASE-001",
+        "EM-BASE-002"
+      ],
+      "next": {
+        "passed": {
+          "action": "done",
+          "reason": "本用例的检查完成；其他已选用例仍需独立结果，本分支不结束整个测试轮。"
+        },
+        "failed": {
+          "action": "retry",
+          "caseId": "EM-LOCAL-010",
+          "reason": "保留该用例原始失败及本机证据；确认根因修复后，显式重测同一环境与本用例，不自动重复写操作。"
+        },
+        "partial": {
+          "action": "retry",
+          "caseId": "EM-LOCAL-010",
+          "reason": "记录已完成与未核对的具体步骤，补齐本用例剩余断言；已知违约必须记 failed，不以 partial 隐藏。"
+        },
+        "blocked": {
+          "action": "wait",
+          "reason": "本用例前置条件或当前依赖证据不足，尚不能形成有效执行。",
+          "resumeWhen": "A/B/C 分离配置、凭据引用、日志和附件目录。 同轮同环境的依赖用例须有当前有效通过记录。"
+        },
+        "skipped": {
+          "action": "done",
+          "reason": "仅在明确排除本用例时记录原因；不代表覆盖、通过或清除原有失败，其他已选范围继续独立处理。"
+        }
+      }
+    },
+    {
+      "id": "EM-LOCAL-011",
+      "title": "所有缓存、日志、导出和备份只写本机非仓库目录",
+      "priority": "P0",
+      "types": [
+        "security",
+        "integration"
+      ],
+      "preconditions": "阶段：首期；适用：隔离文件系统；按平台分开。\n依据：[需求方案](research-and-plan.zh-CN.md#7-授权凭据与操作边界)；[技术设计](technical-design.zh-CN.md#2-数据对象与边界)。\n前置：在隔离根定义 config/state/cache/data/evidence，并准备合成敏感标记。",
+      "steps": "1. 触发读取缓存、附件解析、导出、诊断、错误、备份和清缓存。\n2. 检查每个真实输出位置与构建输入；请求将导出写入 repo。",
+      "expected": "1. 所有持久输出在私有目录；repo 目标拒绝或改用已约定外部目录并明确说明。\n2. 清缓存不删除 data 中用户保留文件；日志不含秘密或完整原始正文。\n证据（仅本地）：文件写入审计、标记扫描及清理前后持久附件哈希。",
+      "dependsOn": [
+        "EM-BASE-001",
+        "EM-BASE-002"
+      ],
+      "next": {
+        "passed": {
+          "action": "done",
+          "reason": "本用例的检查完成；其他已选用例仍需独立结果，本分支不结束整个测试轮。"
+        },
+        "failed": {
+          "action": "retry",
+          "caseId": "EM-LOCAL-011",
+          "reason": "保留该用例原始失败及本机证据；确认根因修复后，显式重测同一环境与本用例，不自动重复写操作。"
+        },
+        "partial": {
+          "action": "retry",
+          "caseId": "EM-LOCAL-011",
+          "reason": "记录已完成与未核对的具体步骤，补齐本用例剩余断言；已知违约必须记 failed，不以 partial 隐藏。"
+        },
+        "blocked": {
+          "action": "wait",
+          "reason": "本用例前置条件或当前依赖证据不足，尚不能形成有效执行。",
+          "resumeWhen": "在隔离根定义 config/state/cache/data/evidence，并准备合成敏感标记。 同轮同环境的依赖用例须有当前有效通过记录。"
+        },
+        "skipped": {
+          "action": "done",
+          "reason": "仅在明确排除本用例时记录原因；不代表覆盖、通过或清除原有失败，其他已选范围继续独立处理。"
+        }
+      }
+    },
+    {
+      "id": "EM-LOCAL-012",
+      "title": "仓库同名配置不能遮蔽本机账号",
+      "priority": "P0",
+      "types": [
+        "security",
+        "integration"
+      ],
+      "preconditions": "阶段：首期；适用：隔离文件系统；按平台分开。\n依据：[需求方案](research-and-plan.zh-CN.md#7-授权凭据与操作边界)；[技术设计](technical-design.zh-CN.md#2-数据对象与边界)。\n前置：本机文件指向 A，隔离工作目录中的后端同名文件指向 B；仅使用合成配置。",
+      "steps": "1. 从该工作目录启动每个所选 CLI/MCP，明确绑定私有配置。\n2. 移除后端的显式路径能力后尝试接入。",
+      "expected": "1. 正常路径只访问 A，不能因 CWD/包内优先级访问 B。\n2. 不能可靠排除遮蔽的接入方式报告不支持，不猜参数或读取仓库配置。\n证据（仅本地）：实际启动配置选择、工具 schema 和分实例调用。",
+      "dependsOn": [
+        "EM-BASE-001",
+        "EM-BASE-002"
+      ],
+      "next": {
+        "passed": {
+          "action": "done",
+          "reason": "本用例的检查完成；其他已选用例仍需独立结果，本分支不结束整个测试轮。"
+        },
+        "failed": {
+          "action": "retry",
+          "caseId": "EM-LOCAL-012",
+          "reason": "保留该用例原始失败及本机证据；确认根因修复后，显式重测同一环境与本用例，不自动重复写操作。"
+        },
+        "partial": {
+          "action": "retry",
+          "caseId": "EM-LOCAL-012",
+          "reason": "记录已完成与未核对的具体步骤，补齐本用例剩余断言；已知违约必须记 failed，不以 partial 隐藏。"
+        },
+        "blocked": {
+          "action": "wait",
+          "reason": "本用例前置条件或当前依赖证据不足，尚不能形成有效执行。",
+          "resumeWhen": "本机文件指向 A，隔离工作目录中的后端同名文件指向 B；仅使用合成配置。 同轮同环境的依赖用例须有当前有效通过记录。"
+        },
+        "skipped": {
+          "action": "done",
+          "reason": "仅在明确排除本用例时记录原因；不代表覆盖、通过或清除原有失败，其他已选范围继续独立处理。"
+        }
+      }
+    },
+    {
+      "id": "EM-LOCAL-013",
+      "title": "忽略规则与暂存审查覆盖误加和改名副本",
+      "priority": "P0",
+      "types": [
+        "security",
+        "integration"
+      ],
+      "preconditions": "阶段：首期；适用：隔离文件系统；按平台分开。\n依据：[需求方案](research-and-plan.zh-CN.md#7-授权凭据与操作边界)；[技术设计](technical-design.zh-CN.md#2-数据对象与边界)。\n前置：一次性 Git 仓库；合成哨兵数据，不操作本仓库真实私有文件。",
+      "steps": "1. 验证根/嵌套 .email-management 目录及两种 local 配置文件被忽略，正常文档/example 不被忽略。\n2. 在临时 repo 预置已跟踪文件与改名哨兵，再演练提交前审查。",
+      "expected": "1. 忽略规则正反例符合预期；不把 gitignore 当作已跟踪文件保护。\n2. 审查识别私有内容时停止提交/推送；不使用 force-add、不擅自删原件或改写历史。\n证据（仅本地）：只在本机保留临时索引差异、审查输出和未执行推送的证据。",
+      "dependsOn": [
+        "EM-BASE-001",
+        "EM-BASE-002"
+      ],
+      "next": {
+        "passed": {
+          "action": "done",
+          "reason": "本用例的检查完成；其他已选用例仍需独立结果，本分支不结束整个测试轮。"
+        },
+        "failed": {
+          "action": "retry",
+          "caseId": "EM-LOCAL-013",
+          "reason": "保留该用例原始失败及本机证据；确认根因修复后，显式重测同一环境与本用例，不自动重复写操作。"
+        },
+        "partial": {
+          "action": "retry",
+          "caseId": "EM-LOCAL-013",
+          "reason": "记录已完成与未核对的具体步骤，补齐本用例剩余断言；已知违约必须记 failed，不以 partial 隐藏。"
+        },
+        "blocked": {
+          "action": "wait",
+          "reason": "本用例前置条件或当前依赖证据不足，尚不能形成有效执行。",
+          "resumeWhen": "一次性 Git 仓库；合成哨兵数据，不操作本仓库真实私有文件。 同轮同环境的依赖用例须有当前有效通过记录。"
+        },
+        "skipped": {
+          "action": "done",
+          "reason": "仅在明确排除本用例时记录原因；不代表覆盖、通过或清除原有失败，其他已选范围继续独立处理。"
+        }
+      }
+    },
+    {
+      "id": "EM-LOCAL-014",
+      "title": "构建和 Skill 同步不携带本机邮箱信息",
+      "priority": "P0",
+      "types": [
+        "security",
+        "integration",
+        "install-upgrade"
+      ],
+      "preconditions": "阶段：首期；适用：隔离文件系统；按平台分开。\n依据：[需求方案](research-and-plan.zh-CN.md#7-授权凭据与操作边界)；[技术设计](technical-design.zh-CN.md#2-数据对象与边界)。\n前置：未来实现及受影响 adapter 可构建；外部私有配置中有合成标记和指向它的引用。",
+      "steps": "1. 在隔离环境构建/同步所选 Skill，并检查源/产物/安装链。\n2. 扫描输出、manifest、文档和链接目标；将单个合法通用改动再构建。",
+      "expected": "1. 私有配置/邮件/本机路径及标记不进入产物或 Git；不会沿引用复制凭据。\n2. 通用文件仍正常分发，受保护私有目录无读写扩散；第二次有效构建保持内容契约。\n证据（仅本地）：本机产物清单/内容摘要、合成标记扫描和输入访问记录。",
+      "dependsOn": [
+        "EM-BASE-001",
+        "EM-BASE-002"
+      ],
+      "next": {
+        "passed": {
+          "action": "done",
+          "reason": "本用例的检查完成；其他已选用例仍需独立结果，本分支不结束整个测试轮。"
+        },
+        "failed": {
+          "action": "retry",
+          "caseId": "EM-LOCAL-014",
+          "reason": "保留该用例原始失败及本机证据；确认根因修复后，显式重测同一环境与本用例，不自动重复写操作。"
+        },
+        "partial": {
+          "action": "retry",
+          "caseId": "EM-LOCAL-014",
+          "reason": "记录已完成与未核对的具体步骤，补齐本用例剩余断言；已知违约必须记 failed，不以 partial 隐藏。"
+        },
+        "blocked": {
+          "action": "wait",
+          "reason": "本用例前置条件或当前依赖证据不足，尚不能形成有效执行。",
+          "resumeWhen": "未来实现及受影响 adapter 可构建；外部私有配置中有合成标记和指向它的引用。 同轮同环境的依赖用例须有当前有效通过记录。"
+        },
+        "skipped": {
+          "action": "done",
+          "reason": "仅在明确排除本用例时记录原因；不代表覆盖、通过或清除原有失败，其他已选范围继续独立处理。"
+        }
+      }
+    },
+    {
+      "id": "EM-AUTH-001",
+      "title": "IMAP 可读而 SMTP 不可用仍可只读使用",
+      "priority": "P0",
+      "types": [
+        "smoke",
+        "functional",
+        "integration"
+      ],
+      "preconditions": "阶段：首期；适用：隔离 + 各供应商联调。\n依据：[需求方案](research-and-plan.zh-CN.md#7-授权凭据与操作边界)；[技术设计](technical-design.zh-CN.md#3-业务逻辑)。\n前置：所选账号读取健康，SMTP 被禁用或无发送权限；已保存本机配置。",
+      "steps": "1. 请求列表和正文。\n2. 观察完整就绪提示以及任何权限升级/测试发送。",
+      "expected": "1. 读取可独立成功，不因 SMTP 不可用把读取一并判失败。\n2. 明确仅可读，不自动开放发信或发测试邮件。\n证据（仅本地）：独立 IMAP/API 读取证据和 SMTP 零提交记录。",
+      "dependsOn": [
+        "EM-LOCAL-001"
+      ],
+      "next": {
+        "passed": {
+          "action": "test",
+          "caseId": "EM-READ-001",
+          "reason": "继续验证“收件箱、未读与空结果返回真实范围”；仅在该目标已被本轮明确选中且其依赖当前通过时继续，不自动扩展范围。"
+        },
+        "failed": {
+          "action": "retry",
+          "caseId": "EM-AUTH-001",
+          "reason": "保留该用例原始失败及本机证据；确认根因修复后，显式重测同一环境与本用例，不自动重复写操作。"
+        },
+        "partial": {
+          "action": "retry",
+          "caseId": "EM-AUTH-001",
+          "reason": "记录已完成与未核对的具体步骤，补齐本用例剩余断言；已知违约必须记 failed，不以 partial 隐藏。"
+        },
+        "blocked": {
+          "action": "wait",
+          "reason": "本用例前置条件或当前依赖证据不足，尚不能形成有效执行。",
+          "resumeWhen": "所选账号读取健康，SMTP 被禁用或无发送权限；已保存本机配置。 同轮同环境的依赖用例须有当前有效通过记录。"
+        },
+        "skipped": {
+          "action": "done",
+          "reason": "仅在明确排除本用例时记录原因；不代表覆盖、通过或清除原有失败，其他已选范围继续独立处理。"
+        }
+      }
+    },
+    {
+      "id": "EM-AUTH-002",
+      "title": "读、草稿、更新和发送权限分别判断",
+      "priority": "P0",
+      "types": [
+        "functional",
+        "security"
+      ],
+      "preconditions": "阶段：首期；适用：隔离 + 各供应商联调。\n依据：[需求方案](research-and-plan.zh-CN.md#7-授权凭据与操作边界)；[技术设计](technical-design.zh-CN.md#3-业务逻辑)。\n前置：可分别配置四类权限开关与对应必要 token scopes。",
+      "steps": "1. 逐类启用最小权限，直接请求其允许和不允许的动作。\n2. 检查读写工具清单与拒绝发生时机。",
+      "expected": "1. 每项动作使用实际权限交集；其他权限不被隐式打开。\n2. 缺权限在首次副作用前拒绝，已读功能不受无关发送权限影响。\n证据（仅本地）：权限矩阵、直接入口调用与受保护状态。",
+      "dependsOn": [
+        "EM-BASE-001",
+        "EM-BASE-002"
+      ],
+      "next": {
+        "passed": {
+          "action": "done",
+          "reason": "本用例的检查完成；其他已选用例仍需独立结果，本分支不结束整个测试轮。"
+        },
+        "failed": {
+          "action": "retry",
+          "caseId": "EM-AUTH-002",
+          "reason": "保留该用例原始失败及本机证据；确认根因修复后，显式重测同一环境与本用例，不自动重复写操作。"
+        },
+        "partial": {
+          "action": "retry",
+          "caseId": "EM-AUTH-002",
+          "reason": "记录已完成与未核对的具体步骤，补齐本用例剩余断言；已知违约必须记 failed，不以 partial 隐藏。"
+        },
+        "blocked": {
+          "action": "wait",
+          "reason": "本用例前置条件或当前依赖证据不足，尚不能形成有效执行。",
+          "resumeWhen": "可分别配置四类权限开关与对应必要 token scopes。 同轮同环境的依赖用例须有当前有效通过记录。"
+        },
+        "skipped": {
+          "action": "done",
+          "reason": "仅在明确排除本用例时记录原因；不代表覆盖、通过或清除原有失败，其他已选范围继续独立处理。"
+        }
+      }
+    },
+    {
+      "id": "EM-AUTH-003",
+      "title": "错误或过期认证明确停止且不替换其他账号",
+      "priority": "P0",
+      "types": [
+        "functional",
+        "security"
+      ],
+      "preconditions": "阶段：首期；适用：隔离 + 各供应商联调。\n依据：[需求方案](research-and-plan.zh-CN.md#7-授权凭据与操作边界)；[技术设计](technical-design.zh-CN.md#3-业务逻辑)。\n前置：健康服务；有错误授权、过期 token 和未登录三个隔离状态，另有健康 B。",
+      "steps": "1. 逐项请求当前账号查询/草稿。\n2. 记录恢复指引和 B 的调用/文件状态。",
+      "expected": "1. 返回认证原因，不当作空邮箱，不盲目重试。\n2. 不换到 B、不扩大 scopes、不打印凭据或覆盖现有认证文件。\n证据（仅本地）：错误分类、调用次数和 B 哨兵摘要。",
+      "dependsOn": [
+        "EM-BASE-001",
+        "EM-BASE-002"
+      ],
+      "next": {
+        "passed": {
+          "action": "done",
+          "reason": "本用例的检查完成；其他已选用例仍需独立结果，本分支不结束整个测试轮。"
+        },
+        "failed": {
+          "action": "retry",
+          "caseId": "EM-AUTH-003",
+          "reason": "保留该用例原始失败及本机证据；确认根因修复后，显式重测同一环境与本用例，不自动重复写操作。"
+        },
+        "partial": {
+          "action": "retry",
+          "caseId": "EM-AUTH-003",
+          "reason": "记录已完成与未核对的具体步骤，补齐本用例剩余断言；已知违约必须记 failed，不以 partial 隐藏。"
+        },
+        "blocked": {
+          "action": "wait",
+          "reason": "本用例前置条件或当前依赖证据不足，尚不能形成有效执行。",
+          "resumeWhen": "健康服务；有错误授权、过期 token 和未登录三个隔离状态，另有健康 B。 同轮同环境的依赖用例须有当前有效通过记录。"
+        },
+        "skipped": {
+          "action": "done",
+          "reason": "仅在明确排除本用例时记录原因；不代表覆盖、通过或清除原有失败，其他已选范围继续独立处理。"
+        }
+      }
+    },
+    {
+      "id": "EM-AUTH-004",
+      "title": "实例返回身份与配置不符时阻止全部写入口",
+      "priority": "P0",
+      "types": [
+        "security",
+        "integration"
+      ],
+      "preconditions": "阶段：首期；适用：隔离 + 各供应商联调。\n依据：[需求方案](research-and-plan.zh-CN.md#7-授权凭据与操作边界)；[技术设计](technical-design.zh-CN.md#3-业务逻辑)。\n前置：配置 A 的实例实际返回 B；覆盖 CLI/MCP 及各写入口。",
+      "steps": "1. 直接调用新发、回复、全部回复、转发、草稿发送、标记、移动和垃圾箱。\n2. 验证身份检查先于任何准备写入或提交。",
+      "expected": "1. 全部入口拒绝错配，不能只靠预先运行诊断。\n2. A/B 及未选账号均无邮件变更。\n证据（仅本地）：入口矩阵、校验至首次副作用调用顺序及账户快照。",
+      "dependsOn": [
+        "EM-BASE-001",
+        "EM-BASE-002"
+      ],
+      "next": {
+        "passed": {
+          "action": "done",
+          "reason": "本用例的检查完成；其他已选用例仍需独立结果，本分支不结束整个测试轮。"
+        },
+        "failed": {
+          "action": "retry",
+          "caseId": "EM-AUTH-004",
+          "reason": "保留该用例原始失败及本机证据；确认根因修复后，显式重测同一环境与本用例，不自动重复写操作。"
+        },
+        "partial": {
+          "action": "retry",
+          "caseId": "EM-AUTH-004",
+          "reason": "记录已完成与未核对的具体步骤，补齐本用例剩余断言；已知违约必须记 failed，不以 partial 隐藏。"
+        },
+        "blocked": {
+          "action": "wait",
+          "reason": "本用例前置条件或当前依赖证据不足，尚不能形成有效执行。",
+          "resumeWhen": "配置 A 的实例实际返回 B；覆盖 CLI/MCP 及各写入口。 同轮同环境的依赖用例须有当前有效通过记录。"
+        },
+        "skipped": {
+          "action": "done",
+          "reason": "仅在明确排除本用例时记录原因；不代表覆盖、通过或清除原有失败，其他已选范围继续独立处理。"
+        }
+      }
+    },
+    {
+      "id": "EM-AUTH-005",
+      "title": "相同原生 ID、跨账号和过期引用不混用",
+      "priority": "P0",
+      "types": [
+        "security",
+        "functional"
+      ],
+      "preconditions": "阶段：首期；适用：隔离 + 各供应商联调。\n依据：[需求方案](research-and-plan.zh-CN.md#7-授权凭据与操作边界)；[技术设计](technical-design.zh-CN.md#3-业务逻辑)。\n前置：A/B 原生 ID 相同；可更改 IMAP UIDVALIDITY、文件夹和 Graph ID 的模拟数据。",
+      "steps": "1. 将 A 引用交给 B 或另一实例。\n2. 在 UIDVALIDITY/移动后更换引用有效性，再读取和更新。",
+      "expected": "1. 跨账号/实例引用拒绝；过期引用明确要求重新查询。\n2. 不命中恰好同 ID 的其他邮件，不修改错误目标。\n证据（仅本地）：每种引用组合、实际访问目标与零误写证据。",
+      "dependsOn": [
+        "EM-BASE-001",
+        "EM-BASE-002"
+      ],
+      "next": {
+        "passed": {
+          "action": "done",
+          "reason": "本用例的检查完成；其他已选用例仍需独立结果，本分支不结束整个测试轮。"
+        },
+        "failed": {
+          "action": "retry",
+          "caseId": "EM-AUTH-005",
+          "reason": "保留该用例原始失败及本机证据；确认根因修复后，显式重测同一环境与本用例，不自动重复写操作。"
+        },
+        "partial": {
+          "action": "retry",
+          "caseId": "EM-AUTH-005",
+          "reason": "记录已完成与未核对的具体步骤，补齐本用例剩余断言；已知违约必须记 failed，不以 partial 隐藏。"
+        },
+        "blocked": {
+          "action": "wait",
+          "reason": "本用例前置条件或当前依赖证据不足，尚不能形成有效执行。",
+          "resumeWhen": "A/B 原生 ID 相同；可更改 IMAP UIDVALIDITY、文件夹和 Graph ID 的模拟数据。 同轮同环境的依赖用例须有当前有效通过记录。"
+        },
+        "skipped": {
+          "action": "done",
+          "reason": "仅在明确排除本用例时记录原因；不代表覆盖、通过或清除原有失败，其他已选范围继续独立处理。"
+        }
+      }
+    },
+    {
+      "id": "EM-AUTH-006",
+      "title": "预览后撤销权限仍在提交前阻止发送",
+      "priority": "P0",
+      "types": [
+        "security",
+        "functional"
+      ],
+      "preconditions": "阶段：首期；适用：隔离 + 各供应商联调。\n依据：[需求方案](research-and-plan.zh-CN.md#7-授权凭据与操作边界)；[技术设计](technical-design.zh-CN.md#3-业务逻辑)。\n前置：有有效预览与用户发送确认；可在实际提交前撤销权限或改变连接账号。",
+      "steps": "1. 准备并确认载荷。\n2. 分别撤销发送权限、切换实例身份后继续提交。",
+      "expected": "1. 写前重新检查，权限/身份变化被拒绝。\n2. 确认记录不替代当前权限，发送提交次数为零。\n证据（仅本地）：确认上下文、权限读回及服务端提交计数。",
+      "dependsOn": [
+        "EM-BASE-001",
+        "EM-BASE-002"
+      ],
+      "next": {
+        "passed": {
+          "action": "done",
+          "reason": "本用例的检查完成；其他已选用例仍需独立结果，本分支不结束整个测试轮。"
+        },
+        "failed": {
+          "action": "retry",
+          "caseId": "EM-AUTH-006",
+          "reason": "保留该用例原始失败及本机证据；确认根因修复后，显式重测同一环境与本用例，不自动重复写操作。"
+        },
+        "partial": {
+          "action": "retry",
+          "caseId": "EM-AUTH-006",
+          "reason": "记录已完成与未核对的具体步骤，补齐本用例剩余断言；已知违约必须记 failed，不以 partial 隐藏。"
+        },
+        "blocked": {
+          "action": "wait",
+          "reason": "本用例前置条件或当前依赖证据不足，尚不能形成有效执行。",
+          "resumeWhen": "有有效预览与用户发送确认；可在实际提交前撤销权限或改变连接账号。 同轮同环境的依赖用例须有当前有效通过记录。"
+        },
+        "skipped": {
+          "action": "done",
+          "reason": "仅在明确排除本用例时记录原因；不代表覆盖、通过或清除原有失败，其他已选范围继续独立处理。"
+        }
+      }
+    },
+    {
+      "id": "EM-AUTH-007",
+      "title": "接入与能力探测不顺带产生邮件副作用",
+      "priority": "P0",
+      "types": [
+        "functional",
+        "security"
+      ],
+      "preconditions": "阶段：首期；适用：隔离 + 各供应商联调。\n依据：[需求方案](research-and-plan.zh-CN.md#7-授权凭据与操作边界)；[技术设计](technical-design.zh-CN.md#3-业务逻辑)。\n前置：仅授权配置与只读验证；后端工具可能把 ready 与发送能力绑定。",
+      "steps": "1. 完成接入，检查身份、文件夹和读取能力。\n2. 追踪是否发信、保存远端草稿、标为已读或修改邮件。",
+      "expected": "1. 能力报告区分支持/授权/未验收，不能通过发信探测读取。\n2. 除授权的本机配置写入外没有邮件副作用。\n证据（仅本地）：本机配置差异和服务端邮件状态/调用对照。",
+      "dependsOn": [
+        "EM-BASE-001",
+        "EM-BASE-002"
+      ],
+      "next": {
+        "passed": {
+          "action": "done",
+          "reason": "本用例的检查完成；其他已选用例仍需独立结果，本分支不结束整个测试轮。"
+        },
+        "failed": {
+          "action": "retry",
+          "caseId": "EM-AUTH-007",
+          "reason": "保留该用例原始失败及本机证据；确认根因修复后，显式重测同一环境与本用例，不自动重复写操作。"
+        },
+        "partial": {
+          "action": "retry",
+          "caseId": "EM-AUTH-007",
+          "reason": "记录已完成与未核对的具体步骤，补齐本用例剩余断言；已知违约必须记 failed，不以 partial 隐藏。"
+        },
+        "blocked": {
+          "action": "wait",
+          "reason": "本用例前置条件或当前依赖证据不足，尚不能形成有效执行。",
+          "resumeWhen": "仅授权配置与只读验证；后端工具可能把 ready 与发送能力绑定。 同轮同环境的依赖用例须有当前有效通过记录。"
+        },
+        "skipped": {
+          "action": "done",
+          "reason": "仅在明确排除本用例时记录原因；不代表覆盖、通过或清除原有失败，其他已选范围继续独立处理。"
+        }
+      }
+    },
+    {
+      "id": "EM-READ-001",
+      "title": "收件箱、未读与空结果返回真实范围",
+      "priority": "P0",
+      "types": [
+        "smoke",
+        "functional"
+      ],
+      "preconditions": "阶段：首期；适用：隔离 + 各供应商联调。\n依据：[需求方案](research-and-plan.zh-CN.md#5-功能设计与差异)；[技术设计](technical-design.zh-CN.md#3-业务逻辑)。\n前置：有独立确认的已读/未读与空文件夹夹具。",
+      "steps": "1. 分别列收件箱、仅未读和空文件夹。\n2. 与独立客户端/夹具索引核对数量及账号。",
+      "expected": "1. 集合与筛选一致；真实空结果可以为空。\n2. 错误或未查询文件夹不伪装成空结果。\n证据（仅本地）：期望集合与实际原生引用对照。",
+      "dependsOn": [
+        "EM-AUTH-001"
+      ],
+      "next": {
+        "passed": {
+          "action": "done",
+          "reason": "本用例的检查完成；其他已选用例仍需独立结果，本分支不结束整个测试轮。"
+        },
+        "failed": {
+          "action": "retry",
+          "caseId": "EM-READ-001",
+          "reason": "保留该用例原始失败及本机证据；确认根因修复后，显式重测同一环境与本用例，不自动重复写操作。"
+        },
+        "partial": {
+          "action": "retry",
+          "caseId": "EM-READ-001",
+          "reason": "记录已完成与未核对的具体步骤，补齐本用例剩余断言；已知违约必须记 failed，不以 partial 隐藏。"
+        },
+        "blocked": {
+          "action": "wait",
+          "reason": "本用例前置条件或当前依赖证据不足，尚不能形成有效执行。",
+          "resumeWhen": "有独立确认的已读/未读与空文件夹夹具。 同轮同环境的依赖用例须有当前有效通过记录。"
+        },
+        "skipped": {
+          "action": "done",
+          "reason": "仅在明确排除本用例时记录原因；不代表覆盖、通过或清除原有失败，其他已选范围继续独立处理。"
+        }
+      }
+    },
+    {
+      "id": "EM-READ-002",
+      "title": "中文、发件人、主题和附件条件正确映射",
+      "priority": "P1",
+      "types": [
+        "functional",
+        "compatibility"
+      ],
+      "preconditions": "阶段：首期；适用：隔离 + 各供应商联调。\n依据：[需求方案](research-and-plan.zh-CN.md#5-功能设计与差异)；[技术设计](technical-design.zh-CN.md#3-业务逻辑)。\n前置：夹具覆盖中文、组合条件、同名不同发件人、含/不含附件邮件。",
+      "steps": "1. 组合指定发件人、主题关键词、未读和附件条件查询。\n2. 检查映射命令及独立期望集合。",
+      "expected": "1. 只返回符合全部条件的邮件；中文正常。\n2. 不支持的条件明确拒绝，不悄悄删掉条件扩大范围。\n证据（仅本地）：查询映射与期望/实际差集。",
+      "dependsOn": [
+        "EM-BASE-001",
+        "EM-BASE-002"
+      ],
+      "next": {
+        "passed": {
+          "action": "done",
+          "reason": "本用例的检查完成；其他已选用例仍需独立结果，本分支不结束整个测试轮。"
+        },
+        "failed": {
+          "action": "retry",
+          "caseId": "EM-READ-002",
+          "reason": "保留该用例原始失败及本机证据；确认根因修复后，显式重测同一环境与本用例，不自动重复写操作。"
+        },
+        "partial": {
+          "action": "retry",
+          "caseId": "EM-READ-002",
+          "reason": "记录已完成与未核对的具体步骤，补齐本用例剩余断言；已知违约必须记 failed，不以 partial 隐藏。"
+        },
+        "blocked": {
+          "action": "wait",
+          "reason": "本用例前置条件或当前依赖证据不足，尚不能形成有效执行。",
+          "resumeWhen": "夹具覆盖中文、组合条件、同名不同发件人、含/不含附件邮件。 同轮同环境的依赖用例须有当前有效通过记录。"
+        },
+        "skipped": {
+          "action": "done",
+          "reason": "仅在明确排除本用例时记录原因；不代表覆盖、通过或清除原有失败，其他已选范围继续独立处理。"
+        }
+      }
+    },
+    {
+      "id": "EM-READ-003",
+      "title": "多页查询保留条件、来源和游标",
+      "priority": "P0",
+      "types": [
+        "functional",
+        "integration"
+      ],
+      "preconditions": "阶段：首期；适用：隔离 + 各供应商联调。\n依据：[需求方案](research-and-plan.zh-CN.md#5-功能设计与差异)；[技术设计](technical-design.zh-CN.md#3-业务逻辑)。\n前置：模拟服务固定返回 3 页互异记录；分页夹具能记录全部请求参数。",
+      "steps": "1. 用小页大小查询并连续翻页至结束。\n2. 核对每页账号、筛选、排序和原生游标。",
+      "expected": "1. 在稳定夹具中无漏项或重复；每页条件不丢失。\n2. 游标仅用于所属账号/查询，不能跨实例复用。\n证据（仅本地）：三页请求/响应索引与唯一记录计数。",
+      "dependsOn": [
+        "EM-BASE-001",
+        "EM-BASE-002"
+      ],
+      "next": {
+        "passed": {
+          "action": "done",
+          "reason": "本用例的检查完成；其他已选用例仍需独立结果，本分支不结束整个测试轮。"
+        },
+        "failed": {
+          "action": "retry",
+          "caseId": "EM-READ-003",
+          "reason": "保留该用例原始失败及本机证据；确认根因修复后，显式重测同一环境与本用例，不自动重复写操作。"
+        },
+        "partial": {
+          "action": "retry",
+          "caseId": "EM-READ-003",
+          "reason": "记录已完成与未核对的具体步骤，补齐本用例剩余断言；已知违约必须记 failed，不以 partial 隐藏。"
+        },
+        "blocked": {
+          "action": "wait",
+          "reason": "本用例前置条件或当前依赖证据不足，尚不能形成有效执行。",
+          "resumeWhen": "模拟服务固定返回 3 页互异记录；分页夹具能记录全部请求参数。 同轮同环境的依赖用例须有当前有效通过记录。"
+        },
+        "skipped": {
+          "action": "done",
+          "reason": "仅在明确排除本用例时记录原因；不代表覆盖、通过或清除原有失败，其他已选范围继续独立处理。"
+        }
+      }
+    },
+    {
+      "id": "EM-READ-004",
+      "title": "时区边界按含起点不含终点处理",
+      "priority": "P1",
+      "types": [
+        "functional",
+        "compatibility"
+      ],
+      "preconditions": "阶段：首期；适用：隔离 + 各供应商联调。\n依据：[需求方案](research-and-plan.zh-CN.md#5-功能设计与差异)；[技术设计](technical-design.zh-CN.md#3-业务逻辑)。\n前置：合成邮件位于起点前、起点、终点前、终点；日期映射可控。",
+      "steps": "1. 以 Asia/Shanghai 解释同一自然语言区间，再核对后端请求。\n2. 对仅支持日期粒度的后端重复，记录二次筛选范围。",
+      "expected": "1. 纳入起点、排除终点，边界外邮件不混入。\n2. 不能精确保证时如实披露；未取到的范围不宣称完整。\n证据（仅本地）：合成时间戳、区间转换及独立集合对照。",
+      "dependsOn": [
+        "EM-BASE-001",
+        "EM-BASE-002"
+      ],
+      "next": {
+        "passed": {
+          "action": "done",
+          "reason": "本用例的检查完成；其他已选用例仍需独立结果，本分支不结束整个测试轮。"
+        },
+        "failed": {
+          "action": "retry",
+          "caseId": "EM-READ-004",
+          "reason": "保留该用例原始失败及本机证据；确认根因修复后，显式重测同一环境与本用例，不自动重复写操作。"
+        },
+        "partial": {
+          "action": "retry",
+          "caseId": "EM-READ-004",
+          "reason": "记录已完成与未核对的具体步骤，补齐本用例剩余断言；已知违约必须记 failed，不以 partial 隐藏。"
+        },
+        "blocked": {
+          "action": "wait",
+          "reason": "本用例前置条件或当前依赖证据不足，尚不能形成有效执行。",
+          "resumeWhen": "合成邮件位于起点前、起点、终点前、终点；日期映射可控。 同轮同环境的依赖用例须有当前有效通过记录。"
+        },
+        "skipped": {
+          "action": "done",
+          "reason": "仅在明确排除本用例时记录原因；不代表覆盖、通过或清除原有失败，其他已选范围继续独立处理。"
+        }
+      }
+    },
+    {
+      "id": "EM-READ-005",
+      "title": "页数、正文和字数预算耗尽时标记不完整",
+      "priority": "P0",
+      "types": [
+        "functional",
+        "usability"
+      ],
+      "preconditions": "阶段：首期；适用：隔离 + 各供应商联调。\n依据：[需求方案](research-and-plan.zh-CN.md#5-功能设计与差异)；[技术设计](technical-design.zh-CN.md#3-业务逻辑)。\n前置：记录数/正文长度超过配置预算，保留原生继续游标。",
+      "steps": "1. 达到页数或正文分段限制后查看摘要。\n2. 明确请求继续，核对仍使用原账号和条件。",
+      "expected": "1. 首次返回 partial/complete=false 或等价明确不完整说明。\n2. 展示剩余边界；不会把截断文本编造成完整结论。\n证据（仅本地）：预算、已取范围和继续请求证据。",
+      "dependsOn": [
+        "EM-BASE-001",
+        "EM-BASE-002"
+      ],
+      "next": {
+        "passed": {
+          "action": "done",
+          "reason": "本用例的检查完成；其他已选用例仍需独立结果，本分支不结束整个测试轮。"
+        },
+        "failed": {
+          "action": "retry",
+          "caseId": "EM-READ-005",
+          "reason": "保留该用例原始失败及本机证据；确认根因修复后，显式重测同一环境与本用例，不自动重复写操作。"
+        },
+        "partial": {
+          "action": "retry",
+          "caseId": "EM-READ-005",
+          "reason": "记录已完成与未核对的具体步骤，补齐本用例剩余断言；已知违约必须记 failed，不以 partial 隐藏。"
+        },
+        "blocked": {
+          "action": "wait",
+          "reason": "本用例前置条件或当前依赖证据不足，尚不能形成有效执行。",
+          "resumeWhen": "记录数/正文长度超过配置预算，保留原生继续游标。 同轮同环境的依赖用例须有当前有效通过记录。"
+        },
+        "skipped": {
+          "action": "done",
+          "reason": "仅在明确排除本用例时记录原因；不代表覆盖、通过或清除原有失败，其他已选范围继续独立处理。"
+        }
+      }
+    },
+    {
+      "id": "EM-READ-006",
+      "title": "跨账号单边失败保留成功来源和缺口",
+      "priority": "P0",
+      "types": [
+        "functional",
+        "integration"
+      ],
+      "preconditions": "阶段：首期；适用：隔离 + 各供应商联调。\n依据：[需求方案](research-and-plan.zh-CN.md#5-功能设计与差异)；[技术设计](technical-design.zh-CN.md#3-业务逻辑)。\n前置：A/B 被明确选中，C 未选；A 正常、B 离线或验证失败。",
+      "steps": "1. 请求联合查询并获取部分结果。\n2. 恢复 B 后在新尝试中继续核对。",
+      "expected": "1. A 结果保留来源，B 标为失败/未完成，C 零访问。\n2. 恢复不会覆盖此前失败记录，也不将失败解释为零邮件。\n证据（仅本地）：逐账号结果、C 调用计数及两次尝试边界。",
+      "dependsOn": [
+        "EM-BASE-001",
+        "EM-BASE-002"
+      ],
+      "next": {
+        "passed": {
+          "action": "done",
+          "reason": "本用例的检查完成；其他已选用例仍需独立结果，本分支不结束整个测试轮。"
+        },
+        "failed": {
+          "action": "retry",
+          "caseId": "EM-READ-006",
+          "reason": "保留该用例原始失败及本机证据；确认根因修复后，显式重测同一环境与本用例，不自动重复写操作。"
+        },
+        "partial": {
+          "action": "retry",
+          "caseId": "EM-READ-006",
+          "reason": "记录已完成与未核对的具体步骤，补齐本用例剩余断言；已知违约必须记 failed，不以 partial 隐藏。"
+        },
+        "blocked": {
+          "action": "wait",
+          "reason": "本用例前置条件或当前依赖证据不足，尚不能形成有效执行。",
+          "resumeWhen": "A/B 被明确选中，C 未选；A 正常、B 离线或验证失败。 同轮同环境的依赖用例须有当前有效通过记录。"
+        },
+        "skipped": {
+          "action": "done",
+          "reason": "仅在明确排除本用例时记录原因；不代表覆盖、通过或清除原有失败，其他已选范围继续独立处理。"
+        }
+      }
+    },
+    {
+      "id": "EM-READ-007",
+      "title": "同一邮件在不同账号中的副本不被抹去",
+      "priority": "P1",
+      "types": [
+        "functional"
+      ],
+      "preconditions": "阶段：首期；适用：隔离 + 各供应商联调。\n依据：[需求方案](research-and-plan.zh-CN.md#5-功能设计与差异)；[技术设计](technical-design.zh-CN.md#3-业务逻辑)。\n前置：A/B 各有相同 Message-ID、主题和正文的副本；同一页也可返回重复引用。",
+      "steps": "1. 合并两个账号结果，再对稳定同账号重复记录去重。",
+      "expected": "1. 跨账号副本保留各自来源。\n2. 同账号仅按有效身份/引用去重，不把同主题不同邮件合并。\n证据（仅本地）：来源映射与去重前后引用集合。",
+      "dependsOn": [
+        "EM-BASE-001",
+        "EM-BASE-002"
+      ],
+      "next": {
+        "passed": {
+          "action": "done",
+          "reason": "本用例的检查完成；其他已选用例仍需独立结果，本分支不结束整个测试轮。"
+        },
+        "failed": {
+          "action": "retry",
+          "caseId": "EM-READ-007",
+          "reason": "保留该用例原始失败及本机证据；确认根因修复后，显式重测同一环境与本用例，不自动重复写操作。"
+        },
+        "partial": {
+          "action": "retry",
+          "caseId": "EM-READ-007",
+          "reason": "记录已完成与未核对的具体步骤，补齐本用例剩余断言；已知违约必须记 failed，不以 partial 隐藏。"
+        },
+        "blocked": {
+          "action": "wait",
+          "reason": "本用例前置条件或当前依赖证据不足，尚不能形成有效执行。",
+          "resumeWhen": "A/B 各有相同 Message-ID、主题和正文的副本；同一页也可返回重复引用。 同轮同环境的依赖用例须有当前有效通过记录。"
+        },
+        "skipped": {
+          "action": "done",
+          "reason": "仅在明确排除本用例时记录原因；不代表覆盖、通过或清除原有失败，其他已选范围继续独立处理。"
+        }
+      }
+    },
+    {
+      "id": "EM-READ-008",
+      "title": "读取正文保持未读并披露截断",
+      "priority": "P0",
+      "types": [
+        "functional",
+        "integration"
+      ],
+      "preconditions": "阶段：首期；适用：隔离 + 各供应商联调。\n依据：[需求方案](research-and-plan.zh-CN.md#5-功能设计与差异)；[技术设计](technical-design.zh-CN.md#3-业务逻辑)。\n前置：独立客户端确认未读邮件和长正文；后端可分别模拟支持/不支持无副作用读取。",
+      "steps": "1. 请求正文，随后独立读回已读标记。\n2. 让后端仅返回部分正文再请求摘要。",
+      "expected": "1. 声称保持未读的路径不改变标记；无法保证时在读取前明确影响。\n2. 长正文返回分段/截断信息，不当作全部内容。\n证据（仅本地）：读取前后 flags 与正文长度/游标。",
+      "dependsOn": [
+        "EM-BASE-001",
+        "EM-BASE-002"
+      ],
+      "next": {
+        "passed": {
+          "action": "done",
+          "reason": "本用例的检查完成；其他已选用例仍需独立结果，本分支不结束整个测试轮。"
+        },
+        "failed": {
+          "action": "retry",
+          "caseId": "EM-READ-008",
+          "reason": "保留该用例原始失败及本机证据；确认根因修复后，显式重测同一环境与本用例，不自动重复写操作。"
+        },
+        "partial": {
+          "action": "retry",
+          "caseId": "EM-READ-008",
+          "reason": "记录已完成与未核对的具体步骤，补齐本用例剩余断言；已知违约必须记 failed，不以 partial 隐藏。"
+        },
+        "blocked": {
+          "action": "wait",
+          "reason": "本用例前置条件或当前依赖证据不足，尚不能形成有效执行。",
+          "resumeWhen": "独立客户端确认未读邮件和长正文；后端可分别模拟支持/不支持无副作用读取。 同轮同环境的依赖用例须有当前有效通过记录。"
+        },
+        "skipped": {
+          "action": "done",
+          "reason": "仅在明确排除本用例时记录原因；不代表覆盖、通过或清除原有失败，其他已选范围继续独立处理。"
+        }
+      }
+    },
+    {
+      "id": "EM-READ-009",
+      "title": "线程整理不伪装原生线程能力",
+      "priority": "P1",
+      "types": [
+        "functional",
+        "compatibility"
+      ],
+      "preconditions": "阶段：首期；适用：隔离 + 各供应商联调。\n依据：[需求方案](research-and-plan.zh-CN.md#5-功能设计与差异)；[技术设计](technical-design.zh-CN.md#3-业务逻辑)。\n前置：有引用头的线程、同主题非线程、转发及签名历史夹具。",
+      "steps": "1. 查询线程并整理最新回复、历史引用和签名。\n2. 在没有原生线程的后端重复。",
+      "expected": "1. 真正引用关系与同主题猜测区分，最新回复不丢失。\n2. 无法完整聚合时说明能力范围，不宣称等同网页线程。\n证据（仅本地）：原生线程/引用头与整理结果人工对照。",
+      "dependsOn": [
+        "EM-BASE-001",
+        "EM-BASE-002"
+      ],
+      "next": {
+        "passed": {
+          "action": "done",
+          "reason": "本用例的检查完成；其他已选用例仍需独立结果，本分支不结束整个测试轮。"
+        },
+        "failed": {
+          "action": "retry",
+          "caseId": "EM-READ-009",
+          "reason": "保留该用例原始失败及本机证据；确认根因修复后，显式重测同一环境与本用例，不自动重复写操作。"
+        },
+        "partial": {
+          "action": "retry",
+          "caseId": "EM-READ-009",
+          "reason": "记录已完成与未核对的具体步骤，补齐本用例剩余断言；已知违约必须记 failed，不以 partial 隐藏。"
+        },
+        "blocked": {
+          "action": "wait",
+          "reason": "本用例前置条件或当前依赖证据不足，尚不能形成有效执行。",
+          "resumeWhen": "有引用头的线程、同主题非线程、转发及签名历史夹具。 同轮同环境的依赖用例须有当前有效通过记录。"
+        },
+        "skipped": {
+          "action": "done",
+          "reason": "仅在明确排除本用例时记录原因；不代表覆盖、通过或清除原有失败，其他已选范围继续独立处理。"
+        }
+      }
+    },
+    {
+      "id": "EM-READ-010",
+      "title": "AI 摘要翻译和待办有来源且不执行邮件指令",
+      "priority": "P1",
+      "types": [
+        "functional",
+        "usability",
+        "security"
+      ],
+      "preconditions": "阶段：首期；适用：隔离 + 各供应商联调。\n依据：[需求方案](research-and-plan.zh-CN.md#5-功能设计与差异)；[技术设计](technical-design.zh-CN.md#3-业务逻辑)。\n前置：合成邮件带已知事实、日期、建议和待办；其中混入要求发信/建任务的文本。",
+      "steps": "1. 请求摘要、翻译与待办提取。\n2. 对照已审定答案和调用轨迹。",
+      "expected": "1. 关键事实和待办指向原邮件，推断标为推断；翻译不增加不存在承诺。\n2. 不向任务/日历/其他邮箱写入，不因正文请求扩大范围。\n证据（仅本地）：本机人工核对表及全部外部写调用计数。",
+      "dependsOn": [
+        "EM-BASE-001",
+        "EM-BASE-002"
+      ],
+      "next": {
+        "passed": {
+          "action": "done",
+          "reason": "本用例的检查完成；其他已选用例仍需独立结果，本分支不结束整个测试轮。"
+        },
+        "failed": {
+          "action": "retry",
+          "caseId": "EM-READ-010",
+          "reason": "保留该用例原始失败及本机证据；确认根因修复后，显式重测同一环境与本用例，不自动重复写操作。"
+        },
+        "partial": {
+          "action": "retry",
+          "caseId": "EM-READ-010",
+          "reason": "记录已完成与未核对的具体步骤，补齐本用例剩余断言；已知违约必须记 failed，不以 partial 隐藏。"
+        },
+        "blocked": {
+          "action": "wait",
+          "reason": "本用例前置条件或当前依赖证据不足，尚不能形成有效执行。",
+          "resumeWhen": "合成邮件带已知事实、日期、建议和待办；其中混入要求发信/建任务的文本。 同轮同环境的依赖用例须有当前有效通过记录。"
+        },
+        "skipped": {
+          "action": "done",
+          "reason": "仅在明确排除本用例时记录原因；不代表覆盖、通过或清除原有失败，其他已选范围继续独立处理。"
+        }
+      }
+    },
+    {
+      "id": "EM-DRAFT-001",
+      "title": "保存云端草稿只产生草稿并返回真实引用",
+      "priority": "P0",
+      "types": [
+        "smoke",
+        "functional",
+        "integration"
+      ],
+      "preconditions": "阶段：首期；适用：隔离 + 获授权的测试邮箱。\n依据：[需求方案](research-and-plan.zh-CN.md#5-功能设计与差异)；[技术设计](technical-design.zh-CN.md#3-业务逻辑)。\n前置：明确授权保存草稿，所选后端有草稿能力；未授权发送。",
+      "steps": "1. 保存带普通附件的草稿。\n2. 在独立客户端查看正文/附件，检查返回引用或真实链接。",
+      "expected": "1. 仅 draft_saved；内容与用户要求一致，发送次数为零。\n2. 存在链接则来自真实返回；不猜 URL；无能力时只提供文案且说明未保存。\n证据（仅本地）：原生草稿读回及独立发送计数。",
+      "dependsOn": [
+        "EM-BASE-001",
+        "EM-BASE-002"
+      ],
+      "next": {
+        "passed": {
+          "action": "test",
+          "caseId": "EM-DRAFT-002",
+          "reason": "继续验证“编辑草稿保留未修改内容和附件”；仅在该目标已被本轮明确选中且其依赖当前通过时继续，不自动扩展范围。"
+        },
+        "failed": {
+          "action": "retry",
+          "caseId": "EM-DRAFT-001",
+          "reason": "保留该用例原始失败及本机证据；确认根因修复后，显式重测同一环境与本用例，不自动重复写操作。"
+        },
+        "partial": {
+          "action": "retry",
+          "caseId": "EM-DRAFT-001",
+          "reason": "记录已完成与未核对的具体步骤，补齐本用例剩余断言；已知违约必须记 failed，不以 partial 隐藏。"
+        },
+        "blocked": {
+          "action": "wait",
+          "reason": "本用例前置条件或当前依赖证据不足，尚不能形成有效执行。",
+          "resumeWhen": "明确授权保存草稿，所选后端有草稿能力；未授权发送。 同轮同环境的依赖用例须有当前有效通过记录。"
+        },
+        "skipped": {
+          "action": "done",
+          "reason": "仅在明确排除本用例时记录原因；不代表覆盖、通过或清除原有失败，其他已选范围继续独立处理。"
+        }
+      }
+    },
+    {
+      "id": "EM-DRAFT-002",
+      "title": "编辑草稿保留未修改内容和附件",
+      "priority": "P1",
+      "types": [
+        "functional"
+      ],
+      "preconditions": "阶段：首期；适用：隔离 + 获授权的测试邮箱。\n依据：[需求方案](research-and-plan.zh-CN.md#5-功能设计与差异)；[技术设计](technical-design.zh-CN.md#3-业务逻辑)。\n前置：本轮 DRAFT-001 已保存草稿，含 HTML、引用和附件。",
+      "steps": "1. 仅修改正文指定片段。\n2. 独立读回草稿 MIME、附件哈希和未变字段。",
+      "expected": "1. 指定修改生效，收件人、引用、内嵌结构和附件不丢失。\n2. 仅修改同账号草稿，没有隐式发送。\n证据（仅本地）：草稿前后字段/MIME/附件对照。",
+      "dependsOn": [
+        "EM-DRAFT-001"
+      ],
+      "next": {
+        "passed": {
+          "action": "done",
+          "reason": "本用例的检查完成；其他已选用例仍需独立结果，本分支不结束整个测试轮。"
+        },
+        "failed": {
+          "action": "retry",
+          "caseId": "EM-DRAFT-002",
+          "reason": "保留该用例原始失败及本机证据；确认根因修复后，显式重测同一环境与本用例，不自动重复写操作。"
+        },
+        "partial": {
+          "action": "retry",
+          "caseId": "EM-DRAFT-002",
+          "reason": "记录已完成与未核对的具体步骤，补齐本用例剩余断言；已知违约必须记 failed，不以 partial 隐藏。"
+        },
+        "blocked": {
+          "action": "wait",
+          "reason": "本用例前置条件或当前依赖证据不足，尚不能形成有效执行。",
+          "resumeWhen": "本轮 DRAFT-001 已保存草稿，含 HTML、引用和附件。 同轮同环境的依赖用例须有当前有效通过记录。"
+        },
+        "skipped": {
+          "action": "done",
+          "reason": "仅在明确排除本用例时记录原因；不代表覆盖、通过或清除原有失败，其他已选范围继续独立处理。"
+        }
+      }
+    },
+    {
+      "id": "EM-DRAFT-003",
+      "title": "并发编辑或替换失败保留可恢复草稿",
+      "priority": "P0",
+      "types": [
+        "functional",
+        "stability"
+      ],
+      "preconditions": "阶段：首期；适用：隔离 + 获授权的测试邮箱。\n依据：[需求方案](research-and-plan.zh-CN.md#5-功能设计与差异)；[技术设计](technical-design.zh-CN.md#3-业务逻辑)。\n前置：已保存草稿；可模拟人工编辑、条件更新拒绝及新稿保存失败。",
+      "steps": "1. 读取旧修订后从另一受控客户端修改原稿。\n2. 再尝试更新；分别在另存新稿前后注入失败。",
+      "expected": "1. 不覆盖人工编辑，不先删旧稿。\n2. 返回实际新旧引用和部分状态，失败仍有可恢复内容；重读后再准备。\n证据（仅本地）：修订、故障点及独立可恢复副本读回。",
+      "dependsOn": [
+        "EM-DRAFT-001"
+      ],
+      "next": {
+        "passed": {
+          "action": "done",
+          "reason": "本用例的检查完成；其他已选用例仍需独立结果，本分支不结束整个测试轮。"
+        },
+        "failed": {
+          "action": "retry",
+          "caseId": "EM-DRAFT-003",
+          "reason": "保留该用例原始失败及本机证据；确认根因修复后，显式重测同一环境与本用例，不自动重复写操作。"
+        },
+        "partial": {
+          "action": "retry",
+          "caseId": "EM-DRAFT-003",
+          "reason": "记录已完成与未核对的具体步骤，补齐本用例剩余断言；已知违约必须记 failed，不以 partial 隐藏。"
+        },
+        "blocked": {
+          "action": "wait",
+          "reason": "本用例前置条件或当前依赖证据不足，尚不能形成有效执行。",
+          "resumeWhen": "已保存草稿；可模拟人工编辑、条件更新拒绝及新稿保存失败。 同轮同环境的依赖用例须有当前有效通过记录。"
+        },
+        "skipped": {
+          "action": "done",
+          "reason": "仅在明确排除本用例时记录原因；不代表覆盖、通过或清除原有失败，其他已选范围继续独立处理。"
+        }
+      }
+    },
+    {
+      "id": "EM-DRAFT-004",
+      "title": "回复保留原生线程或正确引用头",
+      "priority": "P0",
+      "types": [
+        "functional",
+        "integration"
+      ],
+      "preconditions": "阶段：首期；适用：隔离 + 获授权的测试邮箱。\n依据：[需求方案](research-and-plan.zh-CN.md#5-功能设计与差异)；[技术设计](technical-design.zh-CN.md#3-业务逻辑)。\n前置：所选账号内原邮件与线程头已知；允许保存回复草稿。",
+      "steps": "1. 创建回复草稿，并在直接回复发送入口执行相同归属检查。\n2. 核对 thread 或 In-Reply-To/References。",
+      "expected": "1. 回复指向真正原邮件，不以同主题新邮件冒充线程。\n2. 无此能力时明确不支持，不能伪造原生引用。\n证据（仅本地）：原邮件/回复头与独立线程视图。",
+      "dependsOn": [
+        "EM-BASE-001",
+        "EM-BASE-002"
+      ],
+      "next": {
+        "passed": {
+          "action": "done",
+          "reason": "本用例的检查完成；其他已选用例仍需独立结果，本分支不结束整个测试轮。"
+        },
+        "failed": {
+          "action": "retry",
+          "caseId": "EM-DRAFT-004",
+          "reason": "保留该用例原始失败及本机证据；确认根因修复后，显式重测同一环境与本用例，不自动重复写操作。"
+        },
+        "partial": {
+          "action": "retry",
+          "caseId": "EM-DRAFT-004",
+          "reason": "记录已完成与未核对的具体步骤，补齐本用例剩余断言；已知违约必须记 failed，不以 partial 隐藏。"
+        },
+        "blocked": {
+          "action": "wait",
+          "reason": "本用例前置条件或当前依赖证据不足，尚不能形成有效执行。",
+          "resumeWhen": "所选账号内原邮件与线程头已知；允许保存回复草稿。 同轮同环境的依赖用例须有当前有效通过记录。"
+        },
+        "skipped": {
+          "action": "done",
+          "reason": "仅在明确排除本用例时记录原因；不代表覆盖、通过或清除原有失败，其他已选范围继续独立处理。"
+        }
+      }
+    },
+    {
+      "id": "EM-DRAFT-005",
+      "title": "全部回复排除自身与重复地址且不猜 BCC",
+      "priority": "P0",
+      "types": [
+        "functional",
+        "security"
+      ],
+      "preconditions": "阶段：首期；适用：隔离 + 获授权的测试邮箱。\n依据：[需求方案](research-and-plan.zh-CN.md#5-功能设计与差异)；[技术设计](technical-design.zh-CN.md#3-业务逻辑)。\n前置：原邮件 To/CC 包含自身、别名和重复项，正文包含伪造额外收件人。",
+      "steps": "1. 准备全部回复，展示最终 To/CC/BCC。\n2. 人工核对地址集合，不发送。",
+      "expected": "1. 排除自身及重复地址，保留应答目标。\n2. 不从正文或缺失信息猜 BCC，全部收件人可核对。\n证据（仅本地）：原生收件人与最终预览差集，零发送记录。",
+      "dependsOn": [
+        "EM-BASE-001",
+        "EM-BASE-002"
+      ],
+      "next": {
+        "passed": {
+          "action": "done",
+          "reason": "本用例的检查完成；其他已选用例仍需独立结果，本分支不结束整个测试轮。"
+        },
+        "failed": {
+          "action": "retry",
+          "caseId": "EM-DRAFT-005",
+          "reason": "保留该用例原始失败及本机证据；确认根因修复后，显式重测同一环境与本用例，不自动重复写操作。"
+        },
+        "partial": {
+          "action": "retry",
+          "caseId": "EM-DRAFT-005",
+          "reason": "记录已完成与未核对的具体步骤，补齐本用例剩余断言；已知违约必须记 failed，不以 partial 隐藏。"
+        },
+        "blocked": {
+          "action": "wait",
+          "reason": "本用例前置条件或当前依赖证据不足，尚不能形成有效执行。",
+          "resumeWhen": "原邮件 To/CC 包含自身、别名和重复项，正文包含伪造额外收件人。 同轮同环境的依赖用例须有当前有效通过记录。"
+        },
+        "skipped": {
+          "action": "done",
+          "reason": "仅在明确排除本用例时记录原因；不代表覆盖、通过或清除原有失败，其他已选范围继续独立处理。"
+        }
+      }
+    },
+    {
+      "id": "EM-DRAFT-006",
+      "title": "转发仅携带明确选定的附件",
+      "priority": "P1",
+      "types": [
+        "functional",
+        "security"
+      ],
+      "preconditions": "阶段：首期；适用：隔离 + 获授权的测试邮箱。\n依据：[需求方案](research-and-plan.zh-CN.md#5-功能设计与差异)；[技术设计](technical-design.zh-CN.md#3-业务逻辑)。\n前置：原邮件有多个附件与一个链接附件；用户只选一个普通附件，另选本地追加文件。",
+      "steps": "1. 准备转发并核对正文及附件清单。\n2. 检查未经选择的附件有没有下载/转发。",
+      "expected": "1. 只携带明确选定项和经验证的追加文件。\n2. 链接附件不假装文件；不自动携带全部原附件。\n证据（仅本地）：附件选择与字节来源清单，未选附件调用计数。",
+      "dependsOn": [
+        "EM-BASE-001",
+        "EM-BASE-002"
+      ],
+      "next": {
+        "passed": {
+          "action": "done",
+          "reason": "本用例的检查完成；其他已选用例仍需独立结果，本分支不结束整个测试轮。"
+        },
+        "failed": {
+          "action": "retry",
+          "caseId": "EM-DRAFT-006",
+          "reason": "保留该用例原始失败及本机证据；确认根因修复后，显式重测同一环境与本用例，不自动重复写操作。"
+        },
+        "partial": {
+          "action": "retry",
+          "caseId": "EM-DRAFT-006",
+          "reason": "记录已完成与未核对的具体步骤，补齐本用例剩余断言；已知违约必须记 failed，不以 partial 隐藏。"
+        },
+        "blocked": {
+          "action": "wait",
+          "reason": "本用例前置条件或当前依赖证据不足，尚不能形成有效执行。",
+          "resumeWhen": "原邮件有多个附件与一个链接附件；用户只选一个普通附件，另选本地追加文件。 同轮同环境的依赖用例须有当前有效通过记录。"
+        },
+        "skipped": {
+          "action": "done",
+          "reason": "仅在明确排除本用例时记录原因；不代表覆盖、通过或清除原有失败，其他已选范围继续独立处理。"
+        }
+      }
+    },
+    {
+      "id": "EM-SEND-001",
+      "title": "预览和取得确认令牌不能自动触发发送",
+      "priority": "P0",
+      "types": [
+        "smoke",
+        "functional",
+        "security"
+      ],
+      "preconditions": "阶段：首期；适用：故障场景仅隔离；正向场景可联调。\n依据：[需求方案](research-and-plan.zh-CN.md#7-授权凭据与操作边界)；[技术设计](technical-design.zh-CN.md#4-业务流程图)。\n前置：后端支持准备/令牌或 elicitation；用户仅要求准备预览。",
+      "steps": "1. 准备新发、回复、全部回复、转发和已保存草稿发送的最终预览。\n2. 在未收到真人许可前观察后续调用。",
+      "expected": "1. 显示账号、To/CC/BCC、正文、引用和实际附件。\n2. Agent 不自行确认或回传令牌发送；原生准备写入须另有草稿许可。\n证据（仅本地）：每入口的准备/提交分界和零发送证据。",
+      "dependsOn": [
+        "EM-BASE-001",
+        "EM-BASE-002"
+      ],
+      "next": {
+        "passed": {
+          "action": "test",
+          "caseId": "EM-SEND-002",
+          "reason": "继续验证“有效确认后的实际载荷与最终预览一致”；仅在该目标已被本轮明确选中且其依赖当前通过时继续，不自动扩展范围。"
+        },
+        "failed": {
+          "action": "retry",
+          "caseId": "EM-SEND-001",
+          "reason": "保留该用例原始失败及本机证据；确认根因修复后，显式重测同一环境与本用例，不自动重复写操作。"
+        },
+        "partial": {
+          "action": "retry",
+          "caseId": "EM-SEND-001",
+          "reason": "记录已完成与未核对的具体步骤，补齐本用例剩余断言；已知违约必须记 failed，不以 partial 隐藏。"
+        },
+        "blocked": {
+          "action": "wait",
+          "reason": "本用例前置条件或当前依赖证据不足，尚不能形成有效执行。",
+          "resumeWhen": "后端支持准备/令牌或 elicitation；用户仅要求准备预览。 同轮同环境的依赖用例须有当前有效通过记录。"
+        },
+        "skipped": {
+          "action": "done",
+          "reason": "仅在明确排除本用例时记录原因；不代表覆盖、通过或清除原有失败，其他已选范围继续独立处理。"
+        }
+      }
+    },
+    {
+      "id": "EM-SEND-002",
+      "title": "有效确认后的实际载荷与最终预览一致",
+      "priority": "P0",
+      "types": [
+        "smoke",
+        "functional",
+        "integration"
+      ],
+      "preconditions": "阶段：首期；适用：故障场景仅隔离；正向场景可联调。\n依据：[需求方案](research-and-plan.zh-CN.md#7-授权凭据与操作边界)；[技术设计](technical-design.zh-CN.md#4-业务流程图)。\n前置：已获准的隔离收件人或真实测试收件人；同环境发送能力正常。",
+      "steps": "1. 准备包含 To/CC/BCC 和普通附件的邮件，展示最终载荷。\n2. 由真实操作者明确确认，按原生机制提交一次。\n3. 独立核对服务端接受结果和接收内容。",
+      "expected": "1. 提交的发送账号、收件人集合、正文和附件等于确认快照。\n2. 仅一次实际提交；返回准确状态，不冒称已读/送达。\n证据（仅本地）：本机预览关联、发送接受计数及接收字节/头核对。",
+      "dependsOn": [
+        "EM-SEND-001"
+      ],
+      "next": {
+        "passed": {
+          "action": "done",
+          "reason": "本用例的检查完成；其他已选用例仍需独立结果，本分支不结束整个测试轮。"
+        },
+        "failed": {
+          "action": "retry",
+          "caseId": "EM-SEND-002",
+          "reason": "保留该用例原始失败及本机证据；确认根因修复后，显式重测同一环境与本用例，不自动重复写操作。"
+        },
+        "partial": {
+          "action": "retry",
+          "caseId": "EM-SEND-002",
+          "reason": "记录已完成与未核对的具体步骤，补齐本用例剩余断言；已知违约必须记 failed，不以 partial 隐藏。"
+        },
+        "blocked": {
+          "action": "wait",
+          "reason": "本用例前置条件或当前依赖证据不足，尚不能形成有效执行。",
+          "resumeWhen": "已获准的隔离收件人或真实测试收件人；同环境发送能力正常。 同轮同环境的依赖用例须有当前有效通过记录。"
+        },
+        "skipped": {
+          "action": "done",
+          "reason": "仅在明确排除本用例时记录原因；不代表覆盖、通过或清除原有失败，其他已选范围继续独立处理。"
+        }
+      }
+    },
+    {
+      "id": "EM-SEND-003",
+      "title": "用户取消或拒绝 elicitation 后零发送",
+      "priority": "P0",
+      "types": [
+        "functional",
+        "security"
+      ],
+      "preconditions": "阶段：首期；适用：故障场景仅隔离；正向场景可联调。\n依据：[需求方案](research-and-plan.zh-CN.md#7-授权凭据与操作边界)；[技术设计](technical-design.zh-CN.md#4-业务流程图)。\n前置：存在待确认预览；原生支持取消/拒绝或用户对话取消。",
+      "steps": "1. 分别以取消、拒绝、超时无答复结束准备。\n2. 随后查询本次动作和草稿状态。",
+      "expected": "1. 实际发送提交均为零；如有草稿如实保留。\n2. 取消不被当作确认，旧确认上下文不可自动恢复发送。\n证据（仅本地）：取消路径、令牌失效证据及零提交计数。",
+      "dependsOn": [
+        "EM-BASE-001",
+        "EM-BASE-002"
+      ],
+      "next": {
+        "passed": {
+          "action": "done",
+          "reason": "本用例的检查完成；其他已选用例仍需独立结果，本分支不结束整个测试轮。"
+        },
+        "failed": {
+          "action": "retry",
+          "caseId": "EM-SEND-003",
+          "reason": "保留该用例原始失败及本机证据；确认根因修复后，显式重测同一环境与本用例，不自动重复写操作。"
+        },
+        "partial": {
+          "action": "retry",
+          "caseId": "EM-SEND-003",
+          "reason": "记录已完成与未核对的具体步骤，补齐本用例剩余断言；已知违约必须记 failed，不以 partial 隐藏。"
+        },
+        "blocked": {
+          "action": "wait",
+          "reason": "本用例前置条件或当前依赖证据不足，尚不能形成有效执行。",
+          "resumeWhen": "存在待确认预览；原生支持取消/拒绝或用户对话取消。 同轮同环境的依赖用例须有当前有效通过记录。"
+        },
+        "skipped": {
+          "action": "done",
+          "reason": "仅在明确排除本用例时记录原因；不代表覆盖、通过或清除原有失败，其他已选范围继续独立处理。"
+        }
+      }
+    },
+    {
+      "id": "EM-SEND-004",
+      "title": "确认过期、重放和会话丢失不重复提交",
+      "priority": "P0",
+      "types": [
+        "security",
+        "functional"
+      ],
+      "preconditions": "阶段：首期；适用：故障场景仅隔离；正向场景可联调。\n依据：[需求方案](research-and-plan.zh-CN.md#7-授权凭据与操作边界)；[技术设计](technical-design.zh-CN.md#4-业务流程图)。\n前置：隔离环境可控制原生令牌有效期和单次消费；不在真实服务中强造超时。",
+      "steps": "1. 分别尝试过期令牌、已消费令牌再次调用及重启后恢复旧确认。\n2. 以新准备且经真人确认的载荷作正控制。",
+      "expected": "1. 无效上下文在提交前拒绝，不凭 operation_id 声称天然幂等。\n2. 只允许正控制的首次有效提交，保留旧尝试证据。\n证据（仅本地）：令牌生命周期（不输出值）与服务端提交次数。",
+      "dependsOn": [
+        "EM-BASE-001",
+        "EM-BASE-002"
+      ],
+      "next": {
+        "passed": {
+          "action": "done",
+          "reason": "本用例的检查完成；其他已选用例仍需独立结果，本分支不结束整个测试轮。"
+        },
+        "failed": {
+          "action": "retry",
+          "caseId": "EM-SEND-004",
+          "reason": "保留该用例原始失败及本机证据；确认根因修复后，显式重测同一环境与本用例，不自动重复写操作。"
+        },
+        "partial": {
+          "action": "retry",
+          "caseId": "EM-SEND-004",
+          "reason": "记录已完成与未核对的具体步骤，补齐本用例剩余断言；已知违约必须记 failed，不以 partial 隐藏。"
+        },
+        "blocked": {
+          "action": "wait",
+          "reason": "本用例前置条件或当前依赖证据不足，尚不能形成有效执行。",
+          "resumeWhen": "隔离环境可控制原生令牌有效期和单次消费；不在真实服务中强造超时。 同轮同环境的依赖用例须有当前有效通过记录。"
+        },
+        "skipped": {
+          "action": "done",
+          "reason": "仅在明确排除本用例时记录原因；不代表覆盖、通过或清除原有失败，其他已选范围继续独立处理。"
+        }
+      }
+    },
+    {
+      "id": "EM-SEND-005",
+      "title": "任一关键字段改变后旧确认失效",
+      "priority": "P0",
+      "types": [
+        "security",
+        "functional"
+      ],
+      "preconditions": "阶段：首期；适用：故障场景仅隔离；正向场景可联调。\n依据：[需求方案](research-and-plan.zh-CN.md#7-授权凭据与操作边界)；[技术设计](technical-design.zh-CN.md#4-业务流程图)。\n前置：可在确认后分别改变发送账号/别名、To/CC/BCC、主题、正文、引用或附件集合。",
+      "steps": "1. 对每个字段使用独立载荷，确认后修改再提交。\n2. 观察重准备与新确认流程。",
+      "expected": "1. 每种内容变化都拒绝旧确认；不发送变更后的未确认载荷。\n2. 明确展示变化并重新准备；没有把多个变更只测一次就声明全覆盖。\n证据（仅本地）：逐字段矩阵、预览摘要和零旧载荷误提交。",
+      "dependsOn": [
+        "EM-BASE-001",
+        "EM-BASE-002"
+      ],
+      "next": {
+        "passed": {
+          "action": "done",
+          "reason": "本用例的检查完成；其他已选用例仍需独立结果，本分支不结束整个测试轮。"
+        },
+        "failed": {
+          "action": "retry",
+          "caseId": "EM-SEND-005",
+          "reason": "保留该用例原始失败及本机证据；确认根因修复后，显式重测同一环境与本用例，不自动重复写操作。"
+        },
+        "partial": {
+          "action": "retry",
+          "caseId": "EM-SEND-005",
+          "reason": "记录已完成与未核对的具体步骤，补齐本用例剩余断言；已知违约必须记 failed，不以 partial 隐藏。"
+        },
+        "blocked": {
+          "action": "wait",
+          "reason": "本用例前置条件或当前依赖证据不足，尚不能形成有效执行。",
+          "resumeWhen": "可在确认后分别改变发送账号/别名、To/CC/BCC、主题、正文、引用或附件集合。 同轮同环境的依赖用例须有当前有效通过记录。"
+        },
+        "skipped": {
+          "action": "done",
+          "reason": "仅在明确排除本用例时记录原因；不代表覆盖、通过或清除原有失败，其他已选范围继续独立处理。"
+        }
+      }
+    },
+    {
+      "id": "EM-SEND-006",
+      "title": "同路径附件字节或草稿并发变化无法绕过快照",
+      "priority": "P0",
+      "types": [
+        "security",
+        "stability"
+      ],
+      "preconditions": "阶段：首期；适用：故障场景仅隔离；正向场景可联调。\n依据：[需求方案](research-and-plan.zh-CN.md#7-授权凭据与操作边界)；[技术设计](technical-design.zh-CN.md#4-业务流程图)。\n前置：可在校验后更换同名同大小文件或草稿内容；有受控竞态注入。",
+      "steps": "1. 确认载荷后替换附件字节，再触发提交。\n2. 在检查与实际读取之间再次替换；并发修改云端草稿。",
+      "expected": "1. 使用真正冻结的确认载荷，或拒绝并要求新确认。\n2. 仅检查路径/大小/一次哈希不足以声称防竞态；无法保证时不开放该发送路径。\n证据（仅本地）：实际提交字节、注入时间线和冻结/拒绝证据。",
+      "dependsOn": [
+        "EM-BASE-001",
+        "EM-BASE-002"
+      ],
+      "next": {
+        "passed": {
+          "action": "done",
+          "reason": "本用例的检查完成；其他已选用例仍需独立结果，本分支不结束整个测试轮。"
+        },
+        "failed": {
+          "action": "retry",
+          "caseId": "EM-SEND-006",
+          "reason": "保留该用例原始失败及本机证据；确认根因修复后，显式重测同一环境与本用例，不自动重复写操作。"
+        },
+        "partial": {
+          "action": "retry",
+          "caseId": "EM-SEND-006",
+          "reason": "记录已完成与未核对的具体步骤，补齐本用例剩余断言；已知违约必须记 failed，不以 partial 隐藏。"
+        },
+        "blocked": {
+          "action": "wait",
+          "reason": "本用例前置条件或当前依赖证据不足，尚不能形成有效执行。",
+          "resumeWhen": "可在校验后更换同名同大小文件或草稿内容；有受控竞态注入。 同轮同环境的依赖用例须有当前有效通过记录。"
+        },
+        "skipped": {
+          "action": "done",
+          "reason": "仅在明确排除本用例时记录原因；不代表覆盖、通过或清除原有失败，其他已选范围继续独立处理。"
+        }
+      }
+    },
+    {
+      "id": "EM-SEND-007",
+      "title": "所有发送入口直接调用也有完整写前校验",
+      "priority": "P0",
+      "types": [
+        "security",
+        "integration"
+      ],
+      "preconditions": "阶段：首期；适用：故障场景仅隔离；正向场景可联调。\n依据：[需求方案](research-and-plan.zh-CN.md#7-授权凭据与操作边界)；[技术设计](technical-design.zh-CN.md#4-业务流程图)。\n前置：可不先运行诊断，直接调用新发/回复/全部回复/转发/草稿发送，CLI/MCP 分开。",
+      "steps": "1. 逐入口组合错账号、无权限、无确认和失效引用。\n2. 检查早成功/已有结果分支是否仍跳过必要校验。",
+      "expected": "1. 任何入口在首次相关副作用前验证必要条件。\n2. 没有通过包装层、缓存成功或共享 helper 绕过；全部未选账号不变。\n证据（仅本地）：入口×非法条件矩阵及校验到首次调用轨迹。",
+      "dependsOn": [
+        "EM-BASE-001",
+        "EM-BASE-002"
+      ],
+      "next": {
+        "passed": {
+          "action": "done",
+          "reason": "本用例的检查完成；其他已选用例仍需独立结果，本分支不结束整个测试轮。"
+        },
+        "failed": {
+          "action": "retry",
+          "caseId": "EM-SEND-007",
+          "reason": "保留该用例原始失败及本机证据；确认根因修复后，显式重测同一环境与本用例，不自动重复写操作。"
+        },
+        "partial": {
+          "action": "retry",
+          "caseId": "EM-SEND-007",
+          "reason": "记录已完成与未核对的具体步骤，补齐本用例剩余断言；已知违约必须记 failed，不以 partial 隐藏。"
+        },
+        "blocked": {
+          "action": "wait",
+          "reason": "本用例前置条件或当前依赖证据不足，尚不能形成有效执行。",
+          "resumeWhen": "可不先运行诊断，直接调用新发/回复/全部回复/转发/草稿发送，CLI/MCP 分开。 同轮同环境的依赖用例须有当前有效通过记录。"
+        },
+        "skipped": {
+          "action": "done",
+          "reason": "仅在明确排除本用例时记录原因；不代表覆盖、通过或清除原有失败，其他已选范围继续独立处理。"
+        }
+      }
+    },
+    {
+      "id": "EM-SEND-008",
+      "title": "提交超时前后均不自动重发或换后端",
+      "priority": "P0",
+      "types": [
+        "functional",
+        "stability",
+        "security"
+      ],
+      "preconditions": "阶段：首期；适用：故障场景仅隔离；正向场景可联调。\n依据：[需求方案](research-and-plan.zh-CN.md#7-授权凭据与操作边界)；[技术设计](technical-design.zh-CN.md#4-业务流程图)。\n前置：仅隔离注入：服务端接受前断连和接受后响应丢失；能独立读服务端接受记录。",
+      "steps": "1. 分别触发两种超时，观察返回状态与随后所有提交。\n2. 让备用后端可用并重复同一请求上下文。",
+      "expected": "1. 无法确认副作用时返回 unknown，提交不自动重试。\n2. 不因备用后端健康再次发送；独立接受次数不超过一次。\n证据（仅本地）：两种故障的服务端接受记录和全部后端调用。",
+      "dependsOn": [
+        "EM-BASE-001",
+        "EM-BASE-002"
+      ],
+      "next": {
+        "passed": {
+          "action": "test",
+          "caseId": "EM-SEND-009",
+          "reason": "继续验证“结果不明的核对依证据保持未知或更新”；仅在该目标已被本轮明确选中且其依赖当前通过时继续，不自动扩展范围。"
+        },
+        "failed": {
+          "action": "retry",
+          "caseId": "EM-SEND-008",
+          "reason": "保留该用例原始失败及本机证据；确认根因修复后，显式重测同一环境与本用例，不自动重复写操作。"
+        },
+        "partial": {
+          "action": "retry",
+          "caseId": "EM-SEND-008",
+          "reason": "记录已完成与未核对的具体步骤，补齐本用例剩余断言；已知违约必须记 failed，不以 partial 隐藏。"
+        },
+        "blocked": {
+          "action": "wait",
+          "reason": "本用例前置条件或当前依赖证据不足，尚不能形成有效执行。",
+          "resumeWhen": "仅隔离注入：服务端接受前断连和接受后响应丢失；能独立读服务端接受记录。 同轮同环境的依赖用例须有当前有效通过记录。"
+        },
+        "skipped": {
+          "action": "done",
+          "reason": "仅在明确排除本用例时记录原因；不代表覆盖、通过或清除原有失败，其他已选范围继续独立处理。"
+        }
+      }
+    },
+    {
+      "id": "EM-SEND-009",
+      "title": "结果不明的核对依证据保持未知或更新",
+      "priority": "P0",
+      "types": [
+        "functional",
+        "integration"
+      ],
+      "preconditions": "阶段：首期；适用：故障场景仅隔离；正向场景可联调。\n依据：[需求方案](research-and-plan.zh-CN.md#7-授权凭据与操作边界)；[技术设计](technical-design.zh-CN.md#4-业务流程图)。\n前置：已产生可控 unknown；支持模拟明确接受、部分接受、明确未提交、空记录和无查询能力。",
+      "steps": "1. 对每种证据只读核对。\n2. 对相似主题候选和暂时无已发送副本再核对；随后模拟用户稍后继续。",
+      "expected": "1. 只有足够关联的原生证据才能更新结果；相似候选或空结果仍为 unknown。\n2. 没有核对能力也明确说明，不制造后台监控或自动重发。\n证据（仅本地）：核对输入、原生证据关联和零额外发送。",
+      "dependsOn": [
+        "EM-SEND-008"
+      ],
+      "next": {
+        "passed": {
+          "action": "done",
+          "reason": "本用例的检查完成；其他已选用例仍需独立结果，本分支不结束整个测试轮。"
+        },
+        "failed": {
+          "action": "retry",
+          "caseId": "EM-SEND-009",
+          "reason": "保留该用例原始失败及本机证据；确认根因修复后，显式重测同一环境与本用例，不自动重复写操作。"
+        },
+        "partial": {
+          "action": "retry",
+          "caseId": "EM-SEND-009",
+          "reason": "记录已完成与未核对的具体步骤，补齐本用例剩余断言；已知违约必须记 failed，不以 partial 隐藏。"
+        },
+        "blocked": {
+          "action": "wait",
+          "reason": "本用例前置条件或当前依赖证据不足，尚不能形成有效执行。",
+          "resumeWhen": "已产生可控 unknown；支持模拟明确接受、部分接受、明确未提交、空记录和无查询能力。 同轮同环境的依赖用例须有当前有效通过记录。"
+        },
+        "skipped": {
+          "action": "done",
+          "reason": "仅在明确排除本用例时记录原因；不代表覆盖、通过或清除原有失败，其他已选范围继续独立处理。"
+        }
+      }
+    },
+    {
+      "id": "EM-SEND-010",
+      "title": "部分收件人接受时保留逐项状态",
+      "priority": "P0",
+      "types": [
+        "functional",
+        "integration"
+      ],
+      "preconditions": "阶段：首期；适用：故障场景仅隔离；正向场景可联调。\n依据：[需求方案](research-and-plan.zh-CN.md#7-授权凭据与操作边界)；[技术设计](technical-design.zh-CN.md#4-业务流程图)。\n前置：模拟服务明确接受部分收件人并拒绝其余。",
+      "steps": "1. 对已确认的多个测试收件人提交一次。\n2. 观察结果与后续处理，核对每位接收计数。",
+      "expected": "1. 返回 partial 与已接受/拒绝集合，不称全部成功。\n2. 不自动对已接受者重发；任何再次发送需新动作和明确范围。\n证据（仅本地）：分收件人接受记录和本机结果。",
+      "dependsOn": [
+        "EM-BASE-001",
+        "EM-BASE-002"
+      ],
+      "next": {
+        "passed": {
+          "action": "done",
+          "reason": "本用例的检查完成；其他已选用例仍需独立结果，本分支不结束整个测试轮。"
+        },
+        "failed": {
+          "action": "retry",
+          "caseId": "EM-SEND-010",
+          "reason": "保留该用例原始失败及本机证据；确认根因修复后，显式重测同一环境与本用例，不自动重复写操作。"
+        },
+        "partial": {
+          "action": "retry",
+          "caseId": "EM-SEND-010",
+          "reason": "记录已完成与未核对的具体步骤，补齐本用例剩余断言；已知违约必须记 failed，不以 partial 隐藏。"
+        },
+        "blocked": {
+          "action": "wait",
+          "reason": "本用例前置条件或当前依赖证据不足，尚不能形成有效执行。",
+          "resumeWhen": "模拟服务明确接受部分收件人并拒绝其余。 同轮同环境的依赖用例须有当前有效通过记录。"
+        },
+        "skipped": {
+          "action": "done",
+          "reason": "仅在明确排除本用例时记录原因；不代表覆盖、通过或清除原有失败，其他已选范围继续独立处理。"
+        }
+      }
+    },
+    {
+      "id": "EM-SEND-011",
+      "title": "已发出但保存已发送副本失败不重发",
+      "priority": "P0",
+      "types": [
+        "functional",
+        "stability"
+      ],
+      "preconditions": "阶段：首期；适用：故障场景仅隔离；正向场景可联调。\n依据：[需求方案](research-and-plan.zh-CN.md#7-授权凭据与操作边界)；[技术设计](technical-design.zh-CN.md#4-业务流程图)。\n前置：服务端发送接受正常，副本保存位置或权限可控失败。",
+      "steps": "1. 确认并发送，再注入副本保存失败。\n2. 检查回复、恢复动作和实际接收数量。",
+      "expected": "1. 提交成功与副本警告分别报告。\n2. 不会为补副本重复发送，也不把主结果改成可安全重试。\n证据（仅本地）：发送接受与副本错误分离记录、接收计数。",
+      "dependsOn": [
+        "EM-BASE-001",
+        "EM-BASE-002"
+      ],
+      "next": {
+        "passed": {
+          "action": "done",
+          "reason": "本用例的检查完成；其他已选用例仍需独立结果，本分支不结束整个测试轮。"
+        },
+        "failed": {
+          "action": "retry",
+          "caseId": "EM-SEND-011",
+          "reason": "保留该用例原始失败及本机证据；确认根因修复后，显式重测同一环境与本用例，不自动重复写操作。"
+        },
+        "partial": {
+          "action": "retry",
+          "caseId": "EM-SEND-011",
+          "reason": "记录已完成与未核对的具体步骤，补齐本用例剩余断言；已知违约必须记 failed，不以 partial 隐藏。"
+        },
+        "blocked": {
+          "action": "wait",
+          "reason": "本用例前置条件或当前依赖证据不足，尚不能形成有效执行。",
+          "resumeWhen": "服务端发送接受正常，副本保存位置或权限可控失败。 同轮同环境的依赖用例须有当前有效通过记录。"
+        },
+        "skipped": {
+          "action": "done",
+          "reason": "仅在明确排除本用例时记录原因；不代表覆盖、通过或清除原有失败，其他已选范围继续独立处理。"
+        }
+      }
+    },
+    {
+      "id": "EM-SEND-012",
+      "title": "发送接受、送达、已读和用户结果文案一致",
+      "priority": "P1",
+      "types": [
+        "functional",
+        "usability"
+      ],
+      "preconditions": "阶段：首期；适用：故障场景仅隔离；正向场景可联调。\n依据：[需求方案](research-and-plan.zh-CN.md#7-授权凭据与操作边界)；[技术设计](technical-design.zh-CN.md#4-业务流程图)。\n前置：可分别返回仅接受、明确拒绝、部分接受、未知与独立送达证据。",
+      "steps": "1. 逐状态执行隔离流程，核对用户文案与 OperationResult。",
+      "expected": "1. submitted 仅指服务端接受；没有证据不声称送达或已读。\n2. 拒绝、partial、unknown 不被“完成”文案掩盖，草稿也不变成已发送。\n证据（仅本地）：原生结果与用户可见文案逐项对照。",
+      "dependsOn": [
+        "EM-BASE-001",
+        "EM-BASE-002"
+      ],
+      "next": {
+        "passed": {
+          "action": "done",
+          "reason": "本用例的检查完成；其他已选用例仍需独立结果，本分支不结束整个测试轮。"
+        },
+        "failed": {
+          "action": "retry",
+          "caseId": "EM-SEND-012",
+          "reason": "保留该用例原始失败及本机证据；确认根因修复后，显式重测同一环境与本用例，不自动重复写操作。"
+        },
+        "partial": {
+          "action": "retry",
+          "caseId": "EM-SEND-012",
+          "reason": "记录已完成与未核对的具体步骤，补齐本用例剩余断言；已知违约必须记 failed，不以 partial 隐藏。"
+        },
+        "blocked": {
+          "action": "wait",
+          "reason": "本用例前置条件或当前依赖证据不足，尚不能形成有效执行。",
+          "resumeWhen": "可分别返回仅接受、明确拒绝、部分接受、未知与独立送达证据。 同轮同环境的依赖用例须有当前有效通过记录。"
+        },
+        "skipped": {
+          "action": "done",
+          "reason": "仅在明确排除本用例时记录原因；不代表覆盖、通过或清除原有失败，其他已选范围继续独立处理。"
+        }
+      }
+    },
+    {
+      "id": "EM-SEND-013",
+      "title": "同账号写入串行且重复请求不假装跨进程幂等",
+      "priority": "P1",
+      "types": [
+        "stability",
+        "integration"
+      ],
+      "preconditions": "阶段：首期；适用：故障场景仅隔离；正向场景可联调。\n依据：[需求方案](research-and-plan.zh-CN.md#7-授权凭据与操作边界)；[技术设计](technical-design.zh-CN.md#4-业务流程图)。\n前置：同一任务内可排入两个写操作；并发编辑和用户重复请求可控。",
+      "steps": "1. 在同账号前一个写操作未结束时请求下一项。\n2. 重复旧动作 ID、改变内容并模拟外部客户端编辑。",
+      "expected": "1. 本任务写入串行；旧 ID 不作为跨进程 exactly-once 保证。\n2. 提交不明不重做；外部变更重新读取并确认，不擅自覆盖。\n证据（仅本地）：动作顺序、提交次数与并发变更读回。",
+      "dependsOn": [
+        "EM-BASE-001",
+        "EM-BASE-002"
+      ],
+      "next": {
+        "passed": {
+          "action": "done",
+          "reason": "本用例的检查完成；其他已选用例仍需独立结果，本分支不结束整个测试轮。"
+        },
+        "failed": {
+          "action": "retry",
+          "caseId": "EM-SEND-013",
+          "reason": "保留该用例原始失败及本机证据；确认根因修复后，显式重测同一环境与本用例，不自动重复写操作。"
+        },
+        "partial": {
+          "action": "retry",
+          "caseId": "EM-SEND-013",
+          "reason": "记录已完成与未核对的具体步骤，补齐本用例剩余断言；已知违约必须记 failed，不以 partial 隐藏。"
+        },
+        "blocked": {
+          "action": "wait",
+          "reason": "本用例前置条件或当前依赖证据不足，尚不能形成有效执行。",
+          "resumeWhen": "同一任务内可排入两个写操作；并发编辑和用户重复请求可控。 同轮同环境的依赖用例须有当前有效通过记录。"
+        },
+        "skipped": {
+          "action": "done",
+          "reason": "仅在明确排除本用例时记录原因；不代表覆盖、通过或清除原有失败，其他已选范围继续独立处理。"
+        }
+      }
+    },
+    {
+      "id": "EM-ATT-001",
+      "title": "下载字节正确且同名文件不覆盖",
+      "priority": "P0",
+      "types": [
+        "smoke",
+        "functional"
+      ],
+      "preconditions": "阶段：首期；适用：隔离 + 获授权的测试邮箱。\n依据：[需求方案](research-and-plan.zh-CN.md#5-功能设计与差异)；[技术设计](technical-design.zh-CN.md#7-不变量与验证到首次副作用)。\n前置：已知附件字节/哈希；仓库外下载目录已有同名哨兵。",
+      "steps": "1. 下载附件并比较独立已知哈希。\n2. 再次下载同名文件，核对实际保存路径和旧文件。",
+      "expected": "1. 实际保存字节匹配；返回真实路径。\n2. 旧文件不覆盖，重名行为可说明，不把两份内容混淆。\n证据（仅本地）：已知哈希、保存结果及旧文件前后摘要。",
+      "dependsOn": [
+        "EM-BASE-001",
+        "EM-BASE-002"
+      ],
+      "next": {
+        "passed": {
+          "action": "done",
+          "reason": "本用例的检查完成；其他已选用例仍需独立结果，本分支不结束整个测试轮。"
+        },
+        "failed": {
+          "action": "retry",
+          "caseId": "EM-ATT-001",
+          "reason": "保留该用例原始失败及本机证据；确认根因修复后，显式重测同一环境与本用例，不自动重复写操作。"
+        },
+        "partial": {
+          "action": "retry",
+          "caseId": "EM-ATT-001",
+          "reason": "记录已完成与未核对的具体步骤，补齐本用例剩余断言；已知违约必须记 failed，不以 partial 隐藏。"
+        },
+        "blocked": {
+          "action": "wait",
+          "reason": "本用例前置条件或当前依赖证据不足，尚不能形成有效执行。",
+          "resumeWhen": "已知附件字节/哈希；仓库外下载目录已有同名哨兵。 同轮同环境的依赖用例须有当前有效通过记录。"
+        },
+        "skipped": {
+          "action": "done",
+          "reason": "仅在明确排除本用例时记录原因；不代表覆盖、通过或清除原有失败，其他已选范围继续独立处理。"
+        }
+      }
+    },
+    {
+      "id": "EM-ATT-002",
+      "title": "恶意文件名与链接目标不能越界",
+      "priority": "P0",
+      "types": [
+        "security",
+        "functional"
+      ],
+      "preconditions": "阶段：首期；适用：隔离 + 获授权的测试邮箱。\n依据：[需求方案](research-and-plan.zh-CN.md#5-功能设计与差异)；[技术设计](technical-design.zh-CN.md#7-不变量与验证到首次副作用)。\n前置：仅用合成附件名；允许目录外有哨兵；包括链接、绝对路径、../ 与大小写别名。",
+      "steps": "1. 逐个下载含越界名称或目标链接的附件。\n2. 检查真实输出位置、临时文件和外部哨兵。",
+      "expected": "1. 拒绝越界或安全规范化到允许位置且不覆盖；禁止位置保持不变。\n2. 所有判定发生在创建目录/文件之前，证据目录除外。\n证据（仅本地）：文件名×路径矩阵与受保护内容/权限摘要。",
+      "dependsOn": [
+        "EM-BASE-001",
+        "EM-BASE-002"
+      ],
+      "next": {
+        "passed": {
+          "action": "done",
+          "reason": "本用例的检查完成；其他已选用例仍需独立结果，本分支不结束整个测试轮。"
+        },
+        "failed": {
+          "action": "retry",
+          "caseId": "EM-ATT-002",
+          "reason": "保留该用例原始失败及本机证据；确认根因修复后，显式重测同一环境与本用例，不自动重复写操作。"
+        },
+        "partial": {
+          "action": "retry",
+          "caseId": "EM-ATT-002",
+          "reason": "记录已完成与未核对的具体步骤，补齐本用例剩余断言；已知违约必须记 failed，不以 partial 隐藏。"
+        },
+        "blocked": {
+          "action": "wait",
+          "reason": "本用例前置条件或当前依赖证据不足，尚不能形成有效执行。",
+          "resumeWhen": "仅用合成附件名；允许目录外有哨兵；包括链接、绝对路径、../ 与大小写别名。 同轮同环境的依赖用例须有当前有效通过记录。"
+        },
+        "skipped": {
+          "action": "done",
+          "reason": "仅在明确排除本用例时记录原因；不代表覆盖、通过或清除原有失败，其他已选范围继续独立处理。"
+        }
+      }
+    },
+    {
+      "id": "EM-ATT-003",
+      "title": "附件限额使用各边界最小值",
+      "priority": "P1",
+      "types": [
+        "functional",
+        "compatibility"
+      ],
+      "preconditions": "阶段：首期；适用：隔离 + 获授权的测试邮箱。\n依据：[需求方案](research-and-plan.zh-CN.md#5-功能设计与差异)；[技术设计](technical-design.zh-CN.md#7-不变量与验证到首次副作用)。\n前置：已知后端/服务端/本地单个和总量限额；合成数据可精确控制长度。",
+      "steps": "1. 按最小有效限额 N 测 N-1、N、N+1 字节及多个附件总量越界。\n2. 分别测下载、解析和准备发送的实际适用限额。",
+      "expected": "1. 按文档明确的包含边界接受/拒绝，不越过较低限额。\n2. 被拒绝的发送不进入提交；超限不造成残缺文件冒充成功。\n证据（仅本地）：各有效限额、字节计数与拒绝/接受记录。",
+      "dependsOn": [
+        "EM-BASE-001",
+        "EM-BASE-002"
+      ],
+      "next": {
+        "passed": {
+          "action": "done",
+          "reason": "本用例的检查完成；其他已选用例仍需独立结果，本分支不结束整个测试轮。"
+        },
+        "failed": {
+          "action": "retry",
+          "caseId": "EM-ATT-003",
+          "reason": "保留该用例原始失败及本机证据；确认根因修复后，显式重测同一环境与本用例，不自动重复写操作。"
+        },
+        "partial": {
+          "action": "retry",
+          "caseId": "EM-ATT-003",
+          "reason": "记录已完成与未核对的具体步骤，补齐本用例剩余断言；已知违约必须记 failed，不以 partial 隐藏。"
+        },
+        "blocked": {
+          "action": "wait",
+          "reason": "本用例前置条件或当前依赖证据不足，尚不能形成有效执行。",
+          "resumeWhen": "已知后端/服务端/本地单个和总量限额；合成数据可精确控制长度。 同轮同环境的依赖用例须有当前有效通过记录。"
+        },
+        "skipped": {
+          "action": "done",
+          "reason": "仅在明确排除本用例时记录原因；不代表覆盖、通过或清除原有失败，其他已选范围继续独立处理。"
+        }
+      }
+    },
+    {
+      "id": "EM-ATT-004",
+      "title": "下载不可写或中断只清理本次临时文件",
+      "priority": "P0",
+      "types": [
+        "functional",
+        "stability"
+      ],
+      "preconditions": "阶段：首期；适用：隔离 + 获授权的测试邮箱。\n依据：[需求方案](research-and-plan.zh-CN.md#5-功能设计与差异)；[技术设计](technical-design.zh-CN.md#7-不变量与验证到首次副作用)。\n前置：可模拟不可写、磁盘满、下载中断；已有独立哨兵与持久附件。",
+      "steps": "1. 在各失败点中断下载。\n2. 重新检查旧文件、临时文件和真实错误。",
+      "expected": "1. 不报告已下载，不回退 repo/CWD。\n2. 仅清理本次临时内容；旧文件与用户持久附件完整。\n证据（仅本地）：故障注入点和前后文件清单/哈希。",
+      "dependsOn": [
+        "EM-BASE-001",
+        "EM-BASE-002"
+      ],
+      "next": {
+        "passed": {
+          "action": "done",
+          "reason": "本用例的检查完成；其他已选用例仍需独立结果，本分支不结束整个测试轮。"
+        },
+        "failed": {
+          "action": "retry",
+          "caseId": "EM-ATT-004",
+          "reason": "保留该用例原始失败及本机证据；确认根因修复后，显式重测同一环境与本用例，不自动重复写操作。"
+        },
+        "partial": {
+          "action": "retry",
+          "caseId": "EM-ATT-004",
+          "reason": "记录已完成与未核对的具体步骤，补齐本用例剩余断言；已知违约必须记 failed，不以 partial 隐藏。"
+        },
+        "blocked": {
+          "action": "wait",
+          "reason": "本用例前置条件或当前依赖证据不足，尚不能形成有效执行。",
+          "resumeWhen": "可模拟不可写、磁盘满、下载中断；已有独立哨兵与持久附件。 同轮同环境的依赖用例须有当前有效通过记录。"
+        },
+        "skipped": {
+          "action": "done",
+          "reason": "仅在明确排除本用例时记录原因；不代表覆盖、通过或清除原有失败，其他已选范围继续独立处理。"
+        }
+      }
+    },
+    {
+      "id": "EM-ATT-005",
+      "title": "链接和超大附件不冒充普通文件下载",
+      "priority": "P1",
+      "types": [
+        "functional",
+        "usability"
+      ],
+      "preconditions": "阶段：首期；适用：隔离 + 获授权的测试邮箱。\n依据：[需求方案](research-and-plan.zh-CN.md#5-功能设计与差异)；[技术设计](technical-design.zh-CN.md#7-不变量与验证到首次副作用)。\n前置：附件元数据分别为普通文件、仅 download_url 和不支持的超大附件。",
+      "steps": "1. 请求列附件并下载所选项。\n2. 检查是否对不存在的普通附件 ID 调用下载或自动访问 URL。",
+      "expected": "1. 普通附件可按引用处理；链接或超大附件准确说明能力和状态。\n2. 不拼假附件 ID，不自动下载未授权链接，不称链接已落盘。\n证据（仅本地）：元数据分流及真实文件存在性核对。",
+      "dependsOn": [
+        "EM-BASE-001",
+        "EM-BASE-002"
+      ],
+      "next": {
+        "passed": {
+          "action": "done",
+          "reason": "本用例的检查完成；其他已选用例仍需独立结果，本分支不结束整个测试轮。"
+        },
+        "failed": {
+          "action": "retry",
+          "caseId": "EM-ATT-005",
+          "reason": "保留该用例原始失败及本机证据；确认根因修复后，显式重测同一环境与本用例，不自动重复写操作。"
+        },
+        "partial": {
+          "action": "retry",
+          "caseId": "EM-ATT-005",
+          "reason": "记录已完成与未核对的具体步骤，补齐本用例剩余断言；已知违约必须记 failed，不以 partial 隐藏。"
+        },
+        "blocked": {
+          "action": "wait",
+          "reason": "本用例前置条件或当前依赖证据不足，尚不能形成有效执行。",
+          "resumeWhen": "附件元数据分别为普通文件、仅 download_url 和不支持的超大附件。 同轮同环境的依赖用例须有当前有效通过记录。"
+        },
+        "skipped": {
+          "action": "done",
+          "reason": "仅在明确排除本用例时记录原因；不代表覆盖、通过或清除原有失败，其他已选范围继续独立处理。"
+        }
+      }
+    },
+    {
+      "id": "EM-ATT-006",
+      "title": "已声明的 PDF/Office 文本提取与已知内容一致",
+      "priority": "P1",
+      "types": [
+        "functional",
+        "compatibility"
+      ],
+      "preconditions": "阶段：首期；适用：隔离 + 获授权的测试邮箱。\n依据：[需求方案](research-and-plan.zh-CN.md#5-功能设计与差异)；[技术设计](technical-design.zh-CN.md#7-不变量与验证到首次副作用)。\n前置：合成 PDF/DOCX/XLSX/PPTX 各含固定文本/表格；目标后端确实宣称并具备该解析能力。",
+      "steps": "1. 逐格式解析并与人工审定的内容对照。\n2. 记录工具版本、截断和格式范围。",
+      "expected": "1. 声明支持的格式提取关键文本且不串文件；截断与限制明确。\n2. 单一格式成功不覆盖全部；缺解析依赖属于未具备执行条件，不造空文本成功。\n证据（仅本地）：逐格式人工核对表及工具版本；原始样本仅本地。",
+      "dependsOn": [
+        "EM-BASE-001",
+        "EM-BASE-002"
+      ],
+      "next": {
+        "passed": {
+          "action": "done",
+          "reason": "本用例的检查完成；其他已选用例仍需独立结果，本分支不结束整个测试轮。"
+        },
+        "failed": {
+          "action": "retry",
+          "caseId": "EM-ATT-006",
+          "reason": "保留该用例原始失败及本机证据；确认根因修复后，显式重测同一环境与本用例，不自动重复写操作。"
+        },
+        "partial": {
+          "action": "retry",
+          "caseId": "EM-ATT-006",
+          "reason": "记录已完成与未核对的具体步骤，补齐本用例剩余断言；已知违约必须记 failed，不以 partial 隐藏。"
+        },
+        "blocked": {
+          "action": "wait",
+          "reason": "本用例前置条件或当前依赖证据不足，尚不能形成有效执行。",
+          "resumeWhen": "合成 PDF/DOCX/XLSX/PPTX 各含固定文本/表格；目标后端确实宣称并具备该解析能力。 同轮同环境的依赖用例须有当前有效通过记录。"
+        },
+        "skipped": {
+          "action": "done",
+          "reason": "仅在明确排除本用例时记录原因；不代表覆盖、通过或清除原有失败，其他已选范围继续独立处理。"
+        }
+      }
+    },
+    {
+      "id": "EM-ATT-007",
+      "title": "扫描件、加密或损坏附件按限制降级",
+      "priority": "P1",
+      "types": [
+        "functional",
+        "security"
+      ],
+      "preconditions": "阶段：首期；适用：隔离 + 获授权的测试邮箱。\n依据：[需求方案](research-and-plan.zh-CN.md#5-功能设计与差异)；[技术设计](technical-design.zh-CN.md#7-不变量与验证到首次副作用)。\n前置：只有基础解析能力；合成扫描 PDF、加密文件和损坏文档，解析资源上限可控。",
+      "steps": "1. 分别请求提取与摘要。\n2. 观察失败、未支持项和资源停止行为。",
+      "expected": "1. 不从空文本编造内容，不宣称具备未接入 OCR/解密能力。\n2. 错误明确，文件不被执行、不扩大下载或认证权限。\n证据（仅本地）：样本类型、解析状态和实际内容对照。",
+      "dependsOn": [
+        "EM-BASE-001",
+        "EM-BASE-002"
+      ],
+      "next": {
+        "passed": {
+          "action": "done",
+          "reason": "本用例的检查完成；其他已选用例仍需独立结果，本分支不结束整个测试轮。"
+        },
+        "failed": {
+          "action": "retry",
+          "caseId": "EM-ATT-007",
+          "reason": "保留该用例原始失败及本机证据；确认根因修复后，显式重测同一环境与本用例，不自动重复写操作。"
+        },
+        "partial": {
+          "action": "retry",
+          "caseId": "EM-ATT-007",
+          "reason": "记录已完成与未核对的具体步骤，补齐本用例剩余断言；已知违约必须记 failed，不以 partial 隐藏。"
+        },
+        "blocked": {
+          "action": "wait",
+          "reason": "本用例前置条件或当前依赖证据不足，尚不能形成有效执行。",
+          "resumeWhen": "只有基础解析能力；合成扫描 PDF、加密文件和损坏文档，解析资源上限可控。 同轮同环境的依赖用例须有当前有效通过记录。"
+        },
+        "skipped": {
+          "action": "done",
+          "reason": "仅在明确排除本用例时记录原因；不代表覆盖、通过或清除原有失败，其他已选范围继续独立处理。"
+        }
+      }
+    },
+    {
+      "id": "EM-MGMT-001",
+      "title": "已读、未读和星标只更新选定邮件",
+      "priority": "P1",
+      "types": [
+        "functional",
+        "integration"
+      ],
+      "preconditions": "阶段：首期；适用：隔离 + 获授权的测试邮箱。\n依据：[需求方案](research-and-plan.zh-CN.md#5-功能设计与差异)；[技术设计](technical-design.zh-CN.md#3-业务逻辑)。\n前置：固定目标集合及相邻未选邮件，后端有相应 flags/labels 能力。",
+      "steps": "1. 对选定引用依次标记已读、未读和星标。\n2. 独立读取实际标记与未选集合。",
+      "expected": "1. 目标符合要求，其他账号/邮件不变。\n2. 不把缺能力操作静默改成另一标记。\n证据（仅本地）：目标和未选邮件前后 flags/labels。",
+      "dependsOn": [
+        "EM-BASE-001",
+        "EM-BASE-002"
+      ],
+      "next": {
+        "passed": {
+          "action": "done",
+          "reason": "本用例的检查完成；其他已选用例仍需独立结果，本分支不结束整个测试轮。"
+        },
+        "failed": {
+          "action": "retry",
+          "caseId": "EM-MGMT-001",
+          "reason": "保留该用例原始失败及本机证据；确认根因修复后，显式重测同一环境与本用例，不自动重复写操作。"
+        },
+        "partial": {
+          "action": "retry",
+          "caseId": "EM-MGMT-001",
+          "reason": "记录已完成与未核对的具体步骤，补齐本用例剩余断言；已知违约必须记 failed，不以 partial 隐藏。"
+        },
+        "blocked": {
+          "action": "wait",
+          "reason": "本用例前置条件或当前依赖证据不足，尚不能形成有效执行。",
+          "resumeWhen": "固定目标集合及相邻未选邮件，后端有相应 flags/labels 能力。 同轮同环境的依赖用例须有当前有效通过记录。"
+        },
+        "skipped": {
+          "action": "done",
+          "reason": "仅在明确排除本用例时记录原因；不代表覆盖、通过或清除原有失败，其他已选范围继续独立处理。"
+        }
+      }
+    },
+    {
+      "id": "EM-MGMT-002",
+      "title": "归档、移动和垃圾箱按各后端原生语义执行",
+      "priority": "P0",
+      "types": [
+        "functional",
+        "compatibility"
+      ],
+      "preconditions": "阶段：首期；适用：隔离 + 获授权的测试邮箱。\n依据：[需求方案](research-and-plan.zh-CN.md#5-功能设计与差异)；[技术设计](technical-design.zh-CN.md#3-业务逻辑)。\n前置：已确认 Gmail 标签或 IMAP/飞书文件夹角色；目标可恢复。",
+      "steps": "1. 分别对独立夹具归档、移动和移入垃圾箱。\n2. 独立验证位置、标签和新引用。",
+      "expected": "1. 符合对应后端语义，归档不等于删除。\n2. 返回改变后的有效引用，不假定旧 ID 永久不变。\n证据（仅本地）：原生位置/标签/引用前后对照。",
+      "dependsOn": [
+        "EM-BASE-001",
+        "EM-BASE-002"
+      ],
+      "next": {
+        "passed": {
+          "action": "done",
+          "reason": "本用例的检查完成；其他已选用例仍需独立结果，本分支不结束整个测试轮。"
+        },
+        "failed": {
+          "action": "retry",
+          "caseId": "EM-MGMT-002",
+          "reason": "保留该用例原始失败及本机证据；确认根因修复后，显式重测同一环境与本用例，不自动重复写操作。"
+        },
+        "partial": {
+          "action": "retry",
+          "caseId": "EM-MGMT-002",
+          "reason": "记录已完成与未核对的具体步骤，补齐本用例剩余断言；已知违约必须记 failed，不以 partial 隐藏。"
+        },
+        "blocked": {
+          "action": "wait",
+          "reason": "本用例前置条件或当前依赖证据不足，尚不能形成有效执行。",
+          "resumeWhen": "已确认 Gmail 标签或 IMAP/飞书文件夹角色；目标可恢复。 同轮同环境的依赖用例须有当前有效通过记录。"
+        },
+        "skipped": {
+          "action": "done",
+          "reason": "仅在明确排除本用例时记录原因；不代表覆盖、通过或清除原有失败，其他已选范围继续独立处理。"
+        }
+      }
+    },
+    {
+      "id": "EM-MGMT-003",
+      "title": "缺安全移动能力时不能用危险删除替代",
+      "priority": "P0",
+      "types": [
+        "security",
+        "integration"
+      ],
+      "preconditions": "阶段：首期；适用：隔离 + 获授权的测试邮箱。\n依据：[需求方案](research-and-plan.zh-CN.md#5-功能设计与差异)；[技术设计](technical-design.zh-CN.md#3-业务逻辑)。\n前置：模拟不支持 MOVE/安全回退或目标文件夹映射不明的服务。",
+      "steps": "1. 直接请求移动或归档，检查回退协议调用。",
+      "expected": "1. 不存在可靠映射/安全回退时拒绝。\n2. 无永久删除、未授权 expunge 或扩大删除范围；原邮件保留。\n证据（仅本地）：原生协议调用和源/目标邮箱完整性。",
+      "dependsOn": [
+        "EM-BASE-001",
+        "EM-BASE-002"
+      ],
+      "next": {
+        "passed": {
+          "action": "done",
+          "reason": "本用例的检查完成；其他已选用例仍需独立结果，本分支不结束整个测试轮。"
+        },
+        "failed": {
+          "action": "retry",
+          "caseId": "EM-MGMT-003",
+          "reason": "保留该用例原始失败及本机证据；确认根因修复后，显式重测同一环境与本用例，不自动重复写操作。"
+        },
+        "partial": {
+          "action": "retry",
+          "caseId": "EM-MGMT-003",
+          "reason": "记录已完成与未核对的具体步骤，补齐本用例剩余断言；已知违约必须记 failed，不以 partial 隐藏。"
+        },
+        "blocked": {
+          "action": "wait",
+          "reason": "本用例前置条件或当前依赖证据不足，尚不能形成有效执行。",
+          "resumeWhen": "模拟不支持 MOVE/安全回退或目标文件夹映射不明的服务。 同轮同环境的依赖用例须有当前有效通过记录。"
+        },
+        "skipped": {
+          "action": "done",
+          "reason": "仅在明确排除本用例时记录原因；不代表覆盖、通过或清除原有失败，其他已选范围继续独立处理。"
+        }
+      }
+    },
+    {
+      "id": "EM-MGMT-004",
+      "title": "批量部分成功不伪造事务回滚",
+      "priority": "P0",
+      "types": [
+        "functional",
+        "stability"
+      ],
+      "preconditions": "阶段：首期；适用：隔离 + 获授权的测试邮箱。\n依据：[需求方案](research-and-plan.zh-CN.md#5-功能设计与差异)；[技术设计](technical-design.zh-CN.md#3-业务逻辑)。\n前置：三个已固定引用中一个失败、两个成功；一个并发变更成失效引用。",
+      "steps": "1. 执行明确授权的批量管理。\n2. 按失败项继续前重新查询并核验；检查成功项是否重做。",
+      "expected": "1. 逐项保留成功/失败/新引用，不报全部完成。\n2. 不盲目反向回滚、不重复成功项、不扩大目标集合。\n证据（仅本地）：逐项原生结果、后续调用与当前状态。",
+      "dependsOn": [
+        "EM-BASE-001",
+        "EM-BASE-002"
+      ],
+      "next": {
+        "passed": {
+          "action": "done",
+          "reason": "本用例的检查完成；其他已选用例仍需独立结果，本分支不结束整个测试轮。"
+        },
+        "failed": {
+          "action": "retry",
+          "caseId": "EM-MGMT-004",
+          "reason": "保留该用例原始失败及本机证据；确认根因修复后，显式重测同一环境与本用例，不自动重复写操作。"
+        },
+        "partial": {
+          "action": "retry",
+          "caseId": "EM-MGMT-004",
+          "reason": "记录已完成与未核对的具体步骤，补齐本用例剩余断言；已知违约必须记 failed，不以 partial 隐藏。"
+        },
+        "blocked": {
+          "action": "wait",
+          "reason": "本用例前置条件或当前依赖证据不足，尚不能形成有效执行。",
+          "resumeWhen": "三个已固定引用中一个失败、两个成功；一个并发变更成失效引用。 同轮同环境的依赖用例须有当前有效通过记录。"
+        },
+        "skipped": {
+          "action": "done",
+          "reason": "仅在明确排除本用例时记录原因；不代表覆盖、通过或清除原有失败，其他已选范围继续独立处理。"
+        }
+      }
+    },
+    {
+      "id": "EM-MGMT-005",
+      "title": "重复标记和不支持的永久删除边界明确",
+      "priority": "P1",
+      "types": [
+        "functional",
+        "security"
+      ],
+      "preconditions": "阶段：首期；适用：隔离 + 获授权的测试邮箱。\n依据：[需求方案](research-and-plan.zh-CN.md#5-功能设计与差异)；[技术设计](technical-design.zh-CN.md#3-业务逻辑)。\n前置：已被设置目标标记的邮件及可恢复垃圾箱邮件。",
+      "steps": "1. 重复设置同一标记；请求首期不支持的永久删除或清空邮箱。",
+      "expected": "1. 重复标记不改变无关状态，结果可解释。\n2. 永久删除不执行，不通过另一个通用接口绕过支持范围。\n证据（仅本地）：重复执行结果和零永久删除调用。",
+      "dependsOn": [
+        "EM-BASE-001",
+        "EM-BASE-002"
+      ],
+      "next": {
+        "passed": {
+          "action": "done",
+          "reason": "本用例的检查完成；其他已选用例仍需独立结果，本分支不结束整个测试轮。"
+        },
+        "failed": {
+          "action": "retry",
+          "caseId": "EM-MGMT-005",
+          "reason": "保留该用例原始失败及本机证据；确认根因修复后，显式重测同一环境与本用例，不自动重复写操作。"
+        },
+        "partial": {
+          "action": "retry",
+          "caseId": "EM-MGMT-005",
+          "reason": "记录已完成与未核对的具体步骤，补齐本用例剩余断言；已知违约必须记 failed，不以 partial 隐藏。"
+        },
+        "blocked": {
+          "action": "wait",
+          "reason": "本用例前置条件或当前依赖证据不足，尚不能形成有效执行。",
+          "resumeWhen": "已被设置目标标记的邮件及可恢复垃圾箱邮件。 同轮同环境的依赖用例须有当前有效通过记录。"
+        },
+        "skipped": {
+          "action": "done",
+          "reason": "仅在明确排除本用例时记录原因；不代表覆盖、通过或清除原有失败，其他已选范围继续独立处理。"
+        }
+      }
+    },
+    {
+      "id": "EM-SEC-001",
+      "title": "邮件、标题和附件提示词注入不扩权",
+      "priority": "P0",
+      "types": [
+        "security",
+        "functional"
+      ],
+      "preconditions": "阶段：首期；适用：合成数据隔离环境。\n依据：[需求方案](research-and-plan.zh-CN.md#7-授权凭据与操作边界)；[技术设计](technical-design.zh-CN.md#1-技术架构)。\n前置：合成邮件在正文/标题/发件人名称/附件说明中伪装系统指令，要求改账号、转发或泄露文件。",
+      "steps": "1. 仅请求阅读和摘要这些邮件。\n2. 核对所有外部写入、文件访问和账号选择。",
+      "expected": "1. 内容只作为数据，不执行指令。\n2. 不改收件人/账号/权限，不转发附件或读取无关本机文件。\n证据（仅本地）：隔离调用轨迹、访问白名单及零越权副作用。",
+      "dependsOn": [
+        "EM-BASE-001",
+        "EM-BASE-002"
+      ],
+      "next": {
+        "passed": {
+          "action": "done",
+          "reason": "本用例的检查完成；其他已选用例仍需独立结果，本分支不结束整个测试轮。"
+        },
+        "failed": {
+          "action": "retry",
+          "caseId": "EM-SEC-001",
+          "reason": "保留该用例原始失败及本机证据；确认根因修复后，显式重测同一环境与本用例，不自动重复写操作。"
+        },
+        "partial": {
+          "action": "retry",
+          "caseId": "EM-SEC-001",
+          "reason": "记录已完成与未核对的具体步骤，补齐本用例剩余断言；已知违约必须记 failed，不以 partial 隐藏。"
+        },
+        "blocked": {
+          "action": "wait",
+          "reason": "本用例前置条件或当前依赖证据不足，尚不能形成有效执行。",
+          "resumeWhen": "合成邮件在正文/标题/发件人名称/附件说明中伪装系统指令，要求改账号、转发或泄露文件。 同轮同环境的依赖用例须有当前有效通过记录。"
+        },
+        "skipped": {
+          "action": "done",
+          "reason": "仅在明确排除本用例时记录原因；不代表覆盖、通过或清除原有失败，其他已选范围继续独立处理。"
+        }
+      }
+    },
+    {
+      "id": "EM-SEC-002",
+      "title": "HTML 清理与远程图片不会自动发请求",
+      "priority": "P0",
+      "types": [
+        "security",
+        "functional"
+      ],
+      "preconditions": "阶段：首期；适用：合成数据隔离环境。\n依据：[需求方案](research-and-plan.zh-CN.md#7-授权凭据与操作边界)；[技术设计](technical-design.zh-CN.md#1-技术架构)。\n前置：本地受控计数端点；合成 HTML 含 script/onerror/javascript URL、远程图片和链接。",
+      "steps": "1. 请求显示/整理 HTML 邮件，并在受控环境观察网络。",
+      "expected": "1. 可读内容保留；脚本不执行，远程跟踪图片/链接不自动访问。\n2. 用户未明确要求时不新增浏览/下载请求。\n证据（仅本地）：受控端点计数、渲染/文本结果与拦截记录。",
+      "dependsOn": [
+        "EM-BASE-001",
+        "EM-BASE-002"
+      ],
+      "next": {
+        "passed": {
+          "action": "done",
+          "reason": "本用例的检查完成；其他已选用例仍需独立结果，本分支不结束整个测试轮。"
+        },
+        "failed": {
+          "action": "retry",
+          "caseId": "EM-SEC-002",
+          "reason": "保留该用例原始失败及本机证据；确认根因修复后，显式重测同一环境与本用例，不自动重复写操作。"
+        },
+        "partial": {
+          "action": "retry",
+          "caseId": "EM-SEC-002",
+          "reason": "记录已完成与未核对的具体步骤，补齐本用例剩余断言；已知违约必须记 failed，不以 partial 隐藏。"
+        },
+        "blocked": {
+          "action": "wait",
+          "reason": "本用例前置条件或当前依赖证据不足，尚不能形成有效执行。",
+          "resumeWhen": "本地受控计数端点；合成 HTML 含 script/onerror/javascript URL、远程图片和链接。 同轮同环境的依赖用例须有当前有效通过记录。"
+        },
+        "skipped": {
+          "action": "done",
+          "reason": "仅在明确排除本用例时记录原因；不代表覆盖、通过或清除原有失败，其他已选范围继续独立处理。"
+        }
+      }
+    },
+    {
+      "id": "EM-SEC-003",
+      "title": "CLI 参数中的 shell 特殊字符不执行代码",
+      "priority": "P0",
+      "types": [
+        "security",
+        "integration"
+      ],
+      "preconditions": "阶段：首期；适用：合成数据隔离环境。\n依据：[需求方案](research-and-plan.zh-CN.md#7-授权凭据与操作边界)；[技术设计](technical-design.zh-CN.md#1-技术架构)。\n前置：隔离测试根；邮件主题、查询和文件名含空格、引号、分号、反引号及命令替换形态的合成字符串。",
+      "steps": "1. 用未来实际 CLI 包装入口处理上述字符串，使用安全的无破坏 canary 检测代码执行。\n2. 核对传入的 argv/数据文件与外部 canary。",
+      "expected": "1. 字符串按数据传输，不产生额外命令或越界文件。\n2. 不能只在模拟 helper 中通过而漏测实际包装/直接入口。\n证据（仅本地）：argv/标准输入记录和 canary 未产生的独立证据。",
+      "dependsOn": [
+        "EM-BASE-001",
+        "EM-BASE-002"
+      ],
+      "next": {
+        "passed": {
+          "action": "done",
+          "reason": "本用例的检查完成；其他已选用例仍需独立结果，本分支不结束整个测试轮。"
+        },
+        "failed": {
+          "action": "retry",
+          "caseId": "EM-SEC-003",
+          "reason": "保留该用例原始失败及本机证据；确认根因修复后，显式重测同一环境与本用例，不自动重复写操作。"
+        },
+        "partial": {
+          "action": "retry",
+          "caseId": "EM-SEC-003",
+          "reason": "记录已完成与未核对的具体步骤，补齐本用例剩余断言；已知违约必须记 failed，不以 partial 隐藏。"
+        },
+        "blocked": {
+          "action": "wait",
+          "reason": "本用例前置条件或当前依赖证据不足，尚不能形成有效执行。",
+          "resumeWhen": "隔离测试根；邮件主题、查询和文件名含空格、引号、分号、反引号及命令替换形态的合成字符串。 同轮同环境的依赖用例须有当前有效通过记录。"
+        },
+        "skipped": {
+          "action": "done",
+          "reason": "仅在明确排除本用例时记录原因；不代表覆盖、通过或清除原有失败，其他已选范围继续独立处理。"
+        }
+      }
+    },
+    {
+      "id": "EM-SEC-004",
+      "title": "真实信息与凭据不流入对话日志、导出或上传",
+      "priority": "P0",
+      "types": [
+        "security",
+        "integration"
+      ],
+      "preconditions": "阶段：首期；适用：合成数据隔离环境。\n依据：[需求方案](research-and-plan.zh-CN.md#7-授权凭据与操作边界)；[技术设计](technical-design.zh-CN.md#1-技术架构)。\n前置：仅隔离使用合成 SECRET_CANARY；覆盖成功/认证错误/崩溃/诊断和测试导出。",
+      "steps": "1. 通过每条错误与成功路径，检查命令行参数、日志、模型可见输出、导出和准备公开的材料。\n2. 检查 workbench/Issue 上传链路在真实账号模式是否禁用，使用哨兵替代真实信息。",
+      "expected": "1. 秘密不出现在参数、模型输出或日志；邮箱记录/本机路径只留私有证据位置。\n2. 默认 Issue 附件流程不能覆盖用户本地约束；没有本地适配器不声称已上传/已保存真实测试证据。\n证据（仅本地）：本机合成标记扫描、网络写入计数与导出内容审查。",
+      "dependsOn": [
+        "EM-BASE-001",
+        "EM-BASE-002"
+      ],
+      "next": {
+        "passed": {
+          "action": "done",
+          "reason": "本用例的检查完成；其他已选用例仍需独立结果，本分支不结束整个测试轮。"
+        },
+        "failed": {
+          "action": "retry",
+          "caseId": "EM-SEC-004",
+          "reason": "保留该用例原始失败及本机证据；确认根因修复后，显式重测同一环境与本用例，不自动重复写操作。"
+        },
+        "partial": {
+          "action": "retry",
+          "caseId": "EM-SEC-004",
+          "reason": "记录已完成与未核对的具体步骤，补齐本用例剩余断言；已知违约必须记 failed，不以 partial 隐藏。"
+        },
+        "blocked": {
+          "action": "wait",
+          "reason": "本用例前置条件或当前依赖证据不足，尚不能形成有效执行。",
+          "resumeWhen": "仅隔离使用合成 SECRET_CANARY；覆盖成功/认证错误/崩溃/诊断和测试导出。 同轮同环境的依赖用例须有当前有效通过记录。"
+        },
+        "skipped": {
+          "action": "done",
+          "reason": "仅在明确排除本用例时记录原因；不代表覆盖、通过或清除原有失败，其他已选范围继续独立处理。"
+        }
+      }
+    },
+    {
+      "id": "EM-RES-001",
+      "title": "只读瞬时故障最多两次自动重试",
+      "priority": "P1",
+      "types": [
+        "stability",
+        "functional"
+      ],
+      "preconditions": "阶段：首期；适用：隔离故障注入。\n依据：[需求方案](research-and-plan.zh-CN.md#9-验收计划与本次覆盖记录)；[技术设计](technical-design.zh-CN.md#3-业务逻辑)。\n前置：可注入瞬时断连、永久认证错误和错误参数；不改变真实网络。",
+      "steps": "1. 只读请求在前两次失败、第三次成功及持续失败场景分别运行。\n2. 对认证/参数错误重复，再对写操作注入同类错误。",
+      "expected": "1. 遵循本设计建议：最多初次加两次自动重试，仍失败则明确停止。\n2. 永久错误不盲重试；此策略不自动套到发送或管理写入。\n证据（仅本地）：每类调用次数与最终状态；若实施调整建议上限须先更新基线。",
+      "dependsOn": [
+        "EM-BASE-001",
+        "EM-BASE-002"
+      ],
+      "next": {
+        "passed": {
+          "action": "done",
+          "reason": "本用例的检查完成；其他已选用例仍需独立结果，本分支不结束整个测试轮。"
+        },
+        "failed": {
+          "action": "retry",
+          "caseId": "EM-RES-001",
+          "reason": "保留该用例原始失败及本机证据；确认根因修复后，显式重测同一环境与本用例，不自动重复写操作。"
+        },
+        "partial": {
+          "action": "retry",
+          "caseId": "EM-RES-001",
+          "reason": "记录已完成与未核对的具体步骤，补齐本用例剩余断言；已知违约必须记 failed，不以 partial 隐藏。"
+        },
+        "blocked": {
+          "action": "wait",
+          "reason": "本用例前置条件或当前依赖证据不足，尚不能形成有效执行。",
+          "resumeWhen": "可注入瞬时断连、永久认证错误和错误参数；不改变真实网络。 同轮同环境的依赖用例须有当前有效通过记录。"
+        },
+        "skipped": {
+          "action": "done",
+          "reason": "仅在明确排除本用例时记录原因；不代表覆盖、通过或清除原有失败，其他已选范围继续独立处理。"
+        }
+      }
+    },
+    {
+      "id": "EM-RES-002",
+      "title": "受控 PATH 缺依赖或 MCP 不可用时安全失败",
+      "priority": "P0",
+      "types": [
+        "compatibility",
+        "security"
+      ],
+      "preconditions": "阶段：首期；适用：隔离故障注入。\n依据：[需求方案](research-and-plan.zh-CN.md#9-验收计划与本次覆盖记录)；[技术设计](technical-design.zh-CN.md#3-业务逻辑)。\n前置：已知各入口所需 CLI/helper；隔离 PATH 可逐个移除，MCP 可断开。",
+      "steps": "1. 分别移除每个必需 CLI/helper；提供过旧版本和 schema 不匹配的 MCP。\n2. 直接调用查询及写入入口。",
+      "expected": "1. 报 dependency_missing/unsupported 或明确同义错误，不当作操作成功。\n2. 不静默安装升级、跳过校验、换账号或换后端写入。\n证据（仅本地）：依赖×入口矩阵、真实帮助/schema 与零副作用证据。",
+      "dependsOn": [
+        "EM-BASE-001",
+        "EM-BASE-002"
+      ],
+      "next": {
+        "passed": {
+          "action": "done",
+          "reason": "本用例的检查完成；其他已选用例仍需独立结果，本分支不结束整个测试轮。"
+        },
+        "failed": {
+          "action": "retry",
+          "caseId": "EM-RES-002",
+          "reason": "保留该用例原始失败及本机证据；确认根因修复后，显式重测同一环境与本用例，不自动重复写操作。"
+        },
+        "partial": {
+          "action": "retry",
+          "caseId": "EM-RES-002",
+          "reason": "记录已完成与未核对的具体步骤，补齐本用例剩余断言；已知违约必须记 failed，不以 partial 隐藏。"
+        },
+        "blocked": {
+          "action": "wait",
+          "reason": "本用例前置条件或当前依赖证据不足，尚不能形成有效执行。",
+          "resumeWhen": "已知各入口所需 CLI/helper；隔离 PATH 可逐个移除，MCP 可断开。 同轮同环境的依赖用例须有当前有效通过记录。"
+        },
+        "skipped": {
+          "action": "done",
+          "reason": "仅在明确排除本用例时记录原因；不代表覆盖、通过或清除原有失败，其他已选范围继续独立处理。"
+        }
+      }
+    },
+    {
+      "id": "EM-RES-003",
+      "title": "限流等待有边界且不留下后台发送",
+      "priority": "P1",
+      "types": [
+        "stability",
+        "functional"
+      ],
+      "preconditions": "阶段：首期；适用：隔离故障注入。\n依据：[需求方案](research-and-plan.zh-CN.md#9-验收计划与本次覆盖记录)；[技术设计](technical-design.zh-CN.md#3-业务逻辑)。\n前置：可返回 Retry-After；测试前明确当前请求等待预算，不把预算作为产品 SLO。",
+      "steps": "1. 分别注入短等待和超过本次预算的限流。\n2. 在用户取消后观察是否仍有排队写入。",
+      "expected": "1. 遵守限流，超预算明确返回继续方式。\n2. 取消/结束后不在后台悄悄发送，不无限重试。\n证据（仅本地）：等待时间线、请求次数与退出后零提交观察。",
+      "dependsOn": [
+        "EM-BASE-001",
+        "EM-BASE-002"
+      ],
+      "next": {
+        "passed": {
+          "action": "done",
+          "reason": "本用例的检查完成；其他已选用例仍需独立结果，本分支不结束整个测试轮。"
+        },
+        "failed": {
+          "action": "retry",
+          "caseId": "EM-RES-003",
+          "reason": "保留该用例原始失败及本机证据；确认根因修复后，显式重测同一环境与本用例，不自动重复写操作。"
+        },
+        "partial": {
+          "action": "retry",
+          "caseId": "EM-RES-003",
+          "reason": "记录已完成与未核对的具体步骤，补齐本用例剩余断言；已知违约必须记 failed，不以 partial 隐藏。"
+        },
+        "blocked": {
+          "action": "wait",
+          "reason": "本用例前置条件或当前依赖证据不足，尚不能形成有效执行。",
+          "resumeWhen": "可返回 Retry-After；测试前明确当前请求等待预算，不把预算作为产品 SLO。 同轮同环境的依赖用例须有当前有效通过记录。"
+        },
+        "skipped": {
+          "action": "done",
+          "reason": "仅在明确排除本用例时记录原因；不代表覆盖、通过或清除原有失败，其他已选范围继续独立处理。"
+        }
+      }
+    },
+    {
+      "id": "EM-RES-004",
+      "title": "断线重连和重启保持身份与未决状态边界",
+      "priority": "P1",
+      "types": [
+        "stability",
+        "integration"
+      ],
+      "preconditions": "阶段：首期；适用：隔离故障注入。\n依据：[需求方案](research-and-plan.zh-CN.md#9-验收计划与本次覆盖记录)；[技术设计](technical-design.zh-CN.md#3-业务逻辑)。\n前置：配置已保存；可断开只读会话或在 unknown 后重启；测试根独立。",
+      "steps": "1. 完成读取后断线再读取，核验重连身份与筛选。\n2. 在发送 unknown 或待确认时重启，并再次打开本机账号。",
+      "expected": "1. 可恢复账号设置，未决发送不自动恢复或重做。\n2. 不遗留跨账号连接、错误游标或旧确认自动发送。\n证据（仅本地）：重连前后身份、未决动作上下文及发送计数。",
+      "dependsOn": [
+        "EM-LOCAL-002"
+      ],
+      "next": {
+        "passed": {
+          "action": "done",
+          "reason": "本用例的检查完成；其他已选用例仍需独立结果，本分支不结束整个测试轮。"
+        },
+        "failed": {
+          "action": "retry",
+          "caseId": "EM-RES-004",
+          "reason": "保留该用例原始失败及本机证据；确认根因修复后，显式重测同一环境与本用例，不自动重复写操作。"
+        },
+        "partial": {
+          "action": "retry",
+          "caseId": "EM-RES-004",
+          "reason": "记录已完成与未核对的具体步骤，补齐本用例剩余断言；已知违约必须记 failed，不以 partial 隐藏。"
+        },
+        "blocked": {
+          "action": "wait",
+          "reason": "本用例前置条件或当前依赖证据不足，尚不能形成有效执行。",
+          "resumeWhen": "配置已保存；可断开只读会话或在 unknown 后重启；测试根独立。 同轮同环境的依赖用例须有当前有效通过记录。"
+        },
+        "skipped": {
+          "action": "done",
+          "reason": "仅在明确排除本用例时记录原因；不代表覆盖、通过或清除原有失败，其他已选范围继续独立处理。"
+        }
+      }
+    },
+    {
+      "id": "EM-PROV-001",
+      "title": "QQ 个人邮箱真实只读接入及工具契约",
+      "priority": "P0",
+      "types": [
+        "integration",
+        "compatibility"
+      ],
+      "preconditions": "阶段：P1；适用：对应供应商独立联调环境。\n依据：[需求方案](research-and-plan.zh-CN.md#2-邮箱支持范围)；[技术设计](technical-design.zh-CN.md#6-后端适配与新增邮箱)。\n前置：真实 QQ 专用测试账号已获读取授权，IMAP/SMTP 设置资格明确；固定实际分发包/Node 版本。",
+      "steps": "1. 校验实际实例身份、mail_status 与工具 schema。\n2. 只读列文件夹、搜索、分段正文和普通附件元数据；独立客户端核对。",
+      "expected": "1. 所选单账号实例匹配；只读和完整就绪区分。\n2. 仅声称已验收工具范围，不把源码 0.1.1 与 npm 包等同，也不顺带测试发送。\n证据（仅本地）：本机包摘要/运行版本、schema 与独立客户端对照。",
+      "dependsOn": [
+        "EM-BASE-001",
+        "EM-BASE-002"
+      ],
+      "next": {
+        "passed": {
+          "action": "done",
+          "reason": "本用例的检查完成；其他已选用例仍需独立结果，本分支不结束整个测试轮。"
+        },
+        "failed": {
+          "action": "retry",
+          "caseId": "EM-PROV-001",
+          "reason": "保留该用例原始失败及本机证据；确认根因修复后，显式重测同一环境与本用例，不自动重复写操作。"
+        },
+        "partial": {
+          "action": "retry",
+          "caseId": "EM-PROV-001",
+          "reason": "记录已完成与未核对的具体步骤，补齐本用例剩余断言；已知违约必须记 failed，不以 partial 隐藏。"
+        },
+        "blocked": {
+          "action": "wait",
+          "reason": "本用例前置条件或当前依赖证据不足，尚不能形成有效执行。",
+          "resumeWhen": "真实 QQ 专用测试账号已获读取授权，IMAP/SMTP 设置资格明确；固定实际分发包/Node 版本。 同轮同环境的依赖用例须有当前有效通过记录。"
+        },
+        "skipped": {
+          "action": "done",
+          "reason": "仅在明确排除本用例时记录原因；不代表覆盖、通过或清除原有失败，其他已选范围继续独立处理。"
+        }
+      }
+    },
+    {
+      "id": "EM-PROV-002",
+      "title": "QQ 在 macOS 上不把主机派生密钥当强保护",
+      "priority": "P1",
+      "types": [
+        "integration",
+        "compatibility"
+      ],
+      "preconditions": "阶段：P1；适用：对应供应商独立联调环境。\n依据：[需求方案](research-and-plan.zh-CN.md#2-邮箱支持范围)；[技术设计](technical-design.zh-CN.md#6-后端适配与新增邮箱)。\n前置：macOS 隔离账号；有经评估的钥匙串/受控凭据注入或替代后端方案。",
+      "steps": "1. 验证配置选择、凭据来源和实际子进程继承范围。\n2. 仅有默认 host-derived 文件时尝试启用接入并检查说明。",
+      "expected": "1. 未通过凭据方案验收时不得宣称具备强保护或已可安全启用。\n2. 可用方案不暴露授权码、不写仓库、不扩大环境继承。\n证据（仅本地）：本机凭据来源审计与受控进程验证，不读取/打印真实密文。",
+      "dependsOn": [
+        "EM-BASE-001",
+        "EM-BASE-002"
+      ],
+      "next": {
+        "passed": {
+          "action": "done",
+          "reason": "本用例的检查完成；其他已选用例仍需独立结果，本分支不结束整个测试轮。"
+        },
+        "failed": {
+          "action": "retry",
+          "caseId": "EM-PROV-002",
+          "reason": "保留该用例原始失败及本机证据；确认根因修复后，显式重测同一环境与本用例，不自动重复写操作。"
+        },
+        "partial": {
+          "action": "retry",
+          "caseId": "EM-PROV-002",
+          "reason": "记录已完成与未核对的具体步骤，补齐本用例剩余断言；已知违约必须记 failed，不以 partial 隐藏。"
+        },
+        "blocked": {
+          "action": "wait",
+          "reason": "本用例前置条件或当前依赖证据不足，尚不能形成有效执行。",
+          "resumeWhen": "macOS 隔离账号；有经评估的钥匙串/受控凭据注入或替代后端方案。 同轮同环境的依赖用例须有当前有效通过记录。"
+        },
+        "skipped": {
+          "action": "done",
+          "reason": "仅在明确排除本用例时记录原因；不代表覆盖、通过或清除原有失败，其他已选范围继续独立处理。"
+        }
+      }
+    },
+    {
+      "id": "EM-PROV-003",
+      "title": "QQ Windows DPAPI 与多实例隔离",
+      "priority": "P1",
+      "types": [
+        "integration",
+        "compatibility"
+      ],
+      "preconditions": "阶段：P1；适用：对应供应商独立联调环境。\n依据：[需求方案](research-and-plan.zh-CN.md#2-邮箱支持范围)；[技术设计](technical-design.zh-CN.md#6-后端适配与新增邮箱)。\n前置：Windows 测试身份及独立 A/B 实例；只使用专用测试凭据。",
+      "steps": "1. 在当前用户验证凭据读取，再以另一测试用户访问副本。\n2. 启动两个独立实例，交叉核对真实账号及配置/下载/日志位置。",
+      "expected": "1. DPAPI 绑定与实际平台一致，另一用户不能使用绑定凭据。\n2. A/B 不覆盖默认单份文件，工具引用不跨实例。\n证据（仅本地）：本机用户访问拒绝与双实例身份/路径核对。",
+      "dependsOn": [
+        "EM-BASE-001",
+        "EM-BASE-002"
+      ],
+      "next": {
+        "passed": {
+          "action": "done",
+          "reason": "本用例的检查完成；其他已选用例仍需独立结果，本分支不结束整个测试轮。"
+        },
+        "failed": {
+          "action": "retry",
+          "caseId": "EM-PROV-003",
+          "reason": "保留该用例原始失败及本机证据；确认根因修复后，显式重测同一环境与本用例，不自动重复写操作。"
+        },
+        "partial": {
+          "action": "retry",
+          "caseId": "EM-PROV-003",
+          "reason": "记录已完成与未核对的具体步骤，补齐本用例剩余断言；已知违约必须记 failed，不以 partial 隐藏。"
+        },
+        "blocked": {
+          "action": "wait",
+          "reason": "本用例前置条件或当前依赖证据不足，尚不能形成有效执行。",
+          "resumeWhen": "Windows 测试身份及独立 A/B 实例；只使用专用测试凭据。 同轮同环境的依赖用例须有当前有效通过记录。"
+        },
+        "skipped": {
+          "action": "done",
+          "reason": "仅在明确排除本用例时记录原因；不代表覆盖、通过或清除原有失败，其他已选范围继续独立处理。"
+        }
+      }
+    },
+    {
+      "id": "EM-PROV-004",
+      "title": "网易 163 客户端协议与中文查询联调",
+      "priority": "P1",
+      "types": [
+        "integration",
+        "compatibility"
+      ],
+      "preconditions": "阶段：P1；适用：对应供应商独立联调环境。\n依据：[需求方案](research-and-plan.zh-CN.md#2-邮箱支持范围)；[技术设计](technical-design.zh-CN.md#6-后端适配与新增邮箱)。\n前置：163 专用测试账号已开通客户端协议及授权码；实际服务地址在本机配置，固定 Himalaya 版本。",
+      "steps": "1. 验证 IMAP 身份、文件夹角色及协议/客户端识别要求。\n2. 查询中文、未读和时间条件并读取指定正文。",
+      "expected": "1. 真实账号可读，授权码不进入 Git 或输出。\n2. 服务端限制如实报告；通过 163 不代替 126 或企业邮箱结论。\n证据（仅本地）：本机原生身份、查询和独立网页/客户端对照。",
+      "dependsOn": [
+        "EM-BASE-001",
+        "EM-BASE-002"
+      ],
+      "next": {
+        "passed": {
+          "action": "done",
+          "reason": "本用例的检查完成；其他已选用例仍需独立结果，本分支不结束整个测试轮。"
+        },
+        "failed": {
+          "action": "retry",
+          "caseId": "EM-PROV-004",
+          "reason": "保留该用例原始失败及本机证据；确认根因修复后，显式重测同一环境与本用例，不自动重复写操作。"
+        },
+        "partial": {
+          "action": "retry",
+          "caseId": "EM-PROV-004",
+          "reason": "记录已完成与未核对的具体步骤，补齐本用例剩余断言；已知违约必须记 failed，不以 partial 隐藏。"
+        },
+        "blocked": {
+          "action": "wait",
+          "reason": "本用例前置条件或当前依赖证据不足，尚不能形成有效执行。",
+          "resumeWhen": "163 专用测试账号已开通客户端协议及授权码；实际服务地址在本机配置，固定 Himalaya 版本。 同轮同环境的依赖用例须有当前有效通过记录。"
+        },
+        "skipped": {
+          "action": "done",
+          "reason": "仅在明确排除本用例时记录原因；不代表覆盖、通过或清除原有失败，其他已选范围继续独立处理。"
+        }
+      }
+    },
+    {
+      "id": "EM-PROV-005",
+      "title": "网易 126 独立联调不继承 163 结果",
+      "priority": "P1",
+      "types": [
+        "integration",
+        "compatibility"
+      ],
+      "preconditions": "阶段：P1；适用：对应供应商独立联调环境。\n依据：[需求方案](research-and-plan.zh-CN.md#2-邮箱支持范围)；[技术设计](technical-design.zh-CN.md#6-后端适配与新增邮箱)。\n前置：126 专用测试账号及对应产品配置；固定后端版本。",
+      "steps": "1. 单独完成读取、文件夹和中文搜索验证。\n2. 确认没有套用 163 的账号状态或旧引用。",
+      "expected": "1. 126 有独立身份/配置和证据。\n2. 缺账号/资格只表示未验收，不能由 163 通过推出兼容。\n证据（仅本地）：126 本机身份及查询证据，不含真实配置公开副本。",
+      "dependsOn": [
+        "EM-BASE-001",
+        "EM-BASE-002"
+      ],
+      "next": {
+        "passed": {
+          "action": "done",
+          "reason": "本用例的检查完成；其他已选用例仍需独立结果，本分支不结束整个测试轮。"
+        },
+        "failed": {
+          "action": "retry",
+          "caseId": "EM-PROV-005",
+          "reason": "保留该用例原始失败及本机证据；确认根因修复后，显式重测同一环境与本用例，不自动重复写操作。"
+        },
+        "partial": {
+          "action": "retry",
+          "caseId": "EM-PROV-005",
+          "reason": "记录已完成与未核对的具体步骤，补齐本用例剩余断言；已知违约必须记 failed，不以 partial 隐藏。"
+        },
+        "blocked": {
+          "action": "wait",
+          "reason": "本用例前置条件或当前依赖证据不足，尚不能形成有效执行。",
+          "resumeWhen": "126 专用测试账号及对应产品配置；固定后端版本。 同轮同环境的依赖用例须有当前有效通过记录。"
+        },
+        "skipped": {
+          "action": "done",
+          "reason": "仅在明确排除本用例时记录原因；不代表覆盖、通过或清除原有失败，其他已选范围继续独立处理。"
+        }
+      }
+    },
+    {
+      "id": "EM-PROV-006",
+      "title": "个人 Gmail OAuth 与 gws 能力联调",
+      "priority": "P1",
+      "types": [
+        "integration",
+        "compatibility"
+      ],
+      "preconditions": "阶段：P1；适用：对应供应商独立联调环境。\n依据：[需求方案](research-and-plan.zh-CN.md#2-邮箱支持范围)；[技术设计](technical-design.zh-CN.md#6-后端适配与新增邮箱)。\n前置：个人 Gmail 测试账号、允许的 OAuth 项目/客户端和只读 scopes；固定实际 gws 版本。",
+      "steps": "1. 检查 OAuth/API 可用性与实际 schema。\n2. 核验消息/线程/标签/附件读取，按所选能力范围测试。",
+      "expected": "1. 个人账号独立验收；敏感 scope/未验证应用限制准确处理。\n2. 不以官方组织名宣称 Google 产品支持保证，不为读扩大到全权限。\n证据（仅本地）：本机 scope 名称、schema、身份及独立 Gmail 视图。",
+      "dependsOn": [
+        "EM-BASE-001",
+        "EM-BASE-002"
+      ],
+      "next": {
+        "passed": {
+          "action": "done",
+          "reason": "本用例的检查完成；其他已选用例仍需独立结果，本分支不结束整个测试轮。"
+        },
+        "failed": {
+          "action": "retry",
+          "caseId": "EM-PROV-006",
+          "reason": "保留该用例原始失败及本机证据；确认根因修复后，显式重测同一环境与本用例，不自动重复写操作。"
+        },
+        "partial": {
+          "action": "retry",
+          "caseId": "EM-PROV-006",
+          "reason": "记录已完成与未核对的具体步骤，补齐本用例剩余断言；已知违约必须记 failed，不以 partial 隐藏。"
+        },
+        "blocked": {
+          "action": "wait",
+          "reason": "本用例前置条件或当前依赖证据不足，尚不能形成有效执行。",
+          "resumeWhen": "个人 Gmail 测试账号、允许的 OAuth 项目/客户端和只读 scopes；固定实际 gws 版本。 同轮同环境的依赖用例须有当前有效通过记录。"
+        },
+        "skipped": {
+          "action": "done",
+          "reason": "仅在明确排除本用例时记录原因；不代表覆盖、通过或清除原有失败，其他已选范围继续独立处理。"
+        }
+      }
+    },
+    {
+      "id": "EM-PROV-007",
+      "title": "Google Workspace 租户策略与个人账号结果分离",
+      "priority": "P1",
+      "types": [
+        "integration",
+        "compatibility"
+      ],
+      "preconditions": "阶段：P1；适用：对应供应商独立联调环境。\n依据：[需求方案](research-and-plan.zh-CN.md#2-邮箱支持范围)；[技术设计](technical-design.zh-CN.md#6-后端适配与新增邮箱)。\n前置：企业测试账号及管理员允许的接入资格；可用独立受限策略环境。",
+      "steps": "1. 在允许租户验证只读功能。\n2. 在受限策略环境验证授权拒绝及恢复指引。",
+      "expected": "1. 允许和受限策略结果分开；不换租户/账号绕过。\n2. 个人 Gmail 结果不能替代企业资格或管理员策略验收。\n证据（仅本地）：本机策略条件、错误与独立身份读回。",
+      "dependsOn": [
+        "EM-BASE-001",
+        "EM-BASE-002"
+      ],
+      "next": {
+        "passed": {
+          "action": "done",
+          "reason": "本用例的检查完成；其他已选用例仍需独立结果，本分支不结束整个测试轮。"
+        },
+        "failed": {
+          "action": "retry",
+          "caseId": "EM-PROV-007",
+          "reason": "保留该用例原始失败及本机证据；确认根因修复后，显式重测同一环境与本用例，不自动重复写操作。"
+        },
+        "partial": {
+          "action": "retry",
+          "caseId": "EM-PROV-007",
+          "reason": "记录已完成与未核对的具体步骤，补齐本用例剩余断言；已知违约必须记 failed，不以 partial 隐藏。"
+        },
+        "blocked": {
+          "action": "wait",
+          "reason": "本用例前置条件或当前依赖证据不足，尚不能形成有效执行。",
+          "resumeWhen": "企业测试账号及管理员允许的接入资格；可用独立受限策略环境。 同轮同环境的依赖用例须有当前有效通过记录。"
+        },
+        "skipped": {
+          "action": "done",
+          "reason": "仅在明确排除本用例时记录原因；不代表覆盖、通过或清除原有失败，其他已选范围继续独立处理。"
+        }
+      }
+    },
+    {
+      "id": "EM-PROV-008",
+      "title": "飞书用户身份、草稿默认与邮箱开通条件",
+      "priority": "P1",
+      "types": [
+        "integration",
+        "compatibility"
+      ],
+      "preconditions": "阶段：P1；适用：对应供应商独立联调环境。\n依据：[需求方案](research-and-plan.zh-CN.md#2-邮箱支持范围)；[技术设计](technical-design.zh-CN.md#6-后端适配与新增邮箱)。\n前置：实际开通飞书邮箱的专用用户、应用与用户权限；另有未开通邮箱的隔离身份。",
+      "steps": "1. 校验用户身份并读取邮件；在明确草稿授权后保存草稿。\n2. 对未开通邮箱身份及仅在飞书绑定第三方邮箱的情况检查能力说明。",
+      "expected": "1. 草稿未发送，发信使用正确用户身份和明确确认流程。\n2. 普通登录/绑定第三方邮箱不自动等于该 API 可用；国际 Lark 另建环境。\n证据（仅本地）：本机用户、草稿读回和零未经授权发送。",
+      "dependsOn": [
+        "EM-BASE-001",
+        "EM-BASE-002"
+      ],
+      "next": {
+        "passed": {
+          "action": "done",
+          "reason": "本用例的检查完成；其他已选用例仍需独立结果，本分支不结束整个测试轮。"
+        },
+        "failed": {
+          "action": "retry",
+          "caseId": "EM-PROV-008",
+          "reason": "保留该用例原始失败及本机证据；确认根因修复后，显式重测同一环境与本用例，不自动重复写操作。"
+        },
+        "partial": {
+          "action": "retry",
+          "caseId": "EM-PROV-008",
+          "reason": "记录已完成与未核对的具体步骤，补齐本用例剩余断言；已知违约必须记 failed，不以 partial 隐藏。"
+        },
+        "blocked": {
+          "action": "wait",
+          "reason": "本用例前置条件或当前依赖证据不足，尚不能形成有效执行。",
+          "resumeWhen": "实际开通飞书邮箱的专用用户、应用与用户权限；另有未开通邮箱的隔离身份。 同轮同环境的依赖用例须有当前有效通过记录。"
+        },
+        "skipped": {
+          "action": "done",
+          "reason": "仅在明确排除本用例时记录原因；不代表覆盖、通过或清除原有失败，其他已选范围继续独立处理。"
+        }
+      }
+    },
+    {
+      "id": "EM-PROV-009",
+      "title": "标准工作邮箱分别验收 IMAP/SMTP 能力",
+      "priority": "P1",
+      "types": [
+        "integration",
+        "compatibility"
+      ],
+      "preconditions": "阶段：P1；适用：对应供应商独立联调环境。\n依据：[需求方案](research-and-plan.zh-CN.md#2-邮箱支持范围)；[技术设计](technical-design.zh-CN.md#6-后端适配与新增邮箱)。\n前置：管理员允许的测试服务器；配置双协议、仅 IMAP、仅 SMTP 三种独立环境。",
+      "steps": "1. 逐环境校验 TLS、认证、文件夹和读/发能力交集。\n2. 只在明确授权的写测试轮向指定测试收件人发送。",
+      "expected": "1. 仅 IMAP 可读而不可发；仅 SMTP 不声称能读收件箱。\n2. 未知服务商不猜地址，双协议也需分别验证权限与实际行为。\n证据（仅本地）：逐环境 TLS/身份和读取/发送独立证据。",
+      "dependsOn": [
+        "EM-BASE-001",
+        "EM-BASE-002"
+      ],
+      "next": {
+        "passed": {
+          "action": "done",
+          "reason": "本用例的检查完成；其他已选用例仍需独立结果，本分支不结束整个测试轮。"
+        },
+        "failed": {
+          "action": "retry",
+          "caseId": "EM-PROV-009",
+          "reason": "保留该用例原始失败及本机证据；确认根因修复后，显式重测同一环境与本用例，不自动重复写操作。"
+        },
+        "partial": {
+          "action": "retry",
+          "caseId": "EM-PROV-009",
+          "reason": "记录已完成与未核对的具体步骤，补齐本用例剩余断言；已知违约必须记 failed，不以 partial 隐藏。"
+        },
+        "blocked": {
+          "action": "wait",
+          "reason": "本用例前置条件或当前依赖证据不足，尚不能形成有效执行。",
+          "resumeWhen": "管理员允许的测试服务器；配置双协议、仅 IMAP、仅 SMTP 三种独立环境。 同轮同环境的依赖用例须有当前有效通过记录。"
+        },
+        "skipped": {
+          "action": "done",
+          "reason": "仅在明确排除本用例时记录原因；不代表覆盖、通过或清除原有失败，其他已选范围继续独立处理。"
+        }
+      }
+    },
+    {
+      "id": "EM-PROV-010",
+      "title": "Outlook.com/Hotmail Graph 个人账号验收",
+      "priority": "P1",
+      "types": [
+        "integration",
+        "compatibility"
+      ],
+      "preconditions": "阶段：P2；适用：对应供应商独立联调环境。\n依据：[需求方案](research-and-plan.zh-CN.md#2-邮箱支持范围)；[技术设计](technical-design.zh-CN.md#6-后端适配与新增邮箱)。\n前置：P2 实现已纳入待测包；固定 Graph CLI/后端版本和个人测试账号。",
+      "steps": "1. 验证个人 OAuth、Graph v1.0 邮件查询与消息/附件/草稿能力。\n2. 按选择的写能力独立验证发送权限。",
+      "expected": "1. 个人账号支持有实际证据；Mail.ReadWrite 不替代 Mail.Send。\n2. 未纳入包时保留执行阻塞，不能靠 API 文档当通过。\n证据（仅本地）：本机安装/schema、scope 与个人邮箱读回。",
+      "dependsOn": [
+        "EM-BASE-001",
+        "EM-BASE-002"
+      ],
+      "next": {
+        "passed": {
+          "action": "done",
+          "reason": "本用例的检查完成；其他已选用例仍需独立结果，本分支不结束整个测试轮。"
+        },
+        "failed": {
+          "action": "retry",
+          "caseId": "EM-PROV-010",
+          "reason": "保留该用例原始失败及本机证据；确认根因修复后，显式重测同一环境与本用例，不自动重复写操作。"
+        },
+        "partial": {
+          "action": "retry",
+          "caseId": "EM-PROV-010",
+          "reason": "记录已完成与未核对的具体步骤，补齐本用例剩余断言；已知违约必须记 failed，不以 partial 隐藏。"
+        },
+        "blocked": {
+          "action": "wait",
+          "reason": "本用例前置条件或当前依赖证据不足，尚不能形成有效执行。",
+          "resumeWhen": "P2 实现已纳入待测包；固定 Graph CLI/后端版本和个人测试账号。 同轮同环境的依赖用例须有当前有效通过记录。"
+        },
+        "skipped": {
+          "action": "done",
+          "reason": "仅在明确排除本用例时记录原因；不代表覆盖、通过或清除原有失败，其他已选范围继续独立处理。"
+        }
+      }
+    },
+    {
+      "id": "EM-PROV-011",
+      "title": "Microsoft 365 租户、共享与归档范围",
+      "priority": "P1",
+      "types": [
+        "integration",
+        "compatibility"
+      ],
+      "preconditions": "阶段：P2；适用：对应供应商独立联调环境。\n依据：[需求方案](research-and-plan.zh-CN.md#2-邮箱支持范围)；[技术设计](technical-design.zh-CN.md#6-后端适配与新增邮箱)。\n前置：P2 实现及组织测试账号，明确组织策略；共享/归档场景单独有资格。",
+      "steps": "1. 按委托权限验证组织邮箱。\n2. 检查未批准的应用级全租户权限、本地 Exchange 和在线归档请求；共享访问仅按已验收能力测试。",
+      "expected": "1. 不默认申请全租户权限或冒称任意 Exchange 支持。\n2. 不支持/无资格范围明确保留，主邮箱成功不替代共享或归档覆盖。\n证据（仅本地）：本机策略、scope、能力与对应邮箱身份读回。",
+      "dependsOn": [
+        "EM-BASE-001",
+        "EM-BASE-002"
+      ],
+      "next": {
+        "passed": {
+          "action": "done",
+          "reason": "本用例的检查完成；其他已选用例仍需独立结果，本分支不结束整个测试轮。"
+        },
+        "failed": {
+          "action": "retry",
+          "caseId": "EM-PROV-011",
+          "reason": "保留该用例原始失败及本机证据；确认根因修复后，显式重测同一环境与本用例，不自动重复写操作。"
+        },
+        "partial": {
+          "action": "retry",
+          "caseId": "EM-PROV-011",
+          "reason": "记录已完成与未核对的具体步骤，补齐本用例剩余断言；已知违约必须记 failed，不以 partial 隐藏。"
+        },
+        "blocked": {
+          "action": "wait",
+          "reason": "本用例前置条件或当前依赖证据不足，尚不能形成有效执行。",
+          "resumeWhen": "P2 实现及组织测试账号，明确组织策略；共享/归档场景单独有资格。 同轮同环境的依赖用例须有当前有效通过记录。"
+        },
+        "skipped": {
+          "action": "done",
+          "reason": "仅在明确排除本用例时记录原因；不代表覆盖、通过或清除原有失败，其他已选范围继续独立处理。"
+        }
+      }
+    },
+    {
+      "id": "EM-PROV-012",
+      "title": "iCloud 专用密码和文件夹映射验收",
+      "priority": "P1",
+      "types": [
+        "integration",
+        "compatibility"
+      ],
+      "preconditions": "阶段：P2；适用：对应供应商独立联调环境。\n依据：[需求方案](research-and-plan.zh-CN.md#2-邮箱支持范围)；[技术设计](technical-design.zh-CN.md#6-后端适配与新增邮箱)。\n前置：P2 实现及有资格的 Apple 测试账号；已建立 App 专用密码，不在测试稿记录值。",
+      "steps": "1. 验证 IMAP/SMTP 身份差异、TLS 与文件夹角色。\n2. 撤销专用密码后读取，并在授权恢复后重试。",
+      "expected": "1. 读取/发送各自验收；撤销后明确认证失败。\n2. 不使用 Apple 主密码代替、不把服务端失败当空邮箱。\n证据（仅本地）：本机身份、文件夹和撤销前后结果。",
+      "dependsOn": [
+        "EM-BASE-001",
+        "EM-BASE-002"
+      ],
+      "next": {
+        "passed": {
+          "action": "done",
+          "reason": "本用例的检查完成；其他已选用例仍需独立结果，本分支不结束整个测试轮。"
+        },
+        "failed": {
+          "action": "retry",
+          "caseId": "EM-PROV-012",
+          "reason": "保留该用例原始失败及本机证据；确认根因修复后，显式重测同一环境与本用例，不自动重复写操作。"
+        },
+        "partial": {
+          "action": "retry",
+          "caseId": "EM-PROV-012",
+          "reason": "记录已完成与未核对的具体步骤，补齐本用例剩余断言；已知违约必须记 failed，不以 partial 隐藏。"
+        },
+        "blocked": {
+          "action": "wait",
+          "reason": "本用例前置条件或当前依赖证据不足，尚不能形成有效执行。",
+          "resumeWhen": "P2 实现及有资格的 Apple 测试账号；已建立 App 专用密码，不在测试稿记录值。 同轮同环境的依赖用例须有当前有效通过记录。"
+        },
+        "skipped": {
+          "action": "done",
+          "reason": "仅在明确排除本用例时记录原因；不代表覆盖、通过或清除原有失败，其他已选范围继续独立处理。"
+        }
+      }
+    },
+    {
+      "id": "EM-PROV-013",
+      "title": "腾讯/网易/阿里企业邮箱配置分别核验",
+      "priority": "P1",
+      "types": [
+        "integration",
+        "compatibility"
+      ],
+      "preconditions": "阶段：P2；适用：对应供应商独立联调环境。\n依据：[需求方案](research-and-plan.zh-CN.md#2-邮箱支持范围)；[技术设计](technical-design.zh-CN.md#6-后端适配与新增邮箱)。\n前置：P2 实现；每一家独立测试租户和管理员第三方客户端许可；无租户的子项不视为通过。",
+      "steps": "1. 逐供应商、区域和实际租户确认配置并只读连接。\n2. 分别验证管理员禁用协议/客户端与安全密码要求。",
+      "expected": "1. 不套用 QQ 个人/免费 163 参数，不通过一家推断全部企业邮箱。\n2. 每个已选供应商都要有独立证据，禁止访问无授权租户。\n证据（仅本地）：分供应商本机核验矩阵及策略/连接结果。",
+      "dependsOn": [
+        "EM-BASE-001",
+        "EM-BASE-002"
+      ],
+      "next": {
+        "passed": {
+          "action": "done",
+          "reason": "本用例的检查完成；其他已选用例仍需独立结果，本分支不结束整个测试轮。"
+        },
+        "failed": {
+          "action": "retry",
+          "caseId": "EM-PROV-013",
+          "reason": "保留该用例原始失败及本机证据；确认根因修复后，显式重测同一环境与本用例，不自动重复写操作。"
+        },
+        "partial": {
+          "action": "retry",
+          "caseId": "EM-PROV-013",
+          "reason": "记录已完成与未核对的具体步骤，补齐本用例剩余断言；已知违约必须记 failed，不以 partial 隐藏。"
+        },
+        "blocked": {
+          "action": "wait",
+          "reason": "本用例前置条件或当前依赖证据不足，尚不能形成有效执行。",
+          "resumeWhen": "P2 实现；每一家独立测试租户和管理员第三方客户端许可；无租户的子项不视为通过。 同轮同环境的依赖用例须有当前有效通过记录。"
+        },
+        "skipped": {
+          "action": "done",
+          "reason": "仅在明确排除本用例时记录原因；不代表覆盖、通过或清除原有失败，其他已选范围继续独立处理。"
+        }
+      }
+    },
+    {
+      "id": "EM-PROV-014",
+      "title": "Agently Mail 是独立 Agent 邮箱",
+      "priority": "P1",
+      "types": [
+        "integration",
+        "compatibility"
+      ],
+      "preconditions": "阶段：P2；适用：对应供应商独立联调环境。\n依据：[需求方案](research-and-plan.zh-CN.md#2-邮箱支持范围)；[技术设计](technical-design.zh-CN.md#6-后端适配与新增邮箱)。\n前置：P2 实现及独立 Agent 测试邮箱；普通 QQ 收件箱另有哨兵。",
+      "steps": "1. 验证实际 Agently 地址与别名、只读功能和原生确认机制。\n2. 请求读取原有 QQ 收件箱，检查是否错误宣称已连接。",
+      "expected": "1. 明确独立邮箱边界，不冒充获得个人 QQ 访问权。\n2. 个人 QQ 哨兵不被访问；发送仍遵守原生两阶段真人确认。\n证据（仅本地）：本机两类账号身份、调用和确认交互。",
+      "dependsOn": [
+        "EM-BASE-001",
+        "EM-BASE-002"
+      ],
+      "next": {
+        "passed": {
+          "action": "done",
+          "reason": "本用例的检查完成；其他已选用例仍需独立结果，本分支不结束整个测试轮。"
+        },
+        "failed": {
+          "action": "retry",
+          "caseId": "EM-PROV-014",
+          "reason": "保留该用例原始失败及本机证据；确认根因修复后，显式重测同一环境与本用例，不自动重复写操作。"
+        },
+        "partial": {
+          "action": "retry",
+          "caseId": "EM-PROV-014",
+          "reason": "记录已完成与未核对的具体步骤，补齐本用例剩余断言；已知违约必须记 failed，不以 partial 隐藏。"
+        },
+        "blocked": {
+          "action": "wait",
+          "reason": "本用例前置条件或当前依赖证据不足，尚不能形成有效执行。",
+          "resumeWhen": "P2 实现及独立 Agent 测试邮箱；普通 QQ 收件箱另有哨兵。 同轮同环境的依赖用例须有当前有效通过记录。"
+        },
+        "skipped": {
+          "action": "done",
+          "reason": "仅在明确排除本用例时记录原因；不代表覆盖、通过或清除原有失败，其他已选范围继续独立处理。"
+        }
+      }
+    },
+    {
+      "id": "EM-PROV-015",
+      "title": "Gmail 官方 MCP 预览资格与工具清单独立判断",
+      "priority": "P1",
+      "types": [
+        "integration",
+        "compatibility"
+      ],
+      "preconditions": "阶段：可选预览；适用：对应供应商独立联调环境。\n依据：[需求方案](research-and-plan.zh-CN.md#2-邮箱支持范围)；[技术设计](technical-design.zh-CN.md#6-后端适配与新增邮箱)。\n前置：可选预览适配已实现；有预览资格环境和无资格隔离条件；真实官方 MCP schema 可读。",
+      "steps": "1. 分别检查资格/API/OAuth 要求。\n2. 按实际 MCP 工具清单选择读取/草稿等能力，尝试其未提供的动作。",
+      "expected": "1. 无资格时明确不可用，不把预览作为所有 Gmail 用户默认入口。\n2. REST 能力不能自动推定到 MCP，不伪造发送工具或静默换后端。\n证据（仅本地）：本机资格和 MCP schema/拒绝记录。",
+      "dependsOn": [
+        "EM-BASE-001",
+        "EM-BASE-002"
+      ],
+      "next": {
+        "passed": {
+          "action": "done",
+          "reason": "本用例的检查完成；其他已选用例仍需独立结果，本分支不结束整个测试轮。"
+        },
+        "failed": {
+          "action": "retry",
+          "caseId": "EM-PROV-015",
+          "reason": "保留该用例原始失败及本机证据；确认根因修复后，显式重测同一环境与本用例，不自动重复写操作。"
+        },
+        "partial": {
+          "action": "retry",
+          "caseId": "EM-PROV-015",
+          "reason": "记录已完成与未核对的具体步骤，补齐本用例剩余断言；已知违约必须记 failed，不以 partial 隐藏。"
+        },
+        "blocked": {
+          "action": "wait",
+          "reason": "本用例前置条件或当前依赖证据不足，尚不能形成有效执行。",
+          "resumeWhen": "可选预览适配已实现；有预览资格环境和无资格隔离条件；真实官方 MCP schema 可读。 同轮同环境的依赖用例须有当前有效通过记录。"
+        },
+        "skipped": {
+          "action": "done",
+          "reason": "仅在明确排除本用例时记录原因；不代表覆盖、通过或清除原有失败，其他已选范围继续独立处理。"
+        }
+      }
+    },
+    {
+      "id": "EM-PROV-016",
+      "title": "P3 监听、定时、规则等增强不会默认启用",
+      "priority": "P1",
+      "types": [
+        "integration",
+        "compatibility"
+      ],
+      "preconditions": "阶段：P3 边界；适用：对应供应商独立联调环境。\n依据：[需求方案](research-and-plan.zh-CN.md#2-邮箱支持范围)；[技术设计](technical-design.zh-CN.md#6-后端适配与新增邮箱)。\n前置：首期包或未来已明确选择的 P3 包；增强测试需单独授权其权限和常驻资源。",
+      "steps": "1. 在首期只读任务后检查是否有监听、定时发送、规则或共享邮箱写入。\n2. 未来实现启用时，单独验证启动、取消、结束与重启后的原生状态。",
+      "expected": "1. 首期不默认创建常驻进程、定时任务或规则。\n2. 后续增强按供应商和权限单独验收，不把本条设计当全部 P3 详细功能覆盖。\n证据（仅本地）：本机进程/任务/规则前后快照；详细增强用例在需求确定后扩充。",
+      "dependsOn": [
+        "EM-BASE-001",
+        "EM-BASE-002"
+      ],
+      "next": {
+        "passed": {
+          "action": "done",
+          "reason": "本用例的检查完成；其他已选用例仍需独立结果，本分支不结束整个测试轮。"
+        },
+        "failed": {
+          "action": "retry",
+          "caseId": "EM-PROV-016",
+          "reason": "保留该用例原始失败及本机证据；确认根因修复后，显式重测同一环境与本用例，不自动重复写操作。"
+        },
+        "partial": {
+          "action": "retry",
+          "caseId": "EM-PROV-016",
+          "reason": "记录已完成与未核对的具体步骤，补齐本用例剩余断言；已知违约必须记 failed，不以 partial 隐藏。"
+        },
+        "blocked": {
+          "action": "wait",
+          "reason": "本用例前置条件或当前依赖证据不足，尚不能形成有效执行。",
+          "resumeWhen": "首期包或未来已明确选择的 P3 包；增强测试需单独授权其权限和常驻资源。 同轮同环境的依赖用例须有当前有效通过记录。"
+        },
+        "skipped": {
+          "action": "done",
+          "reason": "仅在明确排除本用例时记录原因；不代表覆盖、通过或清除原有失败，其他已选范围继续独立处理。"
+        }
+      }
+    }
+  ]
+}

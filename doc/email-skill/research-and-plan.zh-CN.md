@@ -6,6 +6,8 @@
 
 配套文档：[技术方案、业务逻辑与图示](technical-design.zh-CN.md)，包含架构图、任务流程、账号接入流程、发送状态图，以及查询、草稿发送和异常核对时序图。
 
+测试设计：[测试计划与 94 条用例](test-plan.zh-CN.md)及 [test-workbench 格式设计稿](test-cases.plan.json)。只包含通用定义，没有执行结果或真实邮箱信息。
+
 **本地数据约束：真实邮箱的账号信息、连接配置、凭据和运行数据只保存在本机，禁止进入 Git 提交、构建产物或 Skill 同步包。账号配置必须在仓库外持久化；仓库仅包含通用逻辑、公开服务说明和完全虚构的样例。具体目录、加载和提交边界见技术设计第二节。**
 
 ## 1. 建议结论
@@ -161,10 +163,12 @@ skills/email-management/
 |   `-- microsoft.md          # 随 P2 加入
 `-- doc/
     |-- research-and-plan.zh-CN.md
-    `-- technical-design.zh-CN.md
+    |-- technical-design.zh-CN.md
+    |-- test-plan.zh-CN.md
+    `-- test-cases.plan.json
 ```
 
-本阶段只有方案，不创建半成品 `skills/` 目录或可被发现的 Skill。方案和技术设计暂存仓库级 `doc/email-skill/`，实施时一起迁入所属 Skill 的 `doc/` 并修复引用，不保留重复副本。
+本阶段只有方案和测试设计，不创建半成品 `skills/` 目录或可被发现的 Skill。四份设计文件暂存仓库级 `doc/email-skill/`，实施时一起迁入所属 Skill 的 `doc/` 并修复引用，不保留重复副本。实际测试记录与证据不随设计文件迁入或提交。
 
 `SKILL.md` 只放通用路由、授权与结果判断。CLI 命令差异放供应商参考文档，Agent 的安装路径、MCP 配置文件和 UI 元数据放适当的 `agent-builds/<agent>/` 或平台适配层，不混入可移植入口。
 
@@ -278,7 +282,7 @@ skills/email-management/
 
 ### 9.2 本次文档变更覆盖账本
 
-范围：本方案、配套技术设计及根目录 `.gitignore` 的邮箱专用防误加规则；没有新增或修改任何运行入口、Skill 元数据、Agent adapter、同步状态或根目录目录表。
+范围：本方案、配套技术设计、测试计划与机器可读用例设计稿，以及根目录 `.gitignore` 的邮箱专用防误加规则；没有新增或修改任何运行入口、Skill 元数据、Agent adapter、同步状态或根目录目录表。
 
 原始方案基线：`12851e8c9186755207f89e659ff5b8a21b0036d4`；技术设计补充基于方案提交 `d2bec6c9d8c4c0722a55622c9122df7793bce325`，本地数据约束补充基于 `30712510c62e4dc8bb902d43fb0bd47854a3fd76`。检查对象为设计文档，不宣称完成 PR 审查；若后续创建 PR，需按仓库 playbook 对精确 base/head 和干净提交树执行完整 gate。
 
@@ -293,6 +297,8 @@ skills/email-management/
 | 邮箱信息不得提交 | 文档规则与 `.gitignore` | 正反例用 `git check-ignore --no-index --stdin` 检查；检查本分支文件清单 | 结果见配套技术设计第八节 | 忽略规则不等于内容扫描器；运行时落盘和构建隔离待实施 |
 
 技术设计补充的图文一致性、Mermaid 渲染和链接检查记录见[配套技术设计第八节](technical-design.zh-CN.md#8-实施顺序与本次文档验证)。
+
+需求驱动的测试定义及本次设计检查见[测试计划](test-plan.zh-CN.md)。其设计基线为本地信息约束提交 `b4447b136b171fa26f7fe53c320970c426420988`；机器格式校验不代表对应邮箱功能已经通过。
 
 ## 10. 调研来源与版本边界
 
