@@ -1,6 +1,6 @@
 ---
 name: sync-skills
-description: Use when linking, converting, synchronizing, inventorying, reporting, repairing Agent installs, versioning, auditing, or rolling back Skill copies across repository, project, machine-wide, or explicit external locations.
+description: Use when linking, converting, synchronizing, inventorying, reporting, repairing Agent installs with source provenance and build freshness checks, versioning, auditing, or rolling back Skill copies across repository, project, machine-wide, or explicit external locations.
 metadata:
   sync_id: "sync-skills"
   version: "0.4.0"
@@ -89,7 +89,7 @@ Show recorded versions and their update times:
 python skills/sync-skills/scripts/skill_sync.py versions my-skill-id
 ```
 
-Synchronize all linked copies from the most recently modified copy:
+Synchronize linked copies after checking provenance and resolving any divergence:
 
 ```bash
 python skills/sync-skills/scripts/skill_sync.py sync my-skill-id
@@ -170,12 +170,15 @@ python skills/sync-skills/scripts/skill_sync.py repair-agent-install my-skill-id
 - Treat an Agent installation without `metadata.sync_id` as registered but incomplete only when the registry already identifies the path. Snapshot and reinstall the complete build; do not declare a hand-edited frontmatter field to be a repair.
 - Reject repair or Agent snapshot rollback when the current installation declares a different non-empty sync ID, even when discarding local changes is authorized. All role registration and overwrite commands must check paths against every registered role and location before mutation.
 - Treat missing adapter root information as a blocking error for installation protection; a read-only inventory may continue with diagnostics for other valid adapters.
-- Compare installed file execute bits as well as manifest-v2 content digests. Permission-only differences need the same snapshot, authorized replacement, verification, and idempotency as content differences.
+- Attest generated execute bits in manifest-v2 `output_modes` and validate them before trusting a build. Compare installed file execute bits as well as manifest-v2 content digests. Permission-only differences need the same snapshot, authorized replacement, verification, and idempotency as content differences.
 - Refuse ordinary portable repo sync into a registered or adapter-discovered Agent install directory. Use the Agent build/install flow instead.
+- Rebuild from the selected current source before Agent installation. Repair checks the portable digest and a fingerprint of source, overrides, adapter files, builder code and execute bits before snapshots or registry writes, including `already-current`. Legacy builds without an input fingerprint must be rebuilt.
+- Feature-branch, dirty, detached and unknown-origin builds require `repair-agent-install --allow-development` for an explicitly requested test installation; this flag does not authorize replacing local changes. Keep normal installs on clean default-branch builds. Record build and verified-source SHA, branch, default branch, URL, dirty state, channel and content digests in external registry provenance, never in portable Skill files. Preserve or restore that provenance on same-path registration and rollback.
+- Do not bump a development version for each edit or treat a branch-only version as a published release. Keep pending changes under `[Unreleased]` and select the release version once when finalizing. Never renumber a published release.
 - `link-location` refuses to change an existing location ID or to register a second same-path location ID unless `--replace` is explicit. Replacement revalidates the requested Agent root, rewrites same-Agent paths, and permits a same-path Agent identity migration only when the old path is not in a shared old Agent root. It retires duplicate same-path location IDs in the same group, preserves `derived_from`, and rewrites matching Agent-install snapshots so rollback still works. It moves a legacy `roles.local` entry only when no other Agent resolves the old or new path. An explicit local location suppresses a legacy role only when it is the same physical path or the legacy role is shared by another Agent; distinct candidates remain ambiguous and fail closed. It does not modify Skill files or change `kind`, `project_id`, or `source_id`. Do not retarget a 1.1.0 `workbuddy` install under `~/.agents/skills` to `codex`; keep shared-root registrations separate. After a path or identity change, repair with `--agent` matching the registered identity. A failed snapshot rewrite restores every manifest it changed, and retries that restore when the first attempt fails.
 - Exclude transient directories and files such as `.git`, `node_modules`, `dist`, `.DS_Store`, `__pycache__`, and Python bytecode.
 - Exclude `pr-review-loop.yml` beside a project or installed `pr-review-loop` Skill from copy, snapshot, digest, comparison, and relationship reporting; preserve an existing target policy during synchronization, Agent repair, and rollback. `upgrade-machine-policy` is the only command that reads those installed files: when every regular legacy copy has identical bytes and `$XDG_STATE_HOME/skill/pr-review-loop.yml` (or `$HOME/.local/state/skill/pr-review-loop.yml`) is absent, copy one legacy file there and leave the originals in place. Do not overwrite an existing shared file or merge differing legacy files.
-- When the skill-management repository is on `master` or its configured default branch, compare linked copies by `metadata.version`; if versions differ, synchronize and let the higher version replace the lower version.
+- A higher `metadata.version` does not prove release status or newer content. On the configured default branch, differing versions and digests require an explicit `--source` after inspecting provenance and differences. Never choose an unresolved source by modification time.
 - When the repository is on any other branch, do not synchronize only because versions differ unless the user explicitly requests synchronization or the branch work requires updating the target copy.
 - If versions are equal but digests differ, use normal conflict handling and require an explicit source unless only one linked role changed since the previous snapshot.
 - If two or more copies changed since the previous snapshot and no source was specified, stop and report the conflict instead of choosing silently.

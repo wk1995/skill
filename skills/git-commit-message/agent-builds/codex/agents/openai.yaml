@@ -1,0 +1,6 @@
+interface:
+  display_name: "Git Commit Message"
+  short_description: "Check attribution before every agent Git commit"
+  default_prompt: "Use $git-commit-message before this commit to check its message with the current session identity."
+policy:
+  allow_implicit_invocation: true

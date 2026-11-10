@@ -36,7 +36,25 @@ Avoid duplicating the full agent procedure from `SKILL.md`. Link to it for detai
 
 ## Repository Documentation
 
-When adding or removing a Skill, update both root catalogs in the same change:
+Both root READMEs must keep their `## Skills` catalogs synchronized with the
+current Skills. Update `README.md` and `README.zh-CN.md` in the same change whenever:
+
+- A Skill is added or removed.
+- A Skill's name or directory changes, including its catalog name or documentation links.
+- A Skill's purpose, supported capabilities, scope, or trigger guidance changes in a way that affects its catalog summary.
+
+List each Skill once in the existing `## Skills` table. Capability additions to
+an existing Skill belong in that Skill's row; do not create another Skill row for
+the same Skill or a standalone root README section for its capabilities or usage.
+Keep detailed workflows and examples in the Skill's own bilingual READMEs.
+
+Keep the catalog sources aligned before regenerating: the English purpose is
+taken from `SKILL.md`'s `description`, and the Chinese purpose is taken from the
+first body paragraph of `skills/<skill-name>/README.zh-CN.md`. When the name or
+purpose changes, update the source metadata and both Skill READMEs as applicable,
+then regenerate both root catalogs rather than editing generated rows by hand.
+
+Preserve language-specific documentation links:
 
 - In `README.md`, link every Skill to its English `skills/<skill-name>/README.md` only.
 - In `README.zh-CN.md`, link every Skill to its Chinese `skills/<skill-name>/README.zh-CN.md` only.
@@ -45,12 +63,17 @@ Do not mix English and Chinese Skill README links within either root catalog.
 
 ## Catalog Generation And Pull Requests
 
-The Skills tables in the root READMEs are generated. After adding, removing, or changing a Skill, run:
+The Skills tables in the root READMEs are generated. After adding, removing,
+renaming, or changing a Skill (including its purpose or capabilities), run:
 
 ```bash
 python scripts/skill_catalog.py --write
 python scripts/skill_catalog.py --check
 ```
+
+Inspect both root README diffs to confirm the Skill name, purpose, and links are
+current and equivalent across languages. A catalog-affecting change is incomplete
+until both catalogs are synchronized and the check passes.
 
 The `skill-catalog` GitHub Actions check validates every Skill and both generated catalogs on PRs targeting `main`. A PR cannot merge until the check passes. For an internal PR, the workflow can commit catalog updates back to its source branch only when the repository provides `SKILL_CATALOG_TOKEN`; never grant this token permission to bypass `main` branch protection. Fork PRs must include generated catalog changes in their own commits.
 
@@ -126,6 +149,19 @@ lower parts, including when one push contains several increments of that part.
   evidence, and migration needs in the change description. Record released
   changes in the owning changelog with a UTC date; keep pending changes under
   `[Unreleased]`. Never rewrite a published version to distribute different content.
+
+## Development Builds And Skill Synchronization
+
+- Keep development edits under `[Unreleased]`; determine the component release
+  version once during release finalization. Branch-only version labels do not
+  establish a published release. Never renumber a published release.
+- Default-branch synchronization must inspect provenance and content differences
+  before treating a higher local version as newer. Require an explicit source
+  for unresolved divergence; do not choose by timestamps.
+- Build from the selected current source before installation and verify the
+  source/build/install chain. Development or unknown-origin installs require
+  explicit test intent. Keep Git SHA, branch, channel and digest evidence in
+  external synchronization state or build manifests, not portable Skill inputs.
 
 ## Changelog Requirement
 

@@ -104,6 +104,23 @@ artifact release while leaving unchanged Skill and adapter behavior versions
 alone. The future `.changes/` workflow mentioned in the root README is not a
 prerequisite: the change description and owning changelog carry this evidence.
 
+## Development And Release Finalization
+
+Keep ordinary development changes in `[Unreleased]` without bumping once per
+commit. At release finalization, assess all pending changes against the previous
+release, choose one version and write its dated evidence. For a new Skill, a
+feature branch's provisional version is not a published release; settle the
+initial version before distributing normal installations. Explicit test installs
+must retain their development origin independently of the version number.
+
+Never lower or reuse an already published version to undo development numbering.
+A higher local version can come from an unmerged development branch; it is not
+proof that its content is newer than the default branch. Compare source SHA,
+branch/channel and actual content before synchronizing. Unknown origins and
+unresolved differences require an explicit source. Rebuild from that source,
+snapshot replacements, and verify the installed same-Agent output. Keep origin
+evidence outside portable Skill files. See the [sync model](../skills/sync-skills/references/sync-model.md).
+
 ## CI Validation
 
 Run `python3 scripts/version_guard.py --base origin/main` after committing the

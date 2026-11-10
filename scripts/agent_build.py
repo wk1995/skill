@@ -15,6 +15,9 @@ from pathlib import Path, PurePosixPath
 
 
 ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT / "skills" / "sync-skills" / "scripts"))
+from skill_provenance import git_source, ignored_input, input_digest, output_modes  # noqa: E402
+
 SKILLS_DIR = ROOT / "skills"
 PLATFORMS_DIR = ROOT / "platforms"
 DEFAULT_OUTPUT_DIR = ROOT / "dist"
@@ -148,7 +151,7 @@ def selected_skills(names: list[str]) -> list[tuple[Path, str, str, str]]:
         if not skill_dir.is_dir() or skill_dir.name.startswith("."):
             continue
         name, sync_id, version = skill_metadata(skill_dir)
-        if not requested or name in requested:
+        if not names or name in requested:
             discovered.append((skill_dir, name, sync_id, version))
             requested.discard(name)
     require(not requested, f"unknown Skill(s): {', '.join(sorted(requested))}")
@@ -173,9 +176,7 @@ def copy_tree(
         if (
             relative.parts[0] in skipped_top
             or any(part in skipped_names for part in relative.parts)
-            or any(part in TRANSIENT_DIRECTORY_NAMES for part in relative.parts[:-1])
-            or path.name in TRANSIENT_FILE_NAMES
-            or path.suffix in TRANSIENT_SUFFIXES
+            or ignored_input(relative)
             or is_local_skill_policy(source, relative)
         ):
             continue
@@ -234,9 +235,7 @@ def digest_tree(root: Path, *, skip_top: set[str] | None = None) -> str:
         relative_path = path.relative_to(root)
         if (
             (skip_top and relative_path.parts[0] in skip_top)
-            or any(part in TRANSIENT_DIRECTORY_NAMES for part in relative_path.parts[:-1])
-            or path.name in TRANSIENT_FILE_NAMES
-            or path.suffix in TRANSIENT_SUFFIXES
+            or ignored_input(relative_path)
             or is_local_skill_policy(root, relative_path)
         ):
             continue
@@ -294,8 +293,16 @@ def build(platform: str, skill_names: list[str], output_arg: str | None, force: 
     skills = selected_skills(skill_names)
     output = safe_output(Path(output_arg) if output_arg else DEFAULT_OUTPUT_DIR / platform)
     validate_replacement(output, platform, force)
+    try:
+        fingerprints = {sync_id: input_digest(skill_dir, platform_dir, sync_id)
+                        for skill_dir, _, sync_id, _ in skills}
+    except (OSError, ValueError) as error:
+        raise BuildError(str(error)) from error
+    source = git_source(ROOT)
     output.parent.mkdir(parents=True, exist_ok=True)
     staging = Path(tempfile.mkdtemp(prefix=f".{output.name}-build-", dir=output.parent))
+    backup_root = None
+    preserve_recovery = False
     try:
         root_overlay = config.get("root_overlay")
         if root_overlay:
@@ -303,7 +310,7 @@ def build(platform: str, skill_names: list[str], output_arg: str | None, force: 
 
         skills_root = staging / relative_path(config["skills_path"], "skills_path", allow_dot=True)
         skills_root.mkdir(parents=True, exist_ok=True)
-        manifest_skills: list[dict[str, str]] = []
+        manifest_skills: list[dict[str, object]] = []
         for skill_dir, name, sync_id, version in skills:
             target = skills_root / name
             copy_tree(skill_dir, target, skip_top={"agent-builds"})
@@ -338,6 +345,8 @@ def build(platform: str, skill_names: list[str], output_arg: str | None, force: 
                 "core_version": version,
                 "portable_digest": digest_tree(skill_dir, skip_top={"agent-builds"}),
                 "output_digest": digest_tree(target),
+                "input_digest": fingerprints[sync_id],
+                "output_modes": output_modes(target, sync_id),
                 "path": (relative_path(config["skills_path"], "skills_path", allow_dot=True) / name).as_posix(),
             })
 
@@ -347,19 +356,39 @@ def build(platform: str, skill_names: list[str], output_arg: str | None, force: 
             "adapter_version": config["version"],
             "artifact_version": config["artifact_version"],
             "skills": manifest_skills,
+            "source": source,
         }
         (staging / ".agent-build.json").write_text(
             json.dumps(manifest, ensure_ascii=False, indent=2, sort_keys=True) + "\n",
             encoding="utf-8",
         )
 
+        for skill_dir, _, sync_id, _ in skills:
+            require(input_digest(skill_dir, platform_dir, sync_id) == fingerprints[sync_id],
+                    f"build inputs changed while building {sync_id}; rebuild from a stable source")
         if output.exists():
-            shutil.rmtree(output)
-        os.replace(staging, output)
+            backup_root = Path(tempfile.mkdtemp(prefix=f".{output.name}-previous-", dir=output.parent))
+            os.replace(output, backup_root / "artifact")
+        try:
+            os.replace(staging, output)
+        except BaseException as publish_error:
+            if backup_root is not None and (backup_root / "artifact").exists():
+                try:
+                    os.replace(backup_root / "artifact", output)
+                except BaseException as recovery_error:
+                    preserve_recovery = True
+                    raise BuildError(
+                        f"build publication failed ({publish_error}); recovery failed ({recovery_error}); "
+                        f"previous artifact preserved at {backup_root / 'artifact'}; new build at {staging}"
+                    ) from recovery_error
+            raise
         return output
     finally:
-        if staging.exists():
-            shutil.rmtree(staging)
+        if not preserve_recovery:
+            if staging.exists():
+                shutil.rmtree(staging)
+            if backup_root is not None and backup_root.exists():
+                shutil.rmtree(backup_root)
 
 
 def validate_all() -> None:

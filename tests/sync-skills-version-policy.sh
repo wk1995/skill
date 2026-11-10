@@ -24,28 +24,28 @@ current = {
     "local": {"version": "0.0.3", "digest": "local-digest", "path": str(root / "skills" / "sync-skills")},
 }
 
-with patch.object(skill_sync, "git_current_branch", return_value="master"), patch.object(skill_sync, "git_default_branch", return_value="main"):
-    assert skill_sync.choose_source_by_version_on_mainline(group, current) == "local"
-
-with patch.object(skill_sync, "git_current_branch", return_value="main"), patch.object(skill_sync, "git_default_branch", return_value="main"):
-    assert skill_sync.choose_source_by_version_on_mainline(group, current) == "local"
+# Version numbers alone never prove which divergent copy is released or newer.
+for branch in ("main", "master"):
+    with patch.object(skill_sync, "git_current_branch", return_value=branch), patch.object(skill_sync, "git_default_branch", return_value=branch):
+        try:
+            skill_sync.choose_source_by_version_on_mainline(group, current)
+        except SystemExit as exc:
+            assert "version order does not establish release provenance" in str(exc)
+            assert '"local"' in str(exc) and '"repo"' in str(exc)
+        else:
+            raise AssertionError("unverified higher local version must not win")
 
 with patch.object(skill_sync, "git_current_branch", return_value="feature/test"), patch.object(skill_sync, "git_default_branch", return_value="main"):
     assert skill_sync.choose_source_by_version_on_mainline(group, current) is None
 
-conflicting = {
-    "repo": {"version": "0.0.3", "digest": "repo-digest", "path": str(root / "skills" / "sync-skills")},
-    "local": {"version": "0.0.3", "digest": "local-digest", "path": str(root / "skills" / "sync-skills")},
-    "project": {"version": "0.0.2", "digest": "project-digest", "path": str(root / "skills" / "sync-skills")},
-}
-
-with patch.object(skill_sync, "git_current_branch", return_value="master"), patch.object(skill_sync, "git_default_branch", return_value="main"):
+# No timestamp fallback for an unresolved divergence, even without Git context.
+with patch.object(skill_sync, "git_current_branch", return_value=None), patch.object(skill_sync, "git_default_branch", return_value=None):
     try:
-        skill_sync.choose_source_by_version_on_mainline(group, conflicting)
+        skill_sync.choose_source(group, current)
     except SystemExit as exc:
-        assert "multiple roles have the highest version" in str(exc)
+        assert "--source" in str(exc)
     else:
-        raise AssertionError("expected highest-version digest conflict")
+        raise AssertionError("unknown origin must not choose by timestamp")
 
 assert skill_sync.parse_version("v1.2.3") > skill_sync.parse_version("1.2.3-alpha")
 assert skill_sync.parse_version("1.0.0-alpha.10") > skill_sync.parse_version("1.0.0-alpha.2")

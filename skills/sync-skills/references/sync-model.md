@@ -53,6 +53,31 @@ Role registration and overwrite commands check their paths against all registry 
 
 Install equivalence includes file execute bits, checked separately from the unchanged manifest-v2 content digest. A permission mismatch is `agent-install-diverged` and requires authorized snapshot/replacement. Repair and rollback verify staged and installed execute bits; Agent snapshot rollback also checks the current target's non-empty sync ID before modifying it.
 
+## Build Freshness And Test Installs
+
+New manifest-v2 builds add a top-level `source` record (Git URL, commit, branch,
+default branch, dirty state and channel) and per-Skill `input_digest` plus generated-file `output_modes`. This
+fingerprint includes portable files, Agent overrides, adapter files, builder code and execute
+bits. Source metadata stays in the build manifest and external registry, outside
+portable Skill inputs. `mainline` means a clean configured default-branch checkout;
+it does not certify an official release. Missing Git or unavailable default-branch
+metadata never proves mainline provenance.
+
+Legacy manifests without input or mode evidence set `rebuild_required` and remain inventory-readable while failing strict freshness checks. The relationship report exposes optional `input_digest` and `current_input_digest` evidence and marks mismatches `agent-build-stale`, including in strict mode. Malformed input evidence or artifact execute bits differing from `output_modes` invalidate the Agent build before any partial records can be consumed. Recursive `.git`, `.DS_Store`, cache and distribution paths share one exclusion rule across copy, digest, fingerprint and mode checks.
+
+Repair verifies generated modes and current portable and input digests before every mutation,
+including an already-current registry update. Legacy builds without input or mode evidence remain readable for
+inventory but must be rebuilt before repair. A stale build cannot be authorized
+by `--discard-local-changes` or `--allow-development`. Switching branches requires
+checking the selected current source and rebuilding when inputs differ.
+
+Development, dirty, detached or unknown-origin installs require explicit
+`--allow-development` test intent. Replacement still separately requires
+`--discard-local-changes`. Registry location `provenance` records both build-time
+and verified installation-time origins, fingerprints, and `test_install`.
+Same-path same-Agent re-registration retains this evidence; rollback restores
+prior evidence or clears it when the snapshot has no known provenance.
+
 ## URL Policy
 
 Record addresses separately from local paths:
@@ -91,12 +116,12 @@ For this skill, use:
 
 ```yaml
 metadata:
-  version: "0.3.0"
+  version: "0.4.0"
 ```
 
 When a group is synchronized, copy the selected source version to all targets. If target versions differ before sync, record them in the pre-sync snapshot and report the difference.
 
-When the skill-management repository is on `master` or its configured default branch, treat version mismatch as sufficient reason to sync: the higher `metadata.version` replaces the lower one. On feature or other non-default branches, do not sync only because versions differ unless the user explicitly requested sync or the branch task requires it.
+A version mismatch does not establish release provenance or content freshness. On the configured default branch, different versions and content require an explicit source after inspecting the differences. A branch development copy may have a higher number than the first mainline release. Do not choose an unresolved source by timestamps. Keep development changes under `[Unreleased]` and select one version at release finalization; published versions remain immutable.
 
 ## Conflict Policy
 
@@ -184,3 +209,5 @@ Documentation-only Skills can be copied after validation. Skills with executable
 - binaries or archives in `assets/`
 
 Before enabling or syncing executable content from an untrusted source, report the source path, version, digest, executable entrypoints, and permissions implied by extension metadata.
+
+New Agent snapshots include `original_modes`; snapshot creation verifies copied modes and rollback rejects mode drift before writes. Legacy snapshots without this evidence retain their previous compatibility behavior.

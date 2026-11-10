@@ -8,7 +8,7 @@ Personal Skills 是一个用于集中管理个人 Agent Skills 的 monorepo。�
 
 - 已完成：仓库定位、通用 Skill 约定、声明式 Codex / WorkBuddy / WorkBuddy AI / DeepSeek Harness 适配器、确定性 Agent 构建和 PR 校验。
 - 规划中：共享管理包、CLI、MCP Server、安装、registry 发布和自动化发布流程。
-- 尚未提供：项目级可执行命令。本文中的命令均描述目标接口。
+- 现在可用：下文列出的 Python 目录校验器和 Agent 构建器。项目级 `skills ...` CLI 命令仍为规划接口。
 
 当前适配层和版本边界见 [Agent Build 架构](docs/agent-build-architecture.md)；[最初的仓库设计](docs/superpowers/specs/2026-07-10-skill-management-architecture-design.md)保留为历史背景。
 
@@ -92,11 +92,12 @@ Agent Skills 规范只要求 `SKILL.md`，但本仓库额外要求双语使用�
 <!-- skills-catalog:start -->
 | Skill | 用途 | 文档 |
 | --- | --- | --- |
-| `android-code-release-train` | `android-code-release-train` 约束 Android 需求从功能分支、版本集成和发布提升，到形成已评审源码提交及不可变 Tag 的完整代码链路。它不构建、签名、打包或上传发布产物。 | [README](skills/android-code-release-train/README.zh-CN.md) |
-| `build-pipeline-engineering` | `build-pipeline-engineering` 用于配置和执行可复现的可分发构建流水线：从一个确定源码引用完成 build variant 选择、环境配置、签名、打包、校验与输出上传。对于支持 variant 的目标，未指定时默认使用 `release`；在 GitHub Actions 中，构建输出默认上传到 GitHub Actions Artifacts。 | [README](skills/build-pipeline-engineering/README.zh-CN.md) |
+| `build-pipeline-engineering` | `build-pipeline-engineering` 用于配置和执行 Android、Windows、Linux 及插件的可复现可分发构建流水线：从一个确定源码引用完成 build variant 选择、安装包格式选择、环境配置、签名、运行依赖处理、安装校验与输出上传。对于支持 variant 的目标，未指定时默认使用 `release`；在 GitHub Actions 中，构建输出默认上传到 GitHub Actions Artifacts。 | [README](skills/build-pipeline-engineering/README.zh-CN.md) |
 | `choose-project-doc-location` | `choose-project-doc-location` 为项目文档选择路径，并整理指定文件夹或项目下的文档位置。适用于 PRD、技术文档和机器可读状态机规格文件，不管理它们的业务关联或内容 Schema。 | [README](skills/choose-project-doc-location/README.zh-CN.md) |
+| `git-commit-message` | 每个仓库的每次 Agent Git 提交前都必须执行提交信息检查，包括“修复后提交并推送/部署”中的提交步骤、amend 和辅助脚本提交，无需用户点名。支持 AI 客户端/模型署名、可选整机与仓库前缀，以及策略和 commit-msg Hook 配置；不用于 Git 只读操作、单独暂存或只推送已有提交。 | [README](skills/git-commit-message/README.zh-CN.md) |
 | `pr-review-loop` | `pr-review-loop` 审查指定的 Pull Request。当前托管账号是 PR 作者，且项目级 Skill 或配置适用，或整机配置列出了该仓库时，可审查、修复、推送并复审。`max_rounds` 限制完成的审查次数；独立的 `comment` 开关控制是否向 PR 评论。本 Skill 定义流程，不定义审查标准。适用于：指明某个 PR 并要求审查、审查并修复，或继续已有闭环。不适用于：只要本地报告、同时禁止 PR 评论和代码改动，或只做 PR 管理。 | [README](skills/pr-review-loop/README.zh-CN.md) |
-| `sync-skills` | `sync-skills` 用于管理同一个 Agent Skill 在本仓库、其他项目、本机 Agent 安装目录、生成的 Agent 构建产物和明确指定的外部位置中的等价副本。它会记录稳定身份、来源、版本、摘要、快照与审计时间；比较或同步副本；盘点 Builder 关系；并从可信构建修复已登记的 Agent 安装。 | [README](skills/sync-skills/README.zh-CN.md) |
+| `source-version-train` | `source-version-train` 把需求分支送入 `dev_<version>` 和可见的 `publish_<version>` PR，再 rebase 成不可见的发布候选，然后调用打包和发布，通过后才打 Tag。先识别仓库声明的各平台产物。声明过的产物缺失、失败或从未运行，都会拦住 Tag 和合入默认分支。仓库完全没有打包流程时可以合入，但不能打 Tag。存在声明产物时，由可用的 `build-pipeline-engineering` 打包。全部声明产物都存在后，发布才默认发送到 GitHub Actions Artifacts。本 Skill 不点名其他发布渠道，也不实现签名、校验和、产物保留或某个目的地的上传。 | [README](skills/source-version-train/README.zh-CN.md) |
+| `sync-skills` | `sync-skills` 用于管理同一个 Agent Skill 在本仓库、其他项目、本机 Agent 安装目录、生成的 Agent 构建产物和明确指定的外部位置中的等价副本。它会记录稳定身份、来源、版本、摘要、快照与审计时间；比较或同步副本；盘点 Builder 关系；并通过来源记录、构建新鲜度检查和显式开发安装意图，从当前构建修复已登记的 Agent 安装。 | [README](skills/sync-skills/README.zh-CN.md) |
 | `test-workbench` | `test-workbench` 管理可复用的网页测试流程，统一测试用例、执行记录与绑定数据版本的测试总结；轮次只冻结明确选中的范围与必要前置依赖。工作台组织版本、方案、轮次、环境/设备、用例依赖、下一步测试、Issue 证据及批注，并在需要时衔接不同平台的 CI 测试包和 PR 变更。普通 CI 只归档产物，对外发布须明确要求。当前技能版本：`0.0.7`。 | [README](skills/test-workbench/README.zh-CN.md) |
 <!-- skills-catalog:end -->
 
@@ -105,6 +106,8 @@ Agent Skills 规范只要求 `SKILL.md`，但本仓库额外要求双语使用�
 ## Pull Request 审查门禁
 
 在宣布 PR 可以合并前，应从干净且已提交的工作区运行 `bash tests/pr-review-gate.sh origin/main`，并执行 [PR 审查手册](docs/pr-review-playbook.md)规定的独立对抗性检查。GitHub Actions 的 required check `skill-catalog` 会调用同一门禁：检查完整 PR diff 与模拟合并结果、在[协同迁移](docs/skill-sync-state-migration.md)完成前保护旧版 `.skill-sync/` 状态、拒绝预期范围外的已跟踪忽略文件、解析 Python 源码，并运行仓库全部校验测试。新的同步状态默认保存到仓库外的 XDG state 目录。门禁全绿是必要条件，但不能替代路径身份、直接入口、递归规则、依赖降级和失败后状态检查。内部 PR 在配置 `SKILL_CATALOG_TOKEN` 后仍可自动提交生成目录；fork PR 必须自行提交两份根 README。
+
+[Skill 来源回归测试](tests/skill-provenance.sh)按四类审查发现分组：盘点与修复的新鲜度、产物与快照执行权限、递归排除、发布及恢复失败。可运行 `bash tests/skill-provenance.sh` 做专项检查；原有必需门禁也会执行该套件。`Skill provenance regressions` 工作流在 PR 和默认分支推送时使用 Python 3.10 分别运行 Ubuntu/macOS 检查。必需检查 `skill-catalog` 等待两个系统的专项检查全部通过。测试使用明确用例 ID，缺失用例会失败，不会静默执行零项测试。
 
 ## Skill 结构与版本
 

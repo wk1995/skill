@@ -1,14 +1,19 @@
 #!/usr/bin/env python3
-"""Read-only GitHub branch/PR inventory for Android code release trains."""
+"""Read-only GitHub branch/PR inventory for source version trains."""
 
 from __future__ import annotations
 
 import argparse
 import json
+import re
 import subprocess
 import sys
 from dataclasses import dataclass
 from typing import Any
+
+# A supported version is major.minor.patch, such as 5.1.3. Each component is a
+# canonical integer: 0 or a decimal without leading zeroes, so 1.01.0 is rejected.
+VERSION_IDENTIFIER = re.compile(r"(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)")
 
 
 def run(*args: str) -> str:
@@ -88,7 +93,7 @@ def inspect(repo: str, branch: str) -> BranchStatus:
     review = str(pr.get("reviewDecision") or "PENDING").upper()
     checks = checks_state(pr.get("statusCheckRollup"))
     target = str(pr.get("baseRefName", "-"))
-    if not target.startswith("dev/"):
+    if not target.startswith("dev_"):
         return BranchStatus(branch, "misrouted", target, review, checks, str(pr.get("url", "")))
     ready = not pr.get("isDraft") and review == "APPROVED" and checks == "success"
     state = "ready" if ready else ("blocked" if checks == "failed" else "pending")
@@ -110,9 +115,43 @@ def inventory(args: argparse.Namespace) -> int:
     return 0
 
 
+def require_numeric_version(version: str) -> str:
+    if not VERSION_IDENTIFIER.fullmatch(version or ""):
+        raise RuntimeError(
+            f"Version must be major.minor.patch such as 5.1.3; got {version!r}"
+        )
+    return version
+
+
+def accept_version(args: argparse.Namespace) -> str:
+    """Reject a non-numeric version before initialization, reuse, or tagging."""
+    if not getattr(args, "version", None):
+        raise RuntimeError(f"{args.command} requires --version")
+    return require_numeric_version(args.version)
+
+
+def initialize(args: argparse.Namespace) -> int:
+    version = accept_version(args)
+    print(json.dumps({"action": "initialize", "version": version}, ensure_ascii=False))
+    return 0
+
+
+def reuse(args: argparse.Namespace) -> int:
+    version = accept_version(args)
+    print(json.dumps({"action": "reuse", "version": version}, ensure_ascii=False))
+    return 0
+
+
+def tag(args: argparse.Namespace) -> int:
+    version = accept_version(args)
+    print(json.dumps({"action": "tag", "version": version, "tag": f"v{version}"}, ensure_ascii=False))
+    return 0
+
+
 def select(args: argparse.Namespace) -> int:
     if not args.version or not args.branches:
         raise RuntimeError("select requires --version and --branches")
+    require_numeric_version(args.version)
     repo = resolve_repo(args.repo)
     available = set(list_branches(repo))
     requested = [branch.strip() for branch in args.branches.split(",") if branch.strip()]
@@ -120,7 +159,7 @@ def select(args: argparse.Namespace) -> int:
     if missing:
         raise RuntimeError(f"Branches not found in {repo}: {', '.join(missing)}")
     statuses = [inspect(repo, branch) for branch in requested]
-    expected_target = f"dev/{args.version}"
+    expected_target = f"dev_{args.version}"
     conflicting = [item.branch for item in statuses if item.target not in ("-", expected_target)]
     if conflicting:
         raise RuntimeError(
@@ -152,9 +191,17 @@ def main() -> int:
     select_parser.add_argument(
         "--require-ready",
         action="store_true",
-        help="Require ready PRs targeting dev/<version>; use after train PRs have been created.",
+        help="Require ready PRs targeting dev_<version>; use after train PRs have been created.",
     )
     select_parser.set_defaults(handler=select)
+    for command, handler, help_text in (
+        ("initialize", initialize, "Validate a version before creating its integration train"),
+        ("reuse", reuse, "Validate a version before reusing its integration train"),
+        ("tag", tag, "Validate a version before creating its immutable source tag"),
+    ):
+        command_parser = subparsers.add_parser(command, parents=[repository_option], help=help_text)
+        command_parser.add_argument("--version", required=True)
+        command_parser.set_defaults(handler=handler)
     args = parser.parse_args()
     try:
         return args.handler(args)

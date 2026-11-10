@@ -51,6 +51,8 @@ import skill_relationships as relationships
 
 
 def run(state, *arguments):
+    if arguments and arguments[0] == "repair-agent-install":
+        arguments = (*arguments, "--allow-development")  # Isolated test installs.
     result = subprocess.run(
         [sys.executable, str(cli), "--project-root", str(project),
          "--state-dir", str(state), *map(str, arguments)],

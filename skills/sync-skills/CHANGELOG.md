@@ -6,6 +6,16 @@ version, date, and a change summary.
 
 ## [Unreleased]
 
+- Preserve the previous build artifact until publication succeeds; restore it after publication failure and retain both recovery paths if restoration also fails. Add publication and recovery fault regressions.
+
+- Review fixes: compare recorded and current input fingerprints in relationship reports and their contract validator; attest generated file execute bits in manifests and original snapshot modes before trusting an artifact or restoring a snapshot; share recursive transient-path exclusions across builder, fingerprints, digests, snapshots and rollback. Test public repair from all four distributed adapters outside the checkout with Git removed from PATH.
+
+- Require explicit source selection for mainline version/content divergence and unresolved copies; remove timestamp-based selection. Higher local development versions no longer silently win.
+- Record build-time Git origin and per-Skill input fingerprints in build manifests, and installation-time provenance in external registry locations. Preserve provenance on same-path registration and restore it on Agent rollback.
+- Reject stale/legacy builds before any installation mutation, including already-current registry updates. Rebuild to capture portable, override, adapter, builder-code and execute-bit evidence. Preflight fingerprints before creating build output, preserve prior output if inputs change mid-build, and keep explicitly selected builds from including later sibling Skills.
+- Require `--allow-development` for feature-branch, dirty, detached or unknown-origin test installations. Local replacement remains separately authorized with `--discard-local-changes` and snapshotted.
+- Release impact: pending breaking workflow change; select a MAJOR release at finalization rather than assigning a new development version. Previously `sync` could pick the highest version or newest timestamp and repair could use a stale or unknown-origin build. Now inspect differences and use `--source`; rebuild old artifacts; explicitly opt into test installs. Published versions and unrelated installed Skills are unchanged.
+
 ## [0.4.0] - 2026-09-30
 
 - Change-Type: feature

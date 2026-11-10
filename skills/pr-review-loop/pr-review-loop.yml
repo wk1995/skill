@@ -1,0 +1,4 @@
+# Shared project policy: comments enabled; positive max_rounds enables the fix loop.
+comment: true
+max_rounds: 10
+review_retries: 3
