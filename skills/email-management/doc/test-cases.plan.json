@@ -1,6 +1,6 @@
 {
   "id": "email-management-acceptance-design",
-  "revision": 1,
+  "revision": 2,
   "version": "design-b4447b1",
   "title": "多邮箱 Skill 验收用例设计（未执行）",
   "source": "https://github.com/wk1995/skill/tree/b4447b136b171fa26f7fe53c320970c426420988/doc/email-skill ; 需求与技术设计基线，非运行包",
@@ -467,7 +467,7 @@
         "functional",
         "security"
       ],
-      "preconditions": "阶段：首期；适用：隔离文件系统；按平台分开。\n依据：[需求方案](research-and-plan.zh-CN.md#7-授权凭据与操作边界)；[技术设计](technical-design.zh-CN.md#2-数据对象与边界)。\n前置：准备无效 TOML、重复账号 ID、身份不符等独立隔离文件及有效默认 A。",
+      "preconditions": "阶段：首期；适用：隔离文件系统；按平台分开。\n依据：[需求方案](research-and-plan.zh-CN.md#7-授权凭据与操作边界)；[技术设计](technical-design.zh-CN.md#2-数据对象与边界)。\n前置：准备无效 JSON、重复账号 ID、身份不符等独立隔离文件及有效默认 A。",
       "steps": "1. 逐一将显式文件设为上述状态并调用加载/接入。\n2. 比较原文件、备份和其他账号。",
       "expected": "1. 给出具体错误，拒绝不明确身份。\n2. 不重置、迁移或替换问题文件，不切换默认账号；必要诊断仅在私有证据目录。\n证据（仅本地）：每种输入及受保护文件摘要前后对照。",
       "dependsOn": [
@@ -492,7 +492,7 @@
         "blocked": {
           "action": "wait",
           "reason": "本用例前置条件或当前依赖证据不足，尚不能形成有效执行。",
-          "resumeWhen": "准备无效 TOML、重复账号 ID、身份不符等独立隔离文件及有效默认 A。 同轮同环境的依赖用例须有当前有效通过记录。"
+          "resumeWhen": "准备无效 JSON、重复账号 ID、身份不符等独立隔离文件及有效默认 A。 同轮同环境的依赖用例须有当前有效通过记录。"
         },
         "skipped": {
           "action": "done",

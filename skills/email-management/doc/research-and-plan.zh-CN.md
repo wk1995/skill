@@ -1,6 +1,6 @@
 # 多邮箱 Skill 调研与实施方案
 
-调研日期：2026-11-10（Asia/Shanghai）。状态：待实施的设计方案；没有安装后端、授权邮箱、读取真实邮件或执行发信。
+调研日期：2026-11-10（Asia/Shanghai）。状态：总体方案已形成，并已提供 [Skill 初版](../SKILL.md)及本机账号工具；没有安装或授权邮件后端、读取真实邮件或执行发信。实际实现与验证见[实施记录](implementation-and-validation.zh-CN.md)。
 
 工作分支：`codex/email-skill-plan`，从拉取后的默认分支 `origin/main` 创建，起点为 `12851e8c9186755207f89e659ff5b8a21b0036d4`。
 
@@ -144,7 +144,7 @@ Microsoft 官方旧版 Mail MCP 文档已注明仅为兼容保留，不建议用
 
 ## 6. Skill 结构与扩展方式
 
-### 6.1 目标结构（实施阶段创建）
+### 6.1 初版结构与扩展
 
 ```text
 skills/email-management/
@@ -152,27 +152,30 @@ skills/email-management/
 |-- README.md
 |-- README.zh-CN.md
 |-- CHANGELOG.md
-|-- agent-builds/
-|   `-- .gitkeep
+|-- agent-builds/.gitkeep
 |-- references/
 |   |-- providers.md
+|   |-- local-storage.md
+|   |-- operations.md
 |   |-- qq-email-mcp.md
 |   |-- imap-smtp.md
 |   |-- gmail.md
-|   |-- feishu.md
-|   `-- microsoft.md          # 随 P2 加入
+|   `-- feishu.md
+|-- scripts/email_accounts.py
+|-- tests/test_accounts.py
 `-- doc/
     |-- research-and-plan.zh-CN.md
     |-- technical-design.zh-CN.md
     |-- test-plan.zh-CN.md
-    `-- test-cases.plan.json
+    |-- test-cases.plan.json
+    `-- implementation-and-validation.zh-CN.md
 ```
 
-本阶段只有方案和测试设计，不创建半成品 `skills/` 目录或可被发现的 Skill。四份设计文件暂存仓库级 `doc/email-skill/`，实施时一起迁入所属 Skill 的 `doc/` 并修复引用，不保留重复副本。实际测试记录与证据不随设计文件迁入或提交。
+初版完整 Skill 已建立，四份设计文件和本轮实施记录已迁入所属 Skill 的 `doc/`。原仓库级目录不再保留副本；当前相对链接随文档归属使用，指向历史提交的来源证据保持原样。真实账号及邮箱执行证据不随迁移入仓库。
 
 `SKILL.md` 只放通用路由、授权与结果判断。CLI 命令差异放供应商参考文档，Agent 的安装路径、MCP 配置文件和 UI 元数据放适当的 `agent-builds/<agent>/` 或平台适配层，不混入可移植入口。
 
-暂不开发统一邮件 CLI/MCP 服务，也不默认新增常驻进程、中心账号数据库或脚本。本机账号配置存入仓库外的私有文件，复用后端已有凭据设施；先通过 Skill 编排已有工具，发现确定的重复适配或不可绕过的校验需求后，再单独设计最小辅助程序。
+初版不开发统一邮件 CLI/MCP 服务，也不新增常驻进程或中心账号数据库。新增本机账号引用工具负责非秘密 JSON 索引的校验、私有保存和原子替换；不存凭据、不启动邮件后端、不替代原生身份检查。其他邮件操作通过 Skill 编排已有工具，具体实现边界见[本地存储](../references/local-storage.md)。
 
 ### 6.2 路由与能力记录
 
@@ -280,9 +283,9 @@ skills/email-management/
 
 首次真实账号连通仅做只读；写入用例需使用已明确授权的测试账号、邮件和收件人。没有测试凭据的供应商标记“未验证”，不能通过伪造结果填满矩阵。
 
-### 9.2 本次文档变更覆盖账本
+### 9.2 前期设计变更覆盖账本
 
-范围：本方案、配套技术设计、测试计划与机器可读用例设计稿，以及根目录 `.gitignore` 的邮箱专用防误加规则；没有新增或修改任何运行入口、Skill 元数据、Agent adapter、同步状态或根目录目录表。
+本节保留前期方案/测试设计和忽略规则的文档检查范围；当时没有运行实现。初版新增的 Skill、账号工具、隔离单元测试、文档迁移与构建检查单独记录在[实施与验证记录](implementation-and-validation.zh-CN.md)，不继承设计检查作为运行通过。
 
 原始方案基线：`12851e8c9186755207f89e659ff5b8a21b0036d4`；技术设计补充基于方案提交 `d2bec6c9d8c4c0722a55622c9122df7793bce325`，本地数据约束补充基于 `30712510c62e4dc8bb902d43fb0bd47854a3fd76`。检查对象为设计文档，不宣称完成 PR 审查；若后续创建 PR，需按仓库 playbook 对精确 base/head 和干净提交树执行完整 gate。
 
