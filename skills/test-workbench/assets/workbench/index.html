@@ -19,6 +19,7 @@
   </aside><main>
     <nav class="view-actions" aria-label="工作台视图"><div class="primary-views"><button id="cases-view">测试用例</button><button id="records-view">测试记录</button><button id="summary-view">测试总结</button></div><button id="annotations-view" class="secondary-view">批注</button></nav>
     <section class="view-intro"><div><h2 id="view-title"></h2><p id="view-description" class="muted"></p></div><button id="copy-results">复制本轮结果</button></section>
+    <section id="round-history" class="summary-panel" aria-label="同一变更的测试历程" hidden></section>
     <section id="stats" class="stats" aria-label="点击统计筛选当前列表"></section>
     <section id="test-conclusion" class="summary-panel" aria-label="本轮测试结论"></section>
     <section class="workspace" id="workspace"><div class="cases" id="case-sidebar"><div class="filters"><input id="search" aria-label="搜索用例" placeholder="搜索编号或标题"><select id="type" aria-label="测试类型"></select><select id="status" aria-label="结果筛选"></select></div><nav id="case-list" aria-label="测试用例"></nav></div>
