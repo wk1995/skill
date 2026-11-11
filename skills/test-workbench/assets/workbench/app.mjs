@@ -4,6 +4,7 @@ import {testConclusions} from './conclusions.mjs';
 import {openWorkspace,read,update,initializeSource,commitSource} from './store.mjs';
 import {markTarget, selectedTarget, renderComposer, renderThreads} from './annotation-ui.mjs';
 import {renderFlow, renderTestLocation} from './flow-ui.mjs';
+import {roundOptionLabel, unfinishedCandidates} from './round-preparation.mjs';
 const $ = id => document.getElementById(id);
 const labels = {smoke:'冒烟',functional:'功能',performance:'性能',compatibility:'兼容性',stability:'稳定性',security:'安全',usability:'易用性','install-upgrade':'安装升级',integration:'集成',passed:'通过',failed:'失败',partial:'部分执行',blocked:'阻塞',untested:'待测',running:'测试中',skipped:'跳过',draft:'草稿',ready:'就绪',completed:'已结束',prepare:'标记就绪',begin:'开始本轮',complete:'结束本轮',reopen:'重新打开'};
 const el = (tag, text, className) => { const node = document.createElement(tag); if (text != null) node.textContent = text; if (className) node.className = className; return node; };
@@ -52,7 +53,8 @@ function readLocation() {
   environmentId=params.get('environment')??'';applyFilters({query:params.get('q')??'',type:params.get('type'),status:params.get('status')});
   const plan=state.plans.find(item=>item.id===planId),round=state.rounds.find(item=>item.id===roundId),note=(state.annotations??[]).find(item=>item.id===annotationId);
   if(planId&&!plan)linkError='链接中的方案不存在；请先导入对应归档或明确选择目标方案。';
-  else if(roundId&&(!round||round.planId!==planId))linkError='链接中的轮次不属于此方案，请核对批注上下文。';
+  else if(roundId&&!round)linkError=`链接中的轮次不存在：${roundId}。请从原数据源恢复对应归档。`;
+  else if(roundId&&round.planId!==planId)linkError=`轮次 ${roundId} 不属于方案 ${planId}。请核对原归档的归属。`;
   else if(annotationId&&(!note||note.planId!==planId||note.roundId!==roundId||note.caseId!==caseId))linkError='链接中的批注与用例上下文不一致。';
   else if(caseId&&!(round?.cases??plan?.cases??[]).some(item=>item.id===caseId)&&!note)linkError='链接中的用例不存在，不能自动改为其他用例。';
   else if(observationTarget&&!round?.observations.some(item=>item.id===observationTarget&&item.caseId===caseId))linkError='链接中的执行记录与用例不一致。';
@@ -78,10 +80,12 @@ function render() {
   select('version',versions.map(value=>[value,value]),plan?.version??'');
   select('plan',state.plans.filter(item=>item.version===plan?.version).map(item=>[item.id,item.title]),planId);
   let round=state.rounds.find(item=>item.id===roundId&&item.planId===planId); roundId=round?.id??'';
-  select('round',[['','方案定义'],...model.roundsFor(state,planId).map(item=>[item.id,item.name])],roundId);
+  select('round',[['','选择执行轮次'],...model.roundsFor(state,planId).map(item=>[item.id,roundOptionLabel(item)])],roundId);
+  $('case-library').disabled=!plan;
+  $('case-library').setAttribute('aria-pressed',String(Boolean(plan&&!round&&view==='cases'&&!linkError)));
   const definitions=round?.cases??plan?.cases??[];
   $('identity').replaceChildren();
-  if(plan) for(const [label,value] of [['源码',round?.source??plan.source],['CI / 产物',round?.build??plan.build],['PR / 变更',round?.pr??plan.pr]]) {
+  if(plan) for(const [label,value] of [['源码',round?.source??plan.source],['CI / 产物',round?.build??plan.build],['PR / 变更',round?.pr??plan.pr],...(round?[['测试环境',round.environments.map(env=>`${env.label}（${env.kind}）`).join('、')]]:[])]) {
     const p=el('p',`${label}：`);
     if(/^https?:\/\//i.test(value)) {const a=el('a',value);a.href=value;a.target='_blank';a.rel='noopener noreferrer';p.append(a);} else p.append(document.createTextNode(value||'未提供'));
     $('identity').append(p);
@@ -289,6 +293,7 @@ for(const [id,items] of [['type',model.TYPES],['status',model.STATUSES]]) select
 for(const id of ['search','type','status']) $(id).addEventListener('input',()=>{filtersByView.set(view,currentFilters());observationTarget='';render();});
 $('version').onchange=()=>{linkError='';planId=state.plans.find(plan=>plan.version===$('version').value)?.id??'';roundId='';render();};
 $('plan').onchange=()=>{linkError='';planId=$('plan').value;roundId='';render();};$('round').onchange=()=>{linkError='';roundId=$('round').value;render();};
+$('case-library').onclick=()=>{linkError='';roundId='';caseId='';observationTarget='';annotationId='';environmentId='';showView('cases',{reset:true});};
 $('import-button').onclick=()=>$('import').click();
 $('import').onchange=async event=>{try{if(!event.target.files.length)return;const value=JSON.parse(await event.target.files[0].text());await save(state=>value.schemaVersion?model.importArchive(state,value):model.importPlan(state,value));}catch(error){message(error.message,true);}finally{event.target.value='';}};
 $('json-form').onsubmit=async event=>{event.preventDefault();try{const value=JSON.parse(new FormData(event.target).get('json'));await save(state=>value.schemaVersion?model.importArchive(state,value):model.importPlan(state,value));}catch(error){message(error.message,true);}};
@@ -296,18 +301,38 @@ $('export').onclick=()=>download(state,'test-workbench-archive.json');
 $('export-ai').onclick=()=>{try{download(model.exportAI(state),'test-workbench-ai-state.json');message('AI 快照包含状态机契约、原始归档、当前状态及允许的下一步；恢复数据请使用归档。');}catch(error){message(error.message,true);}};
 $('reload').onclick=async()=>{try{await busy(async()=>{state=await read(db);if(linkError)readLocation();render();message('已读取最新数据；未保存的草稿保留。');});}catch(error){message(error.message,true);}};
 let preparedRound = null;
+let unfinishedPlanId = '';
 function caseIds(value){return [...new Set(String(value??'').split(',').map(item=>item.trim()).filter(Boolean))];}
-function roundSelectionInput(){
+function updateUnfinishedSource() {
+  const form=$('round-form'),plan=state.plans.find(item=>item.id===planId),picker=form.elements.unfinishedRound;
+  const selected=unfinishedPlanId===planId?picker.value:'';
+  const options=[['','自动选择同一变更的轮次'],...model.roundsFor(state,planId).map(round=>[round.id,roundOptionLabel(round)])];
+  if(unfinishedPlanId!==planId||JSON.stringify([...picker.options].map(option=>[option.value,option.textContent]))!==JSON.stringify(options)){
+    select('unfinished-source',options,options.some(([id])=>id===selected)?selected:'');
+    unfinishedPlanId=planId;
+  }
+  const enabled=form.elements.unfinished.checked&&!form.elements.fullRegression.checked;
+  $('unfinished-context').hidden=!enabled;
+  picker.disabled=!enabled||pendingAction;
+  if(!enabled||!plan)return {round:null,cases:[]};
+  const result=unfinishedCandidates(state,plan,picker.value);
+  $('unfinished-origin').textContent=result.round
+    ? `来源：${result.round.name}（${result.round.id}） · 变更：${result.round.pr||'未提供'} · 实测源码：${result.round.source} · 候选：${result.cases.join(', ')||'无'}`
+    : '没有匹配当前变更的轮次。请显式选择来源轮次，或取消追加未完成用例。';
+  return result;
+}
+function roundSelectionInput(origin=updateUnfinishedSource()){
   const form=$('round-form'),plan=state.plans.find(item=>item.id===planId);if(!plan)throw new Error('请选择测试方案');
   const full=form.elements.fullRegression.checked;
-  let ids=full?plan.cases.map(item=>item.id):caseIds(form.elements.cases.value);
-  const previous=model.roundsFor(state,planId).at(-1);
-  if(form.elements.unfinished.checked&&previous)ids.push(...previous.cases.filter(item=>plan.cases.some(current=>current.id===item.id)&&model.statusOf(previous,item.id)!=='passed').map(item=>item.id));
-  return {planId,selection:{source:full?'full-regression':form.elements.source.value,planRevision:plan.revision,cases:[...new Set(ids)]}};
+  const ids=full?plan.cases.map(item=>item.id):caseIds(form.elements.cases.value);
+  if(!full&&form.elements.unfinished.checked&&!origin.round)throw new Error('请明确选择未完成用例的来源轮次');
+  return {input:{planId,selection:{source:full?'full-regression':form.elements.source.value,planRevision:plan.revision,cases:[...new Set([...ids,...origin.cases])]}},origin};
 }
+const roundPreviewKey=({input,origin})=>JSON.stringify([input,origin.round?.id]);
 function updateRoundPreview(){
   const form=$('round-form');form.elements.cases.required=!form.elements.fullRegression.checked&&!form.elements.unfinished.checked;
-  let key='';try{key=JSON.stringify(roundSelectionInput());}catch{}
+  const origin=updateUnfinishedSource();
+  let key='';try{key=roundPreviewKey(roundSelectionInput(origin));}catch{}
   if(preparedRound&&(preparedRound.key!==key||preparedRound.revision!==state.revision))preparedRound=null;
   form.elements.confirmed.disabled=!preparedRound;
   if(!preparedRound){form.elements.confirmed.checked=false;$('round-preview').textContent='请预览并确认本轮范围；选择或数据变化后需要重新预览。';}
@@ -315,10 +340,11 @@ function updateRoundPreview(){
 $('round-form').oninput=event=>{if(event.target.name!=='confirmed'&&event.target.name!=='name'){preparedRound=null;updateRoundPreview();}};
 $('preview-round').onclick=()=>{
   try{
-    const input=roundSelectionInput(),preview=model.previewRoundSelection(state,input),plan=state.plans.find(item=>item.id===input.planId);
-    preparedRound={input,key:JSON.stringify(input),revision:state.revision};
+    const context=roundSelectionInput(),{input,origin}=context,preview=model.previewRoundSelection(state,input),plan=state.plans.find(item=>item.id===input.planId);
+    preparedRound={input,key:roundPreviewKey(context),revision:state.revision};
     const frozenIds=new Set(preview.cases.map(item=>item.id)),added=preview.cases.filter(item=>!preview.requestedCases.includes(item.id)),excluded=plan.cases.filter(item=>!frozenIds.has(item.id));
     const panel=$('round-preview');panel.replaceChildren(el('strong',`本轮冻结 ${preview.cases.length} 个用例 · 来源：${input.selection.source}`),el('p',`选中：${preview.requestedCases.join(', ')}`),el('p',`补充前置依赖：${added.map(item=>item.id).join(', ')||'无'}`),el('p',`排除（${excluded.length}）：${excluded.map(item=>item.id).join(', ')||'无'}`));
+    if(origin.round)panel.append(el('p',$('unfinished-origin').textContent));
     if(input.selection.source==='full-regression')panel.append(el('p','完整回归将纳入整个方案，请确认本次任务确实需要。','error'));
     $('round-form').elements.confirmed.checked=false;updateRoundPreview();
   }catch(error){preparedRound=null;updateRoundPreview();message(error.message,true);}

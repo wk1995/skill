@@ -2,7 +2,7 @@
 
 ## [Unreleased]
 
-- No unreleased changes.
+- Separate the case library from execution rounds and preview unfinished cases from a compatible or explicitly selected source round.
 
 ## [0.0.7] - 2026-11-10
 

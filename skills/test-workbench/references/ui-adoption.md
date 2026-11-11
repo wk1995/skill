@@ -17,6 +17,10 @@ On a typical desktop viewport, verify how far users must scroll to reach the cur
 
 ## Verification
 
+Provide a separate case-library entry. The execution selector lists only real rounds, with an empty prompt, scope classification, zoned date, change or tested source, and case count. Show the tested package/build and execution environment/tool labels with the round. Mark absent historical fields as unknown. Keep the version as the release grouping, the plan as a reusable library, and each round as one frozen execution. Both source adapters must render those identities the same way.
+
+Verify a reusable plan with two changes and a focused historical round. Preview from the compatible change by default, switch to an explicitly selected round, and check that changing the source or archive revision clears confirmation. Open an old deep link directly, then try a missing or foreign round ID and confirm it reports the target rather than selecting another execution. Browsing and preview must preserve both sources' archive revisions.
+
 Use disposable data, not real test results:
 
 1. Edit all basic definition fields; confirm persistence and a new round's definition, while the old round/observations remain byte-equivalent. Reject stale tokens, unknown IDs, injected result fields, invalid classifications and graph cycles before persistence.
