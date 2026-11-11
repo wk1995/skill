@@ -2,7 +2,7 @@
 
 ## [Unreleased]
 
-- No unreleased changes.
+- Verify shared historical rounds from the committed files or published Issue snapshots, and identify missing source data before opening a historical link.
 
 ## [0.0.7] - 2026-11-10
 

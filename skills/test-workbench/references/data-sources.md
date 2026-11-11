@@ -84,3 +84,22 @@ The webpage's **Round test conclusion** and AI `projection.conclusions` use the 
 Existing IndexedDB databases are never silently migrated or cleared. For an explicit local preview/old-data export, serve `assets/workbench/` with a static server and open `?local=1` (the original database) or the existing `?workspace=<name>` URL (a named database). The banner states browser preview and no primary-source sync. Export first, restart with the chosen source bridge, explicitly initialize the destination if needed and import/verify the archive. Browser exports remain backups; primary writes go through the connected source. Node/gh/Git setup errors do not create an automatic file/IndexedDB fallback.
 
 For a requested source switch: retain a backup; map stable IDs, definitions, frozen rounds, environments, observations/events, annotations and evidence URLs; validate the destination projection; verify the transferred data and references; then record the new source selection. Keep the old source as a clearly marked backup/archive. Do not enable automatic bidirectional writes or treat both sources as authoritative during migration. If transfer fails, retain the old authority and pending migration data. Existing local archives remain readable without inventing source metadata or history.
+
+## Verify delivery of shared history
+
+Before handoff, record which old rounds must open from the delivered source and which evidence is intentionally local. For each shared round, take the expected ID, owning plan, version, tested source/build, ordered frozen case IDs, conclusion and evidence references from the accepted handoff or a verified backup. Use the previously accepted values, not an export of the possibly incomplete target. Keep credentials, logs and packages out of the expectations and Git. The read-only verifier takes a JSON array such as:
+
+```json
+[{"roundId":"round-23","planId":"desktop","version":"2.0.0","source":"tested-sha","build":"build-57","scope":["SMOKE-01"],"verdict":"failed","evidence":["https://github.com/OWNER/REPO/issues/17"],"observationId":"obs-8"}]
+```
+
+Run from the Skill directory:
+
+```bash
+node scripts/verify-delivered-archive.mjs --repo-root /absolute/clean/checkout --data-dir testing/testflow --expect /absolute/handoff.json
+node scripts/verify-delivered-archive.mjs --repo OWNER/REPO --workspace default --issue 123 --expect /absolute/handoff.json
+```
+
+For files, clone or check out the exact delivered ref without copying ignored working files. The verifier rejects pending or ignored active test data. For Issues, use the original host, workspace and index with a permitted account. The index must reference readable manifest, round and conclusion snapshots. The verifier checks the saved conclusion through the same source readers as the webpage, compares declared evidence references, and prints each round's link fragment. Open that fragment on the corresponding source in a fresh browser context. Verify it opens the original round or optional observation rather than a similar current round. Check access to evidence separately with the intended recipient's permissions.
+
+If data is missing, keep the delivered source and local evidence intact. Identify the missing ID and dependency (committed workspace pointer/files, published index, snapshot or access). For intentionally local evidence, document the authorized backup or owner and how to retrieve it. Where sharing is intended, recover the original archive from the verified checkout, authorized backup or Issue snapshots and use the project's existing import/publication workflow. Avoid repointing an index or editing a snapshot by hand. Repeat the clean checkout/fresh browser checks after recovery. If no authorized copy is available, record that round as unavailable and preserve the original link rather than reconstructing its results.

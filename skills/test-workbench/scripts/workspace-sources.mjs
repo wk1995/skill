@@ -47,7 +47,8 @@ export class GitHubSource{
   identity(issue,kind,key){if(issue.pull_request)return false;try{const data=unpack(issue.body);return data.format===FORMAT&&data.workspace===this.workspace&&data.kind===kind&&(key===undefined||data.key===key);}catch{return false;}}
   async indexIssue(){
     if(!this.index){const matches=(await this.issues()).filter(item=>this.identity(item,'index'));require(matches.length<=1,'发现多个工作台索引，请使用 --issue 明确选择');if(!matches.length)return null;this.index=matches[0].number;}
-    const issue=await this.api('GET',`repos/${this.repo}/issues/${this.index}`);require(this.identity(issue,'index'),'指定 Issue 不是此工作台索引');return issue;
+    let issue;try{issue=await this.api('GET',`repos/${this.repo}/issues/${this.index}`);}catch(error){throw new Error(`Workspace index Issue #${this.index} is missing or inaccessible: ${error.message}`,{cause:error});}
+    require(this.identity(issue,'index'),'指定 Issue 不是此工作台索引');return issue;
   }
   async #entity(key,title){const matches=(this.inventory??await this.issues()).filter(item=>this.identity(item,'entity',key));require(matches.length<=1,'Duplicate entity Issues; inspect before retrying');if(matches.length)return matches[0];
     const result=await this.api('POST',`repos/${this.repo}/issues`,{title:title.slice(0,180),body:packet({format:FORMAT,workspace:this.workspace,kind:'entity',key})});require(number(result.number)&&result.user?.login===this.actor,'Issue write identity uncertain; inspect before retrying');this.inventory?.push(result);return result;
@@ -76,12 +77,16 @@ export class GitHubSource{
   async load(){
     const issue=await this.indexIssue();if(!issue)return {state:empty(),initialized:false};
     const index=unpack(issue.body);if(index.manifest===null){require(index.revision===0,'Invalid empty index');return {state:empty(),initialized:true};}
-    const manifest=await this.readDocument(index.manifest);require(manifest.revision===index.revision,'Index revision mismatch');
+    const read=async(ref,context)=>{
+      try{return await this.readDocument(ref);}
+      catch(error){throw new Error(`Published ${context} is missing, inaccessible or invalid: ${error.message}`,{cause:error});}
+    };
+    const manifest=await read(index.manifest,`manifest of index #${issue.number}`);require(manifest.revision===index.revision,'Index revision mismatch');
     const {testConclusions:conclusionRef,...archiveManifest}=manifest;const state={...archiveManifest,plans:[],rounds:[],annotations:[]};
-    for(const plan of manifest.plans){const cases=[];for(const ref of plan.cases)cases.push(await this.readDocument(ref));state.plans.push({...plan,cases});}
-    for(const ref of manifest.rounds)state.rounds.push(await this.readDocument(ref));
-    for(const ref of manifest.annotations??[])state.annotations.push(await this.readDocument(ref));
-    validate(state);require(canonical(await this.readDocument(conclusionRef))===canonical(testConclusions(state)),'Test conclusion does not match records');return {state,initialized:true,manifest};
+    for(const plan of manifest.plans){const cases=[];for(const ref of plan.cases)cases.push(await read(ref,`case snapshot ${ref?.key??'(unknown)'}`));state.plans.push({...plan,cases});}
+    for(const ref of manifest.rounds)state.rounds.push(await read(ref,`round snapshot ${ref?.key??'(unknown)'}`));
+    for(const ref of manifest.annotations??[])state.annotations.push(await read(ref,`annotation snapshot ${ref?.key??'(unknown)'}`));
+    validate(state);require(canonical(await read(conclusionRef,'test conclusions'))===canonical(testConclusions(state)),'Test conclusion does not match records');return {state,initialized:true,manifest};
   }
   async read(){const loaded=await this.load();return {state:loaded.state,info:{mode:'github-issues',repository:`${this.hostname}/${this.repo}`,workspace:this.workspace,actor:this.actor,initialized:loaded.initialized,issue:this.index??null,url:this.index?`https://${this.hostname}/${this.repo}/issues/${this.index}`:null,persistence:loaded.initialized?'github-issues':'not-initialized'}};}
   async initialize(){await this.preflight();if(await this.indexIssue())return this.read();const issue=await this.api('POST',`repos/${this.repo}/issues`,{title:`Testflow · ${this.workspace}`,body:packet({format:FORMAT,workspace:this.workspace,kind:'index',revision:0,manifest:null})});require(number(issue.number)&&issue.user?.login===this.actor,'Index creation uncertain; inspect before retrying');this.index=issue.number;return this.read();}
