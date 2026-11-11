@@ -2,7 +2,7 @@
 
 ## [Unreleased]
 
-- No unreleased changes.
+- Acknowledge exact focused-round creation retries against the frozen round after the plan revision changes. New rounds still require a current preview and selection.
 
 ## [0.0.7] - 2026-11-10
 

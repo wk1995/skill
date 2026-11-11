@@ -240,14 +240,12 @@ export function statusOf(round, caseId) {
   return priority.find(status => statuses.includes(status)) ?? 'untested';
 }
 export const roundsFor = (state, planId) => state.rounds.filter(round => round.planId === planId).sort((a,b) => Date.parse(a.createdAt) - Date.parse(b.createdAt));
-function resolveRoundSelection(state, input) {
-  const plan = find(state.plans, input.planId, 'Plan');
+function readRoundSelection(input) {
   const selection = input.selection;
   require(object(selection), 'Frozen round selection required');
   require(!['changedIds', 'includeUnfinished'].some(key => Object.hasOwn(input, key)), 'Use explicit selection.cases instead of legacy selection inputs');
   require(SELECTION_SOURCES.includes(selection.source), 'Invalid selection source');
   require(Number.isSafeInteger(selection.planRevision) && selection.planRevision >= 0, 'selection: invalid plan revision');
-  require(selection.planRevision === plan.revision, 'Selection is stale; reload the current plan before creating a round');
   list(selection.cases, 'selection.cases');
   require(selection.cases.length > 0, 'Select at least one case');
   const ids = new Set();
@@ -255,8 +253,12 @@ function resolveRoundSelection(state, input) {
     text(id, 'selection.cases.id');
     require(!ids.has(id), `selection.cases: duplicate ID ${id}`);
     ids.add(id);
-    find(plan.cases, id, 'Selected case');
   }
+  return selection;
+}
+function resolveRoundSelection(plan, selection) {
+  require(selection.planRevision === plan.revision, 'Selection is stale; reload the current plan before creating a round');
+  const ids = new Set(selection.cases);
   if (selection.source === 'full-regression') require(ids.size === plan.cases.length && plan.cases.every(item => ids.has(item.id)), 'Full regression selection must include every plan case');
   const current = new Map(plan.cases.map(item => [item.id, item]));
   const selected = new Map();
@@ -270,21 +272,33 @@ function resolveRoundSelection(state, input) {
     add(find(plan.cases, id, 'Dependency case'), 'dependency');
   }
   const cases = orderCases([...selected.values()]);
-  return {plan, selection, cases};
+  return cases;
 }
 export function previewRoundSelection(state, input) {
   validate(state);
-  const {selection, cases} = resolveRoundSelection(state, input);
+  const selection = readRoundSelection(input);
+  const cases = resolveRoundSelection(find(state.plans, input.planId, 'Plan'), selection);
   return {source: selection.source, planRevision: selection.planRevision, requestedCases: [...selection.cases], cases: cases.map(item => ({id: item.id, reasons: [...item.selectionReasons]}))};
 }
 export function createRound(state, input) {
   validate(state);
   text(input.id, 'round ID'); text(input.name, 'round name'); timestamp(input.createdAt, 'createdAt');
-  const {plan, selection, cases} = resolveRoundSelection(state, input);
+  const plan = find(state.plans, input.planId, 'Plan');
+  const selection = readRoundSelection(input);
+  const existing = state.rounds.find(item => item.id === input.id);
+  if (existing && selection.planRevision !== plan.revision) {
+    // The old plan revision is no longer available. Only acknowledge the
+    // original request against the validated, immutable round snapshot.
+    const frozen = existing.selection;
+    require(existing.planId === input.planId && existing.name === input.name && existing.createdAt === input.createdAt &&
+      frozen?.source === selection.source && frozen.planRevision === selection.planRevision &&
+      same(frozen.requestedCases, selection.cases), 'Round ID already exists with a different definition');
+    return state;
+  }
+  const cases = resolveRoundSelection(plan, selection);
   const round = {id: input.id, name: input.name, planId: plan.id, version: plan.version, source: plan.source,
     build: plan.build, pr: plan.pr, createdAt: input.createdAt, selection: {source: selection.source, planRevision: selection.planRevision, requestedCases: [...selection.cases], cases: cases.map(item => item.id)},
     cases, environments: [], observations: [], workflow: {version: CONTRACT.version, events: []}};
-  const existing = state.rounds.find(item => item.id === input.id);
   if (existing) {
     const definition = value => Object.fromEntries(Object.entries(value).filter(([key]) => !['environments', 'observations', 'workflow', 'issueLinks'].includes(key)));
     require(same(definition(existing), definition(round)), 'Round ID already exists with a different definition');
