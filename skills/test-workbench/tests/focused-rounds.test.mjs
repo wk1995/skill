@@ -49,6 +49,18 @@ test('explicit full regression includes every case and old smoke archives remain
  const legacy=structuredClone(all);delete legacy.rounds[0].selection;assert(m.validate(legacy));assert.equal(m.importArchive(legacy,structuredClone(legacy)),legacy);assert.equal(legacy.rounds[0].selection,undefined);
 });
 
+test('an exact creation retry uses the saved scope after a plan revision; stale requests cannot create new rounds',()=>{
+ const s=fixture(),request=input(s),saved=m.createRound(s,request);
+ const edited=m.editCase(saved,'p',{...saved.plans[0].cases[0],steps:'Edited after creation'});
+ assert.equal(m.createRound(edited,request),edited);
+ assert.equal(edited.rounds[0].cases[0].steps,'Execute');
+ rejects(edited,x=>m.createRound(x,{...request,id:'new'}),/stale/);
+ rejects(edited,x=>m.previewRoundSelection(x,request),/stale/);
+ rejects(edited,x=>m.createRound(x,{...request,name:'Conflicting retry'}),/already exists/);
+ rejects(edited,x=>m.createRound(x,{...request,selection:{...request.selection,cases:['C49']}}),/already exists/);
+ rejects(edited,x=>m.createRound(x,{...request,changedIds:['C49']}),/legacy/);
+});
+
 test('focused archive and exact conclusion survive both primary sources; invalid scope writes preserve authority and repeats write nothing',async t=>{
  const root=await fs.mkdtemp(path.join(os.tmpdir(),'focused-sources-'));t.after(()=>fs.rm(root,{recursive:true,force:true}));await command('git',['init','-q','-b','main',root]);for(const [key,value] of [['user.name','Fixture'],['user.email','fixture@example.invalid'],['commit.gpgsign','false'],['core.hooksPath',os.devnull]])await command('git',['-C',root,'config',key,value]);await fs.writeFile(path.join(root,'README'),'Disposable');await command('git',['-C',root,'add','README']);await command('git',['-C',root,'commit','-qm','Fixture']);
  const api=new FakeGitHub(),sources=[api.source(),new FileSource({repoRoot:root})];let saved=running(m.createRound(fixture(),input(fixture())));saved.revision=1;
