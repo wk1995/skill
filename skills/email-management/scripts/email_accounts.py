@@ -10,6 +10,7 @@ from pathlib import Path
 import re
 import stat
 import sys
+from unicodedata import normalize
 import uuid
 
 MAX_BYTES = 1024 * 1024
@@ -37,8 +38,23 @@ def require(condition, message):
         raise AccountError(message)
 
 
+def same_location(left, right):
+    """Compare actual identity, including paths with components not yet created."""
+    while left != right:
+        if left.exists() and right.exists():
+            return os.path.samefile(left, right)
+        if left == left.parent or right == right.parent:
+            return False
+        # An absent name has no inode. Reject ambiguous case or Unicode
+        # variants before creation, even on a case-sensitive filesystem.
+        if normalize("NFD", left.name).casefold() != normalize("NFD", right.name).casefold():
+            return False
+        left, right = left.parent, right.parent
+    return True
+
+
 def contained(path, parent):
-    return path == parent or parent in path.parents
+    return any(same_location(candidate, parent) for candidate in (path, *path.parents))
 
 
 def local_path(value):
@@ -82,8 +98,7 @@ def separate_locations(locations):
     items = list(locations.values())
     for index, left in enumerate(items):
         for right in items[index + 1:]:
-            aliases = left.exists() and right.exists() and os.path.samefile(left, right)
-            require(not aliases and not contained(left, right) and not contained(right, left),
+            require(not contained(left, right) and not contained(right, left),
                     "Private config, state, cache and data directories must be separate")
 
 
@@ -163,7 +178,7 @@ def document(value):
             and type(value["schema_version"]) is int and value["schema_version"] == SCHEMA
             and isinstance(value["accounts"], dict), "Unsupported or damaged private account index")
     seen = set()
-    qq_instances, qq_configs = set(), set()
+    qq_instances, qq_configs = set(), []
     for key, entry in value["accounts"].items():
         item = profile(entry)
         require(key == item["id"], "Account index identity mismatch")
@@ -171,10 +186,12 @@ def document(value):
         seen.add(item["address"].casefold())
         require(item == entry, "Noncanonical native configuration reference; explicitly repair the local index")
         if item["backend"] == "qq-email-mcp":
-            require(item["instance"] not in qq_instances and item["config_path"] not in qq_configs,
+            config = Path(item["config_path"])
+            require(item["instance"] not in qq_instances
+                    and not any(same_location(config, other) for other in qq_configs),
                     "QQ single-account instances and native configuration must be isolated")
             qq_instances.add(item["instance"])
-            qq_configs.add(item["config_path"])
+            qq_configs.append(config)
     return value
 
 
@@ -312,10 +329,6 @@ class Store:
             for key, other in accounts.items():
                 require(key == entry["id"] or other["address"].casefold() != entry["address"].casefold(),
                         "Address already belongs to another local account ID")
-                if entry["backend"] == "qq-email-mcp" and other["backend"] == "qq-email-mcp" and key != entry["id"]:
-                    require(other["instance"] != entry["instance"] and
-                            other.get("config_path") != entry.get("config_path"),
-                            "QQ single-account instances and native configuration must be isolated")
             accounts[entry["id"]] = entry
             return value
         return self.mutate(apply)

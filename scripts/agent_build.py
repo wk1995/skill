@@ -29,6 +29,7 @@ TRANSIENT_DIRECTORY_NAMES = {".git", "dist", "node_modules", "__pycache__", ".py
 TRANSIENT_FILE_NAMES = {".DS_Store"}
 TRANSIENT_SUFFIXES = {".pyc", ".pyo"}
 LOCAL_SKILL_POLICIES = {"pr-review-loop": "pr-review-loop.yml"}
+LOCAL_EMAIL_INPUTS = {".email-management", "email-management.local.json", "email-management.local.toml"}
 
 
 def is_local_skill_policy(root: Path, relative: Path) -> bool:
@@ -45,6 +46,11 @@ class BuildError(Exception):
 def require(condition: bool, message: str) -> None:
     if not condition:
         raise BuildError(message)
+
+
+def reject_local_email_input(relative: Path) -> None:
+    require(not any(part.casefold() in LOCAL_EMAIL_INPUTS for part in relative.parts),
+            "Local email data found in build inputs; move it to private storage outside the checkout")
 
 
 def relative_path(value: object, field: str, *, allow_dot: bool = False) -> Path:
@@ -180,6 +186,7 @@ def copy_tree(
             or is_local_skill_policy(source, relative)
         ):
             continue
+        reject_local_email_input(relative)
         require(not path.is_symlink(), f"build inputs must not contain symbolic links: {path}")
         destination = target / relative
         if path.is_dir():
@@ -293,6 +300,11 @@ def build(platform: str, skill_names: list[str], output_arg: str | None, force: 
     skills = selected_skills(skill_names)
     output = safe_output(Path(output_arg) if output_arg else DEFAULT_OUTPUT_DIR / platform)
     validate_replacement(output, platform, force)
+    for root in (platform_dir, *(skill_dir for skill_dir, _, _, _ in skills)):
+        for path in root.rglob("*"):
+            relative = path.relative_to(root)
+            if not ignored_input(relative):
+                reject_local_email_input(relative)
     try:
         fingerprints = {sync_id: input_digest(skill_dir, platform_dir, sync_id)
                         for skill_dir, _, sync_id, _ in skills}

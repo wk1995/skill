@@ -209,9 +209,37 @@ nested_fragment.unlink()
 nested_fragment.parent.rmdir()
 (nested_fragment.parent.parent).rmdir()
 
+for source in (fixture_root / "skills" / "demo", fixture_root / "platforms" / "new-agent"):
+    for prefix in (Path(), Path("nested")):
+        for name in (".email-management/canary", "email-management.local.json", "email-management.local.toml"):
+            path = source / prefix / name
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text("synthetic local-only data", encoding="utf-8")
+            try:
+                agent_build.build("new-agent", [], None, True)
+            except agent_build.BuildError as error:
+                assert "Local email data found" in str(error), str(error)
+            else:
+                raise AssertionError("build must reject local email data before replacing the artifact")
+            assert path.read_text(encoding="utf-8") == "synthetic local-only data"
+            assert (output / ".agent-build.json").read_text(encoding="utf-8") == first_manifest
+            assert not list(output.parent.glob(f".{output.name}-build-*"))
+            fresh = output.parent / "absent" / "build"
+            try:
+                agent_build.build("new-agent", [], str(fresh), False)
+            except agent_build.BuildError as error:
+                assert "Local email data found" in str(error), str(error)
+            else:
+                raise AssertionError("build must reject local email data before creating an artifact")
+            assert not fresh.parent.exists()
+            path.unlink()
+            if name.startswith(".email-management/"):
+                path.parent.rmdir()
+
 rebuilt = agent_build.build("new-agent", [], None, True)
 assert rebuilt == output
 assert (rebuilt / ".agent-build.json").read_text(encoding="utf-8") == first_manifest
+assert agent_build.build("new-agent", [], None, True) == output
 print("PASS: a new Agent is added by one platform directory without builder or Skill changes")
 PY
 

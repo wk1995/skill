@@ -1,6 +1,8 @@
 # Feishu Mail
 
-Use the user's activated Feishu mailbox with official `lark-cli mail`; a Feishu login or a third-party mailbox bound in the client does not prove this API is available. [Official baseline guidance](https://github.com/larksuite/cli/blob/1bfdcc2c1a0ed0296ddb6349d251bdd75145bc5a/skills/lark-mail/SKILL.md). Help inspected locally on lark-cli 1.0.73; real-mail integration remains untested. Feishu and international Lark contexts need separate identity/qualification checks.
+Use the user's activated Feishu mailbox with official `lark-cli mail`; a Feishu login or a third-party mailbox bound in the client does not prove this API is available. [Official baseline guidance](https://github.com/larksuite/cli/blob/1bfdcc2c1a0ed0296ddb6349d251bdd75145bc5a/skills/lark-mail/SKILL.md).
+
+Selected read-only checks passed on lark-cli 1.0.73, including account identity, search and one message body. Feishu write operations and international Lark remain pending. [Anonymized smoke test record](../doc/test-results/2026-11-10-readonly-smoke/report.zh-CN.md).
 
 ## Discover And Verify
 

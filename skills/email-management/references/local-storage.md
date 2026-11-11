@@ -62,6 +62,8 @@ A native configuration pointer may be registered before that backend creates the
 
 Both direct mutation methods and CLI entry points validate the platform, all selected roots, profile whitelist, existing index and owned file identities before creating a directory/lock. Paths resolve through existing ancestors and reject Git worktrees, bare repositories and directories under a `SKILL.md`, including linked/case aliases to them. The running Skill and its ancestor cannot be selected as the private base.
 
+Storage roots and QQ native configuration references use filesystem identity for existing paths. For paths awaiting creation, potentially equivalent spellings that differ only in case or Unicode normalization are treated as aliases. Select distinct paths before retrying a rejected registration or setup.
+
 New private directories use `0700`, files use `0600`. Insecure existing owned storage rejects without chmod repair. Each mutation takes an exclusive private `.accounts.lock`, rereads the index, writes a same-directory temporary file, retains the previous valid index as `accounts.json.bak`, atomically replaces the index and fsyncs. Writes use an open directory descriptor; final links/hardlinks are not followed. Failure retains recoverable data and cleans only its own temporary file/lock. A post-replacement fsync failure may leave the new index visible: read it back before explicitly retrying.
 
 An existing lock is not automatically stolen or removed. Inspect it locally and resolve the owning operation before an explicit retry; do not delete an unknown process's files. If the main index is damaged, preserve both it and its backup; this version does not auto-restore a backup, migrate schemas or purge private data. Reads and no-op mutations still validate the owned paths; a successful no-op is not a network health check.
@@ -71,3 +73,5 @@ These checks constrain this helper. They are not an OS sandbox against another p
 ## Git And Distribution
 
 Only synthetic profile shapes and public provider instructions are distributable. Do not read or copy actual local files during builds. Ignore rules for `.email-management/` and `email-management.local.*` are secondary precautions; tracked or renamed private copies still require inspection. Never force-add them. Do not upload real execution evidence under a default Issue attachment workflow. Stop before publication if private content has entered the proposed output; preserve local originals and report without rewriting shared history automatically.
+
+The repository builder rejects `.email-management`, `email-management.local.json` and `email-management.local.toml` anywhere in selected build inputs. Move any such data outside the checkout before rebuilding.

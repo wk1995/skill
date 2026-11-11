@@ -131,14 +131,19 @@ class AccountStorageTests(unittest.TestCase):
         self.assertFalse(self.root.exists())
 
     def test_xdg_roots_cannot_overlap_config_and_cleanable_cache(self):
-        for cache in (self.base / "settings", self.base / "settings/email-management/child"):
+        for cache in (self.base / "settings", self.base / "settings/email-management/child",
+                      self.base / "SETTINGS/EMAIL-MANAGEMENT/child"):
             env = {"XDG_CONFIG_HOME": str(self.base / "settings"),
                    "XDG_STATE_HOME": str(self.base / "state"),
                    "XDG_CACHE_HOME": str(cache), "XDG_DATA_HOME": str(self.base / "data")}
             with self.subTest(cache=cache.name), mock.patch.dict(os.environ, env):
                 with self.assertRaises(accounts.AccountError):
                     accounts.Store()
+                result = subprocess.run([sys.executable, "-B", str(SCRIPT), "put"],
+                                        input=json.dumps(self.alpha), capture_output=True, text=True)
+                self.assertEqual(result.returncode, 2, result.stderr)
         self.assertFalse((self.base / "settings").exists())
+        self.assertFalse((self.base / "SETTINGS").exists())
 
     def test_git_worktree_bare_repository_and_skill_paths_rejected(self):
         variants = [self.base / name for name in ("repo", "worktree", "bare", "skill")]
@@ -362,6 +367,33 @@ class AccountStorageTests(unittest.TestCase):
             self.store.put(second)
         with self.assertRaises(accounts.AccountError):
             self.store.put(dict(second, config_path=str(self.base / "other.toml"), instance="alpha"))
+
+    def test_qq_config_alias_rejected_before_mutation_and_on_reopen(self):
+        native = self.base / "qq.toml"
+        alias = self.base / "QQ.TOML"
+        first = dict(self.alpha, provider="qq", backend="qq-email-mcp", config_path=str(native))
+        second = dict(self.beta, provider="qq", backend="qq-email-mcp", config_path=str(alias))
+        self.assertTrue(self.store.put(first))
+        index = self.store.directory / "accounts.json"
+        original = index.read_bytes()
+        for create_native in (False, True):
+            if create_native:
+                native.touch(mode=0o600)
+            with self.subTest(native_present=create_native):
+                result = self.cli("put", data=second)
+                self.assertEqual(result.returncode, 2, result.stderr)
+                self.assertEqual(index.read_bytes(), original)
+                self.assertEqual(set(p.name for p in self.store.directory.iterdir()), {"accounts.json"})
+                invalid = json.dumps({"schema_version": 1, "accounts": {"alpha": first, "beta": second}})
+                index.write_text(invalid)
+                for command in (("list",), ("show", "--account", "alpha"), ("remove", "--account", "beta")):
+                    self.assertEqual(self.cli(*command).returncode, 2)
+                    self.assertEqual(index.read_text(), invalid)
+                    self.assertEqual(set(p.name for p in self.store.directory.iterdir()), {"accounts.json"})
+                index.write_bytes(original)
+        second["config_path"] = str(self.base / "distinct.toml")
+        self.assertTrue(self.store.put(second))
+        self.assertFalse(self.store.put(second))
 
     def test_existing_qq_isolation_damage_rejected_on_read_and_remove(self):
         first = dict(self.alpha, provider="qq", backend="qq-email-mcp",
