@@ -53,6 +53,8 @@ File mode also links new or existing execution records to one or more GitHub Iss
 
 In the [GitHub Issues mode](references/github-issues.md), multi-user concurrency and strict remote history protection are explicitly deferred for an initial single-operator flow, while existing local guards remain. CLI image/video attachments require **gh 2.99.0+** and `--attach` in the actual command's help. For older/missing support, upgrade through the existing installation channel (Homebrew: `brew upgrade gh`) when authorized, recheck capabilities/account, or use browser upload. Logs/text/ZIP files use browser attachments or a separately verified adapter even on newer CLI versions. Ordinary CI/text tasks are not subject to this optional media version gate.
 
+Before handing off shared history, use `node scripts/verify-delivered-archive.mjs --repo-root /absolute/clean/checkout --expect handoff.json` for repository files, or replace `--repo-root` with `--repo OWNER/REPO` for published Issues. Use the printed historical link in a fresh browser context. See [delivery verification](references/data-sources.md#verify-delivery-of-shared-history) for expectations and recovery.
+
 ### Routing And Prerequisite Flow
 
 Declare a required pass on the **target's `dependsOn`**, including when that target is reached through `next`. For example, LOGIN01's passed branch targets PAY01, while PAY01 requires both LOGIN01 and CART01. Until CART01 passes, guidance identifies CART01 first; it does not record a result or change the configured route. See the [combined definition example](references/dependencies.md#where-to-put-the-condition).

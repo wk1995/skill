@@ -56,7 +56,11 @@ function readLocation() {
   else if(annotationId&&(!note||note.planId!==planId||note.roundId!==roundId||note.caseId!==caseId))linkError='链接中的批注与用例上下文不一致。';
   else if(caseId&&!(round?.cases??plan?.cases??[]).some(item=>item.id===caseId)&&!note)linkError='链接中的用例不存在，不能自动改为其他用例。';
   else if(observationTarget&&!round?.observations.some(item=>item.id===observationTarget&&item.caseId===caseId))linkError='链接中的执行记录与用例不一致。';
-  if(environmentId&&!state.environments.some(item=>item.id===environmentId))linkError='链接中的环境不存在，请核对上下文。';
+  if(!linkError&&environmentId&&!state.environments.some(item=>item.id===environmentId))linkError='链接中的环境不存在，请核对上下文。';
+  if(roundId&&db?.remote&&db.info.initialized===false){
+    const missing=db.info.mode==='github-issues'?' GitHub 工作台索引':'仓库文件工作台入口';
+    linkError=`找不到${missing}，无法读取轮次 ${roundId}。请核对所选数据源或恢复已交付归档。`;
+  }
   if(note&&!linkError){observationTarget=note.observationId;if(!(round?.cases??plan?.cases??[]).some(item=>item.id===caseId))view='annotations';}
   if(observationTarget&&!linkError){if(view==='cases')view='records';if(!environmentId)environmentId=round.observations.find(item=>item.id===observationTarget).environment.id;}
 }

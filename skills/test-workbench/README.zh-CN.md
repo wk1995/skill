@@ -2,7 +2,7 @@
 
 语言：[English](README.md) | **简体中文**
 
-`test-workbench` 管理可复用的网页测试流程，统一测试用例、执行记录与绑定数据版本的测试总结；轮次只冻结明确选中的范围与必要前置依赖。工作台组织版本、方案、轮次、环境/设备、用例依赖、下一步测试、Issue 证据及批注，并在需要时衔接不同平台的 CI 测试包和 PR 变更。普通 CI 只归档产物，对外发布须明确要求。当前技能版本：`0.0.7`。
+`test-workbench` 管理可复用的网页测试流程，统一测试用例、执行记录与绑定数据版本的测试总结；轮次只冻结明确选中的范围与必要前置依赖。工作台组织版本、方案、轮次、环境/设备、用例依赖、下一步测试、Issue 证据及批注，支持从交付的数据源校验共享历史轮次，并在需要时衔接不同平台的 CI 测试包和 PR 变更。普通 CI 只归档产物，对外发布须明确要求。当前技能版本：`0.0.7`。
 
 ## 如何使用
 
@@ -52,6 +52,8 @@ Skill 支持**两种主数据源模式**：新项目默认使用 **GitHub Issues
 文件模式也支持为新增或已有测试记录关联一个或多个 GitHub Issue。新增记录时填完整 Issue 链接，或展开已有记录的“关联 Issue”。截图和日志直接放在 Issue 中，网页不再提供单独的附件入口。关联信息追加保存在 `records.json`，随显式 Git 提交入库，并显示为网页链接及 AI/结论引用。原始记录和结果保持不变。失败须填写备注并关联 Issue（旧记录的证据字段仍兼容）。链接仅表示声明的关联，存在性、权限和附件内容需在 GitHub 确认；关联不会创建、评论或关闭 Issue，也不联动状态。详见[记录关联 Issue](references/data-sources.md#record-to-issue-associations)。
 
 在 [GitHub Issues 模式](references/github-issues.md)下，初期按单人顺序操作，**多人并发与严格的远端历史保护暂不处理**，现有本地校验保留。CLI 上传图片/视频要求 **gh 2.99.0+**，并确认实际命令帮助中有 `--attach`。版本过低或缺少参数时，在已授权范围内通过原安装渠道升级（Homebrew：`brew upgrade gh`），复查能力和账号；无法升级则改用 GitHub 网页上传。即使版本足够，日志、文本和 ZIP 仍走网页附件或另行验证的适配器。普通 CI 和文本操作不受此可选媒体功能的最低版本限制。
+
+交付共享历史时，文件模式运行 `node scripts/verify-delivered-archive.mjs --repo-root /干净检出绝对路径 --expect handoff.json`，Issue 模式改用 `--repo OWNER/REPO`。在全新浏览器会话中打开命令输出的历史链接。验收清单和恢复方法见[交付历史校验](references/data-sources.md#verify-delivery-of-shared-history)。
 
 ### 路由与依赖流程
 
