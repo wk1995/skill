@@ -1,0 +1,1516 @@
+{
+  "schemaVersion": 1,
+  "revision": 43,
+  "plans": [
+    {
+      "id": "email-connected-readonly-smoke",
+      "revision": 1,
+      "version": "0.1.0-dev",
+      "title": "已接入邮箱的受限只读功能测试",
+      "source": "07ef7b1eedc4d82db56e84d8cc38215264332700",
+      "build": "Skill source + existing native QQ MCP 0.1.1 / Feishu CLI 1.0.73; no CI package",
+      "pr": "",
+      "cases": [
+        {
+          "id": "LIVE-01",
+          "title": "账号身份与本机绑定一致",
+          "priority": "P0",
+          "types": [
+            "smoke",
+            "integration"
+          ],
+          "preconditions": "用户已确认 QQ 与飞书只读范围，每邮箱最多读取1封正文。源设计追踪：EM-AUTH-007；本用例是缩减后的实际样本检查，不能关闭原设计的完整用例。",
+          "steps": "读取当前后端身份，与本机选定账号比较；记录运行版本和读取权限。",
+          "expected": "真实账号匹配且读取可用；不打印或公开账号值。",
+          "dependsOn": [],
+          "next": {
+            "passed": {
+              "action": "done",
+              "reason": "本项观察完成，继续冻结范围内独立检查"
+            },
+            "failed": {
+              "action": "retry",
+              "caseId": "LIVE-01",
+              "reason": "保留失败，明确修复或恢复后再另行复测"
+            },
+            "partial": {
+              "action": "wait",
+              "reason": "证据不完整",
+              "resumeWhen": "补齐本项未验证证据并明确重测"
+            },
+            "blocked": {
+              "action": "wait",
+              "reason": "前提或样本不足",
+              "resumeWhen": "具备缺失样本或权限并明确重测"
+            },
+            "skipped": {
+              "action": "done",
+              "reason": "本项未执行，不代表通过"
+            }
+          }
+        },
+        {
+          "id": "LIVE-02",
+          "title": "文件夹可读取且存在收件箱",
+          "priority": "P1",
+          "types": [
+            "smoke",
+            "integration"
+          ],
+          "preconditions": "用户已确认 QQ 与飞书只读范围，每邮箱最多读取1封正文。源设计追踪：EM-PROV-001/008；本用例是缩减后的实际样本检查，不能关闭原设计的完整用例。",
+          "steps": "列出文件夹并解析收件箱角色，检查所选账号的有效文件夹。",
+          "expected": "返回结构有效且有可用收件箱；不公开自定义目录名称。",
+          "dependsOn": [
+            "LIVE-01"
+          ],
+          "next": {
+            "passed": {
+              "action": "done",
+              "reason": "本项观察完成，继续冻结范围内独立检查"
+            },
+            "failed": {
+              "action": "retry",
+              "caseId": "LIVE-02",
+              "reason": "保留失败，明确修复或恢复后再另行复测"
+            },
+            "partial": {
+              "action": "wait",
+              "reason": "证据不完整",
+              "resumeWhen": "补齐本项未验证证据并明确重测"
+            },
+            "blocked": {
+              "action": "wait",
+              "reason": "前提或样本不足",
+              "resumeWhen": "具备缺失样本或权限并明确重测"
+            },
+            "skipped": {
+              "action": "done",
+              "reason": "本项未执行，不代表通过"
+            }
+          }
+        },
+        {
+          "id": "LIVE-03",
+          "title": "受限邮件列表结构正确",
+          "priority": "P1",
+          "types": [
+            "smoke",
+            "integration"
+          ],
+          "preconditions": "用户已确认 QQ 与飞书只读范围，每邮箱最多读取1封正文。源设计追踪：EM-READ-001；本用例是缩减后的实际样本检查，不能关闭原设计的完整用例。",
+          "steps": "仅查询收件箱首页，页大小为3；核对消息引用、主题字段和去重。",
+          "expected": "最多返回3条有原生引用的摘要；内容仅存本机，不把错误当空结果。",
+          "dependsOn": [
+            "LIVE-02"
+          ],
+          "next": {
+            "passed": {
+              "action": "done",
+              "reason": "本项观察完成，继续冻结范围内独立检查"
+            },
+            "failed": {
+              "action": "retry",
+              "caseId": "LIVE-03",
+              "reason": "保留失败，明确修复或恢复后再另行复测"
+            },
+            "partial": {
+              "action": "wait",
+              "reason": "证据不完整",
+              "resumeWhen": "补齐本项未验证证据并明确重测"
+            },
+            "blocked": {
+              "action": "wait",
+              "reason": "前提或样本不足",
+              "resumeWhen": "具备缺失样本或权限并明确重测"
+            },
+            "skipped": {
+              "action": "done",
+              "reason": "本项未执行，不代表通过"
+            }
+          }
+        },
+        {
+          "id": "LIVE-04",
+          "title": "第二页保留条件并与首页不重叠",
+          "priority": "P1",
+          "types": [
+            "smoke",
+            "integration"
+          ],
+          "preconditions": "用户已确认 QQ 与飞书只读范围，每邮箱最多读取1封正文。源设计追踪：EM-READ-003；本用例是缩减后的实际样本检查，不能关闭原设计的完整用例。",
+          "steps": "使用首页返回游标请求第二页，保持账号、目录和页大小；比较原生引用。",
+          "expected": "确有下一页时第二页结构正确且与首页不重叠；无下一页则标记 blocked，不能声称已覆盖。",
+          "dependsOn": [
+            "LIVE-03"
+          ],
+          "next": {
+            "passed": {
+              "action": "done",
+              "reason": "本项观察完成，继续冻结范围内独立检查"
+            },
+            "failed": {
+              "action": "retry",
+              "caseId": "LIVE-04",
+              "reason": "保留失败，明确修复或恢复后再另行复测"
+            },
+            "partial": {
+              "action": "wait",
+              "reason": "证据不完整",
+              "resumeWhen": "补齐本项未验证证据并明确重测"
+            },
+            "blocked": {
+              "action": "wait",
+              "reason": "前提或样本不足",
+              "resumeWhen": "具备缺失样本或权限并明确重测"
+            },
+            "skipped": {
+              "action": "done",
+              "reason": "本项未执行，不代表通过"
+            }
+          }
+        },
+        {
+          "id": "LIVE-05",
+          "title": "未读筛选符合状态",
+          "priority": "P1",
+          "types": [
+            "smoke",
+            "integration"
+          ],
+          "preconditions": "用户已确认 QQ 与飞书只读范围，每邮箱最多读取1封正文。源设计追踪：EM-READ-001；本用例是缩减后的实际样本检查，不能关闭原设计的完整用例。",
+          "steps": "使用原生未读筛选查询最多3条；用可用标签或元数据验证筛选结果。",
+          "expected": "存在有效未读样本且状态符合筛选；缺样本或状态证据则 blocked/partial。",
+          "dependsOn": [
+            "LIVE-03"
+          ],
+          "next": {
+            "passed": {
+              "action": "done",
+              "reason": "本项观察完成，继续冻结范围内独立检查"
+            },
+            "failed": {
+              "action": "retry",
+              "caseId": "LIVE-05",
+              "reason": "保留失败，明确修复或恢复后再另行复测"
+            },
+            "partial": {
+              "action": "wait",
+              "reason": "证据不完整",
+              "resumeWhen": "补齐本项未验证证据并明确重测"
+            },
+            "blocked": {
+              "action": "wait",
+              "reason": "前提或样本不足",
+              "resumeWhen": "具备缺失样本或权限并明确重测"
+            },
+            "skipped": {
+              "action": "done",
+              "reason": "本项未执行，不代表通过"
+            }
+          }
+        },
+        {
+          "id": "LIVE-06",
+          "title": "关键词搜索返回已知样本",
+          "priority": "P1",
+          "types": [
+            "smoke",
+            "integration"
+          ],
+          "preconditions": "用户已确认 QQ 与飞书只读范围，每邮箱最多读取1封正文。源设计追踪：EM-READ-002；本用例是缩减后的实际样本检查，不能关闭原设计的完整用例。",
+          "steps": "从首页最近一封的主题提取最多32字符；在同一收件箱检索最多3条，并核对该消息引用。",
+          "expected": "已知目标出现在结果中；仅证明此单个正样本，不宣称完整搜索或中文边界覆盖。",
+          "dependsOn": [
+            "LIVE-03"
+          ],
+          "next": {
+            "passed": {
+              "action": "done",
+              "reason": "本项观察完成，继续冻结范围内独立检查"
+            },
+            "failed": {
+              "action": "retry",
+              "caseId": "LIVE-06",
+              "reason": "保留失败，明确修复或恢复后再另行复测"
+            },
+            "partial": {
+              "action": "wait",
+              "reason": "证据不完整",
+              "resumeWhen": "补齐本项未验证证据并明确重测"
+            },
+            "blocked": {
+              "action": "wait",
+              "reason": "前提或样本不足",
+              "resumeWhen": "具备缺失样本或权限并明确重测"
+            },
+            "skipped": {
+              "action": "done",
+              "reason": "本项未执行，不代表通过"
+            }
+          }
+        },
+        {
+          "id": "LIVE-07",
+          "title": "读取单封正文并保留来源",
+          "priority": "P1",
+          "types": [
+            "smoke",
+            "integration"
+          ],
+          "preconditions": "用户已确认 QQ 与飞书只读范围，每邮箱最多读取1封正文。源设计追踪：EM-READ-008；本用例是缩减后的实际样本检查，不能关闭原设计的完整用例。",
+          "steps": "优先选择一个未读样本，否则选择首页样本；仅读取一封正文，不请求附件、链接或回执。",
+          "expected": "引用或消息标识匹配选定样本，正文类型正确；明确返回是否截断，正文只留本机。",
+          "dependsOn": [
+            "LIVE-03"
+          ],
+          "next": {
+            "passed": {
+              "action": "done",
+              "reason": "本项观察完成，继续冻结范围内独立检查"
+            },
+            "failed": {
+              "action": "retry",
+              "caseId": "LIVE-07",
+              "reason": "保留失败，明确修复或恢复后再另行复测"
+            },
+            "partial": {
+              "action": "wait",
+              "reason": "证据不完整",
+              "resumeWhen": "补齐本项未验证证据并明确重测"
+            },
+            "blocked": {
+              "action": "wait",
+              "reason": "前提或样本不足",
+              "resumeWhen": "具备缺失样本或权限并明确重测"
+            },
+            "skipped": {
+              "action": "done",
+              "reason": "本项未执行，不代表通过"
+            }
+          }
+        },
+        {
+          "id": "LIVE-08",
+          "title": "读取前后未读状态保持",
+          "priority": "P0",
+          "types": [
+            "smoke",
+            "integration"
+          ],
+          "preconditions": "用户已确认 QQ 与飞书只读范围，每邮箱最多读取1封正文。源设计追踪：EM-READ-008；本用例是缩减后的实际样本检查，不能关闭原设计的完整用例。",
+          "steps": "对同一未读样本比较读取前后原生元数据/未读列表；不调用任何状态修改接口。",
+          "expected": "未读前后均成立；没有未读样本则 blocked，无可靠状态证据则 partial。",
+          "dependsOn": [
+            "LIVE-07"
+          ],
+          "next": {
+            "passed": {
+              "action": "done",
+              "reason": "本项观察完成，继续冻结范围内独立检查"
+            },
+            "failed": {
+              "action": "retry",
+              "caseId": "LIVE-08",
+              "reason": "保留失败，明确修复或恢复后再另行复测"
+            },
+            "partial": {
+              "action": "wait",
+              "reason": "证据不完整",
+              "resumeWhen": "补齐本项未验证证据并明确重测"
+            },
+            "blocked": {
+              "action": "wait",
+              "reason": "前提或样本不足",
+              "resumeWhen": "具备缺失样本或权限并明确重测"
+            },
+            "skipped": {
+              "action": "done",
+              "reason": "本项未执行，不代表通过"
+            }
+          }
+        }
+      ]
+    }
+  ],
+  "environments": [
+    {
+      "id": "qq",
+      "label": "QQ native MCP on macOS",
+      "kind": "service",
+      "configuration": "macOS 26.5.2 arm64; Node v23.11.0; QQ Email MCP package 0.1.1; read-only; private Keychain launcher; account binding kept locally"
+    },
+    {
+      "id": "feishu",
+      "label": "Feishu native CLI on macOS",
+      "kind": "service",
+      "configuration": "macOS 26.5.2 arm64; lark-cli 1.0.73; explicit user identity and native profile; existing scopes retained; account binding kept locally"
+    }
+  ],
+  "rounds": [
+    {
+      "id": "connected-readonly-2026-11-10",
+      "name": "User-confirmed QQ and Feishu read-only smoke",
+      "planId": "email-connected-readonly-smoke",
+      "version": "0.1.0-dev",
+      "source": "07ef7b1eedc4d82db56e84d8cc38215264332700",
+      "build": "Skill source + existing native QQ MCP 0.1.1 / Feishu CLI 1.0.73; no CI package",
+      "pr": "",
+      "createdAt": "2026-11-10T07:52:55.785Z",
+      "selection": {
+        "source": "user",
+        "planRevision": 1,
+        "requestedCases": [
+          "LIVE-01",
+          "LIVE-02",
+          "LIVE-03",
+          "LIVE-04",
+          "LIVE-05",
+          "LIVE-06",
+          "LIVE-07",
+          "LIVE-08"
+        ],
+        "cases": [
+          "LIVE-01",
+          "LIVE-02",
+          "LIVE-03",
+          "LIVE-04",
+          "LIVE-05",
+          "LIVE-06",
+          "LIVE-07",
+          "LIVE-08"
+        ]
+      },
+      "cases": [
+        {
+          "id": "LIVE-01",
+          "title": "账号身份与本机绑定一致",
+          "priority": "P0",
+          "types": [
+            "smoke",
+            "integration"
+          ],
+          "preconditions": "用户已确认 QQ 与飞书只读范围，每邮箱最多读取1封正文。源设计追踪：EM-AUTH-007；本用例是缩减后的实际样本检查，不能关闭原设计的完整用例。",
+          "steps": "读取当前后端身份，与本机选定账号比较；记录运行版本和读取权限。",
+          "expected": "真实账号匹配且读取可用；不打印或公开账号值。",
+          "dependsOn": [],
+          "next": {
+            "passed": {
+              "action": "done",
+              "reason": "本项观察完成，继续冻结范围内独立检查"
+            },
+            "failed": {
+              "action": "retry",
+              "caseId": "LIVE-01",
+              "reason": "保留失败，明确修复或恢复后再另行复测"
+            },
+            "partial": {
+              "action": "wait",
+              "reason": "证据不完整",
+              "resumeWhen": "补齐本项未验证证据并明确重测"
+            },
+            "blocked": {
+              "action": "wait",
+              "reason": "前提或样本不足",
+              "resumeWhen": "具备缺失样本或权限并明确重测"
+            },
+            "skipped": {
+              "action": "done",
+              "reason": "本项未执行，不代表通过"
+            }
+          },
+          "selectionReasons": [
+            "selected",
+            "dependency"
+          ]
+        },
+        {
+          "id": "LIVE-02",
+          "title": "文件夹可读取且存在收件箱",
+          "priority": "P1",
+          "types": [
+            "smoke",
+            "integration"
+          ],
+          "preconditions": "用户已确认 QQ 与飞书只读范围，每邮箱最多读取1封正文。源设计追踪：EM-PROV-001/008；本用例是缩减后的实际样本检查，不能关闭原设计的完整用例。",
+          "steps": "列出文件夹并解析收件箱角色，检查所选账号的有效文件夹。",
+          "expected": "返回结构有效且有可用收件箱；不公开自定义目录名称。",
+          "dependsOn": [
+            "LIVE-01"
+          ],
+          "next": {
+            "passed": {
+              "action": "done",
+              "reason": "本项观察完成，继续冻结范围内独立检查"
+            },
+            "failed": {
+              "action": "retry",
+              "caseId": "LIVE-02",
+              "reason": "保留失败，明确修复或恢复后再另行复测"
+            },
+            "partial": {
+              "action": "wait",
+              "reason": "证据不完整",
+              "resumeWhen": "补齐本项未验证证据并明确重测"
+            },
+            "blocked": {
+              "action": "wait",
+              "reason": "前提或样本不足",
+              "resumeWhen": "具备缺失样本或权限并明确重测"
+            },
+            "skipped": {
+              "action": "done",
+              "reason": "本项未执行，不代表通过"
+            }
+          },
+          "selectionReasons": [
+            "selected",
+            "dependency"
+          ]
+        },
+        {
+          "id": "LIVE-03",
+          "title": "受限邮件列表结构正确",
+          "priority": "P1",
+          "types": [
+            "smoke",
+            "integration"
+          ],
+          "preconditions": "用户已确认 QQ 与飞书只读范围，每邮箱最多读取1封正文。源设计追踪：EM-READ-001；本用例是缩减后的实际样本检查，不能关闭原设计的完整用例。",
+          "steps": "仅查询收件箱首页，页大小为3；核对消息引用、主题字段和去重。",
+          "expected": "最多返回3条有原生引用的摘要；内容仅存本机，不把错误当空结果。",
+          "dependsOn": [
+            "LIVE-02"
+          ],
+          "next": {
+            "passed": {
+              "action": "done",
+              "reason": "本项观察完成，继续冻结范围内独立检查"
+            },
+            "failed": {
+              "action": "retry",
+              "caseId": "LIVE-03",
+              "reason": "保留失败，明确修复或恢复后再另行复测"
+            },
+            "partial": {
+              "action": "wait",
+              "reason": "证据不完整",
+              "resumeWhen": "补齐本项未验证证据并明确重测"
+            },
+            "blocked": {
+              "action": "wait",
+              "reason": "前提或样本不足",
+              "resumeWhen": "具备缺失样本或权限并明确重测"
+            },
+            "skipped": {
+              "action": "done",
+              "reason": "本项未执行，不代表通过"
+            }
+          },
+          "selectionReasons": [
+            "selected",
+            "dependency"
+          ]
+        },
+        {
+          "id": "LIVE-04",
+          "title": "第二页保留条件并与首页不重叠",
+          "priority": "P1",
+          "types": [
+            "smoke",
+            "integration"
+          ],
+          "preconditions": "用户已确认 QQ 与飞书只读范围，每邮箱最多读取1封正文。源设计追踪：EM-READ-003；本用例是缩减后的实际样本检查，不能关闭原设计的完整用例。",
+          "steps": "使用首页返回游标请求第二页，保持账号、目录和页大小；比较原生引用。",
+          "expected": "确有下一页时第二页结构正确且与首页不重叠；无下一页则标记 blocked，不能声称已覆盖。",
+          "dependsOn": [
+            "LIVE-03"
+          ],
+          "next": {
+            "passed": {
+              "action": "done",
+              "reason": "本项观察完成，继续冻结范围内独立检查"
+            },
+            "failed": {
+              "action": "retry",
+              "caseId": "LIVE-04",
+              "reason": "保留失败，明确修复或恢复后再另行复测"
+            },
+            "partial": {
+              "action": "wait",
+              "reason": "证据不完整",
+              "resumeWhen": "补齐本项未验证证据并明确重测"
+            },
+            "blocked": {
+              "action": "wait",
+              "reason": "前提或样本不足",
+              "resumeWhen": "具备缺失样本或权限并明确重测"
+            },
+            "skipped": {
+              "action": "done",
+              "reason": "本项未执行，不代表通过"
+            }
+          },
+          "selectionReasons": [
+            "selected"
+          ]
+        },
+        {
+          "id": "LIVE-05",
+          "title": "未读筛选符合状态",
+          "priority": "P1",
+          "types": [
+            "smoke",
+            "integration"
+          ],
+          "preconditions": "用户已确认 QQ 与飞书只读范围，每邮箱最多读取1封正文。源设计追踪：EM-READ-001；本用例是缩减后的实际样本检查，不能关闭原设计的完整用例。",
+          "steps": "使用原生未读筛选查询最多3条；用可用标签或元数据验证筛选结果。",
+          "expected": "存在有效未读样本且状态符合筛选；缺样本或状态证据则 blocked/partial。",
+          "dependsOn": [
+            "LIVE-03"
+          ],
+          "next": {
+            "passed": {
+              "action": "done",
+              "reason": "本项观察完成，继续冻结范围内独立检查"
+            },
+            "failed": {
+              "action": "retry",
+              "caseId": "LIVE-05",
+              "reason": "保留失败，明确修复或恢复后再另行复测"
+            },
+            "partial": {
+              "action": "wait",
+              "reason": "证据不完整",
+              "resumeWhen": "补齐本项未验证证据并明确重测"
+            },
+            "blocked": {
+              "action": "wait",
+              "reason": "前提或样本不足",
+              "resumeWhen": "具备缺失样本或权限并明确重测"
+            },
+            "skipped": {
+              "action": "done",
+              "reason": "本项未执行，不代表通过"
+            }
+          },
+          "selectionReasons": [
+            "selected"
+          ]
+        },
+        {
+          "id": "LIVE-06",
+          "title": "关键词搜索返回已知样本",
+          "priority": "P1",
+          "types": [
+            "smoke",
+            "integration"
+          ],
+          "preconditions": "用户已确认 QQ 与飞书只读范围，每邮箱最多读取1封正文。源设计追踪：EM-READ-002；本用例是缩减后的实际样本检查，不能关闭原设计的完整用例。",
+          "steps": "从首页最近一封的主题提取最多32字符；在同一收件箱检索最多3条，并核对该消息引用。",
+          "expected": "已知目标出现在结果中；仅证明此单个正样本，不宣称完整搜索或中文边界覆盖。",
+          "dependsOn": [
+            "LIVE-03"
+          ],
+          "next": {
+            "passed": {
+              "action": "done",
+              "reason": "本项观察完成，继续冻结范围内独立检查"
+            },
+            "failed": {
+              "action": "retry",
+              "caseId": "LIVE-06",
+              "reason": "保留失败，明确修复或恢复后再另行复测"
+            },
+            "partial": {
+              "action": "wait",
+              "reason": "证据不完整",
+              "resumeWhen": "补齐本项未验证证据并明确重测"
+            },
+            "blocked": {
+              "action": "wait",
+              "reason": "前提或样本不足",
+              "resumeWhen": "具备缺失样本或权限并明确重测"
+            },
+            "skipped": {
+              "action": "done",
+              "reason": "本项未执行，不代表通过"
+            }
+          },
+          "selectionReasons": [
+            "selected"
+          ]
+        },
+        {
+          "id": "LIVE-07",
+          "title": "读取单封正文并保留来源",
+          "priority": "P1",
+          "types": [
+            "smoke",
+            "integration"
+          ],
+          "preconditions": "用户已确认 QQ 与飞书只读范围，每邮箱最多读取1封正文。源设计追踪：EM-READ-008；本用例是缩减后的实际样本检查，不能关闭原设计的完整用例。",
+          "steps": "优先选择一个未读样本，否则选择首页样本；仅读取一封正文，不请求附件、链接或回执。",
+          "expected": "引用或消息标识匹配选定样本，正文类型正确；明确返回是否截断，正文只留本机。",
+          "dependsOn": [
+            "LIVE-03"
+          ],
+          "next": {
+            "passed": {
+              "action": "done",
+              "reason": "本项观察完成，继续冻结范围内独立检查"
+            },
+            "failed": {
+              "action": "retry",
+              "caseId": "LIVE-07",
+              "reason": "保留失败，明确修复或恢复后再另行复测"
+            },
+            "partial": {
+              "action": "wait",
+              "reason": "证据不完整",
+              "resumeWhen": "补齐本项未验证证据并明确重测"
+            },
+            "blocked": {
+              "action": "wait",
+              "reason": "前提或样本不足",
+              "resumeWhen": "具备缺失样本或权限并明确重测"
+            },
+            "skipped": {
+              "action": "done",
+              "reason": "本项未执行，不代表通过"
+            }
+          },
+          "selectionReasons": [
+            "selected",
+            "dependency"
+          ]
+        },
+        {
+          "id": "LIVE-08",
+          "title": "读取前后未读状态保持",
+          "priority": "P0",
+          "types": [
+            "smoke",
+            "integration"
+          ],
+          "preconditions": "用户已确认 QQ 与飞书只读范围，每邮箱最多读取1封正文。源设计追踪：EM-READ-008；本用例是缩减后的实际样本检查，不能关闭原设计的完整用例。",
+          "steps": "对同一未读样本比较读取前后原生元数据/未读列表；不调用任何状态修改接口。",
+          "expected": "未读前后均成立；没有未读样本则 blocked，无可靠状态证据则 partial。",
+          "dependsOn": [
+            "LIVE-07"
+          ],
+          "next": {
+            "passed": {
+              "action": "done",
+              "reason": "本项观察完成，继续冻结范围内独立检查"
+            },
+            "failed": {
+              "action": "retry",
+              "caseId": "LIVE-08",
+              "reason": "保留失败，明确修复或恢复后再另行复测"
+            },
+            "partial": {
+              "action": "wait",
+              "reason": "证据不完整",
+              "resumeWhen": "补齐本项未验证证据并明确重测"
+            },
+            "blocked": {
+              "action": "wait",
+              "reason": "前提或样本不足",
+              "resumeWhen": "具备缺失样本或权限并明确重测"
+            },
+            "skipped": {
+              "action": "done",
+              "reason": "本项未执行，不代表通过"
+            }
+          },
+          "selectionReasons": [
+            "selected"
+          ]
+        }
+      ],
+      "environments": [
+        {
+          "id": "qq",
+          "label": "QQ native MCP on macOS",
+          "kind": "service",
+          "configuration": "macOS 26.5.2 arm64; Node v23.11.0; QQ Email MCP package 0.1.1; read-only; private Keychain launcher; account binding kept locally"
+        },
+        {
+          "id": "feishu",
+          "label": "Feishu native CLI on macOS",
+          "kind": "service",
+          "configuration": "macOS 26.5.2 arm64; lark-cli 1.0.73; explicit user identity and native profile; existing scopes retained; account binding kept locally"
+        }
+      ],
+      "observations": [
+        {
+          "id": "qq-LIVE-01-observation-0",
+          "caseId": "LIVE-01",
+          "environmentId": "qq",
+          "environment": {
+            "id": "qq",
+            "label": "QQ native MCP on macOS",
+            "kind": "service",
+            "configuration": "macOS 26.5.2 arm64; Node v23.11.0; QQ Email MCP package 0.1.1; read-only; private Keychain launcher; account binding kept locally"
+          },
+          "status": "passed",
+          "executedAt": "2026-11-10T07:52:55.795Z",
+          "recordedAt": "2026-11-10T07:52:58.349Z",
+          "tester": "Codex GPT-6",
+          "notes": "All selected assertions passed",
+          "evidence": "{\"identity_matches\":true,\"read_available\":true,\"write_permissions\":false}"
+        },
+        {
+          "id": "qq-LIVE-02-observation-1",
+          "caseId": "LIVE-02",
+          "environmentId": "qq",
+          "environment": {
+            "id": "qq",
+            "label": "QQ native MCP on macOS",
+            "kind": "service",
+            "configuration": "macOS 26.5.2 arm64; Node v23.11.0; QQ Email MCP package 0.1.1; read-only; private Keychain launcher; account binding kept locally"
+          },
+          "status": "passed",
+          "executedAt": "2026-11-10T07:52:58.357Z",
+          "recordedAt": "2026-11-10T07:52:58.486Z",
+          "tester": "Codex GPT-6",
+          "notes": "All selected assertions passed",
+          "evidence": "{\"folder_listing_valid\":true,\"inbox_available\":true}"
+        },
+        {
+          "id": "qq-LIVE-03-observation-2",
+          "caseId": "LIVE-03",
+          "environmentId": "qq",
+          "environment": {
+            "id": "qq",
+            "label": "QQ native MCP on macOS",
+            "kind": "service",
+            "configuration": "macOS 26.5.2 arm64; Node v23.11.0; QQ Email MCP package 0.1.1; read-only; private Keychain launcher; account binding kept locally"
+          },
+          "status": "passed",
+          "executedAt": "2026-11-10T07:52:58.489Z",
+          "recordedAt": "2026-11-10T07:52:58.930Z",
+          "tester": "Codex GPT-6",
+          "notes": "All selected assertions passed",
+          "evidence": "{\"returned\":3,\"limit\":3,\"unique_references\":true,\"metadata_structure_valid\":true}"
+        },
+        {
+          "id": "feishu-LIVE-01-observation-3",
+          "caseId": "LIVE-01",
+          "environmentId": "feishu",
+          "environment": {
+            "id": "feishu",
+            "label": "Feishu native CLI on macOS",
+            "kind": "service",
+            "configuration": "macOS 26.5.2 arm64; lark-cli 1.0.73; explicit user identity and native profile; existing scopes retained; account binding kept locally"
+          },
+          "status": "passed",
+          "executedAt": "2026-11-10T07:52:58.933Z",
+          "recordedAt": "2026-11-10T07:52:59.700Z",
+          "tester": "Codex GPT-6",
+          "notes": "All selected assertions passed",
+          "evidence": "{\"identity_matches\":true,\"user_identity_verified\":true,\"existing_grant_reused\":true}"
+        },
+        {
+          "id": "feishu-LIVE-02-observation-4",
+          "caseId": "LIVE-02",
+          "environmentId": "feishu",
+          "environment": {
+            "id": "feishu",
+            "label": "Feishu native CLI on macOS",
+            "kind": "service",
+            "configuration": "macOS 26.5.2 arm64; lark-cli 1.0.73; explicit user identity and native profile; existing scopes retained; account binding kept locally"
+          },
+          "status": "passed",
+          "executedAt": "2026-11-10T07:52:59.704Z",
+          "recordedAt": "2026-11-10T07:53:00.351Z",
+          "tester": "Codex GPT-6",
+          "notes": "All selected assertions passed",
+          "evidence": "{\"folder_listing_valid\":true,\"inbox_available\":true}"
+        },
+        {
+          "id": "feishu-LIVE-03-observation-5",
+          "caseId": "LIVE-03",
+          "environmentId": "feishu",
+          "environment": {
+            "id": "feishu",
+            "label": "Feishu native CLI on macOS",
+            "kind": "service",
+            "configuration": "macOS 26.5.2 arm64; lark-cli 1.0.73; explicit user identity and native profile; existing scopes retained; account binding kept locally"
+          },
+          "status": "partial",
+          "executedAt": "2026-11-10T07:53:00.356Z",
+          "recordedAt": "2026-11-10T07:53:01.536Z",
+          "tester": "Codex GPT-6",
+          "notes": "Native response or instrumentation needs investigation; private evidence preserved",
+          "evidence": "Native read attempt preserved locally; account data omitted"
+        },
+        {
+          "id": "feishu-LIVE-03-observation-6",
+          "caseId": "LIVE-03",
+          "environmentId": "feishu",
+          "environment": {
+            "id": "feishu",
+            "label": "Feishu native CLI on macOS",
+            "kind": "service",
+            "configuration": "macOS 26.5.2 arm64; lark-cli 1.0.73; explicit user identity and native profile; existing scopes retained; account binding kept locally"
+          },
+          "status": "passed",
+          "executedAt": "2026-11-10T07:57:19.998Z",
+          "recordedAt": "2026-11-10T07:57:21.362Z",
+          "tester": "Codex GPT-6",
+          "notes": "Native helper JSON object handled explicitly; original incomplete instrumentation attempt retained",
+          "evidence": "{\"returned\":3,\"limit\":3,\"unique_references\":true,\"metadata_structure_valid\":true}"
+        },
+        {
+          "id": "qq-LIVE-04-observation-7",
+          "caseId": "LIVE-04",
+          "environmentId": "qq",
+          "environment": {
+            "id": "qq",
+            "label": "QQ native MCP on macOS",
+            "kind": "service",
+            "configuration": "macOS 26.5.2 arm64; Node v23.11.0; QQ Email MCP package 0.1.1; read-only; private Keychain launcher; account binding kept locally"
+          },
+          "status": "passed",
+          "executedAt": "2026-11-10T07:57:21.368Z",
+          "recordedAt": "2026-11-10T07:57:23.744Z",
+          "tester": "Codex GPT-6",
+          "notes": "All selected assertions passed",
+          "evidence": "{\"second_page_count\":3,\"nonoverlap\":true,\"filters_preserved\":true,\"stable_sample_union_matches_larger_page\":true}"
+        },
+        {
+          "id": "qq-LIVE-05-observation-8",
+          "caseId": "LIVE-05",
+          "environmentId": "qq",
+          "environment": {
+            "id": "qq",
+            "label": "QQ native MCP on macOS",
+            "kind": "service",
+            "configuration": "macOS 26.5.2 arm64; Node v23.11.0; QQ Email MCP package 0.1.1; read-only; private Keychain launcher; account binding kept locally"
+          },
+          "status": "passed",
+          "executedAt": "2026-11-10T07:57:23.750Z",
+          "recordedAt": "2026-11-10T07:57:23.971Z",
+          "tester": "Codex GPT-6",
+          "notes": "All selected assertions passed",
+          "evidence": "{\"returned\":3,\"unread_flags_match\":true}"
+        },
+        {
+          "id": "qq-LIVE-06-observation-9",
+          "caseId": "LIVE-06",
+          "environmentId": "qq",
+          "environment": {
+            "id": "qq",
+            "label": "QQ native MCP on macOS",
+            "kind": "service",
+            "configuration": "macOS 26.5.2 arm64; Node v23.11.0; QQ Email MCP package 0.1.1; read-only; private Keychain launcher; account binding kept locally"
+          },
+          "status": "passed",
+          "executedAt": "2026-11-10T07:57:23.977Z",
+          "recordedAt": "2026-11-10T07:57:26.794Z",
+          "tester": "Codex GPT-6",
+          "notes": "All selected assertions passed",
+          "evidence": "{\"positive_known_sample_found\":true,\"executed_server_side\":true,\"result_limit\":3}"
+        },
+        {
+          "id": "feishu-LIVE-04-observation-10",
+          "caseId": "LIVE-04",
+          "environmentId": "feishu",
+          "environment": {
+            "id": "feishu",
+            "label": "Feishu native CLI on macOS",
+            "kind": "service",
+            "configuration": "macOS 26.5.2 arm64; lark-cli 1.0.73; explicit user identity and native profile; existing scopes retained; account binding kept locally"
+          },
+          "status": "passed",
+          "executedAt": "2026-11-10T07:57:26.801Z",
+          "recordedAt": "2026-11-10T07:57:29.555Z",
+          "tester": "Codex GPT-6",
+          "notes": "All selected assertions passed",
+          "evidence": "{\"second_page_count\":3,\"nonoverlap\":true,\"filters_preserved\":true,\"stable_sample_union_matches_larger_page\":true}"
+        },
+        {
+          "id": "feishu-LIVE-05-observation-11",
+          "caseId": "LIVE-05",
+          "environmentId": "feishu",
+          "environment": {
+            "id": "feishu",
+            "label": "Feishu native CLI on macOS",
+            "kind": "service",
+            "configuration": "macOS 26.5.2 arm64; lark-cli 1.0.73; explicit user identity and native profile; existing scopes retained; account binding kept locally"
+          },
+          "status": "passed",
+          "executedAt": "2026-11-10T07:57:29.561Z",
+          "recordedAt": "2026-11-10T07:57:30.823Z",
+          "tester": "Codex GPT-6",
+          "notes": "All selected assertions passed",
+          "evidence": "{\"returned\":3,\"unread_labels_match\":true}"
+        },
+        {
+          "id": "feishu-LIVE-06-observation-12",
+          "caseId": "LIVE-06",
+          "environmentId": "feishu",
+          "environment": {
+            "id": "feishu",
+            "label": "Feishu native CLI on macOS",
+            "kind": "service",
+            "configuration": "macOS 26.5.2 arm64; lark-cli 1.0.73; explicit user identity and native profile; existing scopes retained; account binding kept locally"
+          },
+          "status": "passed",
+          "executedAt": "2026-11-10T07:57:30.829Z",
+          "recordedAt": "2026-11-10T07:57:32.238Z",
+          "tester": "Codex GPT-6",
+          "notes": "All selected assertions passed",
+          "evidence": "{\"positive_known_sample_found\":true,\"result_limit\":3,\"native_subject_filter_used\":true}"
+        },
+        {
+          "id": "qq-LIVE-07-observation-13",
+          "caseId": "LIVE-07",
+          "environmentId": "qq",
+          "environment": {
+            "id": "qq",
+            "label": "QQ native MCP on macOS",
+            "kind": "service",
+            "configuration": "macOS 26.5.2 arm64; Node v23.11.0; QQ Email MCP package 0.1.1; read-only; private Keychain launcher; account binding kept locally"
+          },
+          "status": "passed",
+          "executedAt": "2026-11-10T07:57:32.242Z",
+          "recordedAt": "2026-11-10T07:57:32.503Z",
+          "tester": "Codex GPT-6",
+          "notes": "All selected assertions passed",
+          "evidence": "{\"selected_reference_matches\":true,\"body_type_valid\":true,\"character_limit\":2000,\"truncation_disclosed\":true,\"untrusted_marker_present\":true,\"unique_messages_read\":1}"
+        },
+        {
+          "id": "qq-LIVE-08-observation-14",
+          "caseId": "LIVE-08",
+          "environmentId": "qq",
+          "environment": {
+            "id": "qq",
+            "label": "QQ native MCP on macOS",
+            "kind": "service",
+            "configuration": "macOS 26.5.2 arm64; Node v23.11.0; QQ Email MCP package 0.1.1; read-only; private Keychain launcher; account binding kept locally"
+          },
+          "status": "passed",
+          "executedAt": "2026-11-10T07:57:32.509Z",
+          "recordedAt": "2026-11-10T07:57:32.618Z",
+          "tester": "Codex GPT-6",
+          "notes": "Native metadata read-back retained unread state for this one live sample; not a controlled concurrency test",
+          "evidence": "{\"unread_before\":true,\"unread_after\":true,\"same_reference\":true,\"mutation_tools_called\":0}"
+        },
+        {
+          "id": "feishu-LIVE-07-observation-15",
+          "caseId": "LIVE-07",
+          "environmentId": "feishu",
+          "environment": {
+            "id": "feishu",
+            "label": "Feishu native CLI on macOS",
+            "kind": "service",
+            "configuration": "macOS 26.5.2 arm64; lark-cli 1.0.73; explicit user identity and native profile; existing scopes retained; account binding kept locally"
+          },
+          "status": "passed",
+          "executedAt": "2026-11-10T07:57:32.624Z",
+          "recordedAt": "2026-11-10T07:57:34.044Z",
+          "tester": "Codex GPT-6",
+          "notes": "Native plain_text_full response requested; no client-side truncation represented as full semantic coverage",
+          "evidence": "{\"selected_reference_matches\":true,\"plain_text_body_valid\":true,\"html_body_not_requested\":true,\"unique_messages_read\":1}"
+        },
+        {
+          "id": "feishu-LIVE-08-observation-16",
+          "caseId": "LIVE-08",
+          "environmentId": "feishu",
+          "environment": {
+            "id": "feishu",
+            "label": "Feishu native CLI on macOS",
+            "kind": "service",
+            "configuration": "macOS 26.5.2 arm64; lark-cli 1.0.73; explicit user identity and native profile; existing scopes retained; account binding kept locally"
+          },
+          "status": "passed",
+          "executedAt": "2026-11-10T07:57:34.048Z",
+          "recordedAt": "2026-11-10T07:57:34.733Z",
+          "tester": "Codex GPT-6",
+          "notes": "Native metadata read-back retained unread state for this one live sample; not a controlled concurrency test",
+          "evidence": "{\"unread_before\":true,\"unread_after\":true,\"same_reference\":true,\"mutation_commands_called\":0}"
+        }
+      ],
+      "workflow": {
+        "version": 1,
+        "events": [
+          {
+            "id": "prepare",
+            "scope": "round",
+            "action": "prepare",
+            "from": "draft",
+            "to": "ready",
+            "actor": "Codex GPT-6",
+            "at": "2026-11-10T07:52:55.790Z",
+            "reason": "User confirmed eight checks on each connected provider and anonymized publication"
+          },
+          {
+            "id": "begin",
+            "scope": "round",
+            "action": "begin",
+            "from": "ready",
+            "to": "running",
+            "actor": "Codex GPT-6",
+            "at": "2026-11-10T07:52:55.791Z",
+            "reason": "User confirmed eight checks on each connected provider and anonymized publication"
+          },
+          {
+            "id": "qq-LIVE-01-start",
+            "scope": "execution",
+            "action": "start",
+            "from": "untested",
+            "to": "running",
+            "actor": "Codex GPT-6",
+            "at": "2026-11-10T07:52:55.795Z",
+            "reason": "",
+            "caseId": "LIVE-01",
+            "environmentId": "qq",
+            "observationId": ""
+          },
+          {
+            "id": "result:qq-LIVE-01-observation-0",
+            "scope": "execution",
+            "action": "record",
+            "from": "running",
+            "to": "passed",
+            "actor": "Codex GPT-6",
+            "at": "2026-11-10T07:52:58.349Z",
+            "reason": "All selected assertions passed",
+            "caseId": "LIVE-01",
+            "environmentId": "qq",
+            "observationId": "qq-LIVE-01-observation-0"
+          },
+          {
+            "id": "qq-LIVE-02-start",
+            "scope": "execution",
+            "action": "start",
+            "from": "untested",
+            "to": "running",
+            "actor": "Codex GPT-6",
+            "at": "2026-11-10T07:52:58.357Z",
+            "reason": "",
+            "caseId": "LIVE-02",
+            "environmentId": "qq",
+            "observationId": ""
+          },
+          {
+            "id": "result:qq-LIVE-02-observation-1",
+            "scope": "execution",
+            "action": "record",
+            "from": "running",
+            "to": "passed",
+            "actor": "Codex GPT-6",
+            "at": "2026-11-10T07:52:58.486Z",
+            "reason": "All selected assertions passed",
+            "caseId": "LIVE-02",
+            "environmentId": "qq",
+            "observationId": "qq-LIVE-02-observation-1"
+          },
+          {
+            "id": "qq-LIVE-03-start",
+            "scope": "execution",
+            "action": "start",
+            "from": "untested",
+            "to": "running",
+            "actor": "Codex GPT-6",
+            "at": "2026-11-10T07:52:58.489Z",
+            "reason": "",
+            "caseId": "LIVE-03",
+            "environmentId": "qq",
+            "observationId": ""
+          },
+          {
+            "id": "result:qq-LIVE-03-observation-2",
+            "scope": "execution",
+            "action": "record",
+            "from": "running",
+            "to": "passed",
+            "actor": "Codex GPT-6",
+            "at": "2026-11-10T07:52:58.930Z",
+            "reason": "All selected assertions passed",
+            "caseId": "LIVE-03",
+            "environmentId": "qq",
+            "observationId": "qq-LIVE-03-observation-2"
+          },
+          {
+            "id": "feishu-LIVE-01-start",
+            "scope": "execution",
+            "action": "start",
+            "from": "untested",
+            "to": "running",
+            "actor": "Codex GPT-6",
+            "at": "2026-11-10T07:52:58.933Z",
+            "reason": "",
+            "caseId": "LIVE-01",
+            "environmentId": "feishu",
+            "observationId": ""
+          },
+          {
+            "id": "result:feishu-LIVE-01-observation-3",
+            "scope": "execution",
+            "action": "record",
+            "from": "running",
+            "to": "passed",
+            "actor": "Codex GPT-6",
+            "at": "2026-11-10T07:52:59.700Z",
+            "reason": "All selected assertions passed",
+            "caseId": "LIVE-01",
+            "environmentId": "feishu",
+            "observationId": "feishu-LIVE-01-observation-3"
+          },
+          {
+            "id": "feishu-LIVE-02-start",
+            "scope": "execution",
+            "action": "start",
+            "from": "untested",
+            "to": "running",
+            "actor": "Codex GPT-6",
+            "at": "2026-11-10T07:52:59.704Z",
+            "reason": "",
+            "caseId": "LIVE-02",
+            "environmentId": "feishu",
+            "observationId": ""
+          },
+          {
+            "id": "result:feishu-LIVE-02-observation-4",
+            "scope": "execution",
+            "action": "record",
+            "from": "running",
+            "to": "passed",
+            "actor": "Codex GPT-6",
+            "at": "2026-11-10T07:53:00.351Z",
+            "reason": "All selected assertions passed",
+            "caseId": "LIVE-02",
+            "environmentId": "feishu",
+            "observationId": "feishu-LIVE-02-observation-4"
+          },
+          {
+            "id": "feishu-LIVE-03-start",
+            "scope": "execution",
+            "action": "start",
+            "from": "untested",
+            "to": "running",
+            "actor": "Codex GPT-6",
+            "at": "2026-11-10T07:53:00.356Z",
+            "reason": "",
+            "caseId": "LIVE-03",
+            "environmentId": "feishu",
+            "observationId": ""
+          },
+          {
+            "id": "result:feishu-LIVE-03-observation-5",
+            "scope": "execution",
+            "action": "record",
+            "from": "running",
+            "to": "partial",
+            "actor": "Codex GPT-6",
+            "at": "2026-11-10T07:53:01.536Z",
+            "reason": "Native response or instrumentation needs investigation; private evidence preserved",
+            "caseId": "LIVE-03",
+            "environmentId": "feishu",
+            "observationId": "feishu-LIVE-03-observation-5"
+          },
+          {
+            "id": "feishu-LIVE-03-start-6",
+            "scope": "execution",
+            "action": "start",
+            "from": "partial",
+            "to": "running",
+            "actor": "Codex GPT-6",
+            "at": "2026-11-10T07:57:19.998Z",
+            "reason": "One explicit metadata-only retest after correcting the native helper JSON mapping; earlier partial observation retained",
+            "caseId": "LIVE-03",
+            "environmentId": "feishu",
+            "observationId": ""
+          },
+          {
+            "id": "result:feishu-LIVE-03-observation-6",
+            "scope": "execution",
+            "action": "record",
+            "from": "running",
+            "to": "passed",
+            "actor": "Codex GPT-6",
+            "at": "2026-11-10T07:57:21.362Z",
+            "reason": "Native helper JSON object handled explicitly; original incomplete instrumentation attempt retained",
+            "caseId": "LIVE-03",
+            "environmentId": "feishu",
+            "observationId": "feishu-LIVE-03-observation-6"
+          },
+          {
+            "id": "qq-LIVE-04-start-7",
+            "scope": "execution",
+            "action": "start",
+            "from": "untested",
+            "to": "running",
+            "actor": "Codex GPT-6",
+            "at": "2026-11-10T07:57:21.368Z",
+            "reason": "",
+            "caseId": "LIVE-04",
+            "environmentId": "qq",
+            "observationId": ""
+          },
+          {
+            "id": "result:qq-LIVE-04-observation-7",
+            "scope": "execution",
+            "action": "record",
+            "from": "running",
+            "to": "passed",
+            "actor": "Codex GPT-6",
+            "at": "2026-11-10T07:57:23.744Z",
+            "reason": "All selected assertions passed",
+            "caseId": "LIVE-04",
+            "environmentId": "qq",
+            "observationId": "qq-LIVE-04-observation-7"
+          },
+          {
+            "id": "qq-LIVE-05-start-8",
+            "scope": "execution",
+            "action": "start",
+            "from": "untested",
+            "to": "running",
+            "actor": "Codex GPT-6",
+            "at": "2026-11-10T07:57:23.750Z",
+            "reason": "",
+            "caseId": "LIVE-05",
+            "environmentId": "qq",
+            "observationId": ""
+          },
+          {
+            "id": "result:qq-LIVE-05-observation-8",
+            "scope": "execution",
+            "action": "record",
+            "from": "running",
+            "to": "passed",
+            "actor": "Codex GPT-6",
+            "at": "2026-11-10T07:57:23.971Z",
+            "reason": "All selected assertions passed",
+            "caseId": "LIVE-05",
+            "environmentId": "qq",
+            "observationId": "qq-LIVE-05-observation-8"
+          },
+          {
+            "id": "qq-LIVE-06-start-9",
+            "scope": "execution",
+            "action": "start",
+            "from": "untested",
+            "to": "running",
+            "actor": "Codex GPT-6",
+            "at": "2026-11-10T07:57:23.977Z",
+            "reason": "",
+            "caseId": "LIVE-06",
+            "environmentId": "qq",
+            "observationId": ""
+          },
+          {
+            "id": "result:qq-LIVE-06-observation-9",
+            "scope": "execution",
+            "action": "record",
+            "from": "running",
+            "to": "passed",
+            "actor": "Codex GPT-6",
+            "at": "2026-11-10T07:57:26.794Z",
+            "reason": "All selected assertions passed",
+            "caseId": "LIVE-06",
+            "environmentId": "qq",
+            "observationId": "qq-LIVE-06-observation-9"
+          },
+          {
+            "id": "feishu-LIVE-04-start-10",
+            "scope": "execution",
+            "action": "start",
+            "from": "untested",
+            "to": "running",
+            "actor": "Codex GPT-6",
+            "at": "2026-11-10T07:57:26.801Z",
+            "reason": "",
+            "caseId": "LIVE-04",
+            "environmentId": "feishu",
+            "observationId": ""
+          },
+          {
+            "id": "result:feishu-LIVE-04-observation-10",
+            "scope": "execution",
+            "action": "record",
+            "from": "running",
+            "to": "passed",
+            "actor": "Codex GPT-6",
+            "at": "2026-11-10T07:57:29.555Z",
+            "reason": "All selected assertions passed",
+            "caseId": "LIVE-04",
+            "environmentId": "feishu",
+            "observationId": "feishu-LIVE-04-observation-10"
+          },
+          {
+            "id": "feishu-LIVE-05-start-11",
+            "scope": "execution",
+            "action": "start",
+            "from": "untested",
+            "to": "running",
+            "actor": "Codex GPT-6",
+            "at": "2026-11-10T07:57:29.561Z",
+            "reason": "",
+            "caseId": "LIVE-05",
+            "environmentId": "feishu",
+            "observationId": ""
+          },
+          {
+            "id": "result:feishu-LIVE-05-observation-11",
+            "scope": "execution",
+            "action": "record",
+            "from": "running",
+            "to": "passed",
+            "actor": "Codex GPT-6",
+            "at": "2026-11-10T07:57:30.823Z",
+            "reason": "All selected assertions passed",
+            "caseId": "LIVE-05",
+            "environmentId": "feishu",
+            "observationId": "feishu-LIVE-05-observation-11"
+          },
+          {
+            "id": "feishu-LIVE-06-start-12",
+            "scope": "execution",
+            "action": "start",
+            "from": "untested",
+            "to": "running",
+            "actor": "Codex GPT-6",
+            "at": "2026-11-10T07:57:30.829Z",
+            "reason": "",
+            "caseId": "LIVE-06",
+            "environmentId": "feishu",
+            "observationId": ""
+          },
+          {
+            "id": "result:feishu-LIVE-06-observation-12",
+            "scope": "execution",
+            "action": "record",
+            "from": "running",
+            "to": "passed",
+            "actor": "Codex GPT-6",
+            "at": "2026-11-10T07:57:32.238Z",
+            "reason": "All selected assertions passed",
+            "caseId": "LIVE-06",
+            "environmentId": "feishu",
+            "observationId": "feishu-LIVE-06-observation-12"
+          },
+          {
+            "id": "qq-LIVE-07-start-13",
+            "scope": "execution",
+            "action": "start",
+            "from": "untested",
+            "to": "running",
+            "actor": "Codex GPT-6",
+            "at": "2026-11-10T07:57:32.242Z",
+            "reason": "",
+            "caseId": "LIVE-07",
+            "environmentId": "qq",
+            "observationId": ""
+          },
+          {
+            "id": "result:qq-LIVE-07-observation-13",
+            "scope": "execution",
+            "action": "record",
+            "from": "running",
+            "to": "passed",
+            "actor": "Codex GPT-6",
+            "at": "2026-11-10T07:57:32.503Z",
+            "reason": "All selected assertions passed",
+            "caseId": "LIVE-07",
+            "environmentId": "qq",
+            "observationId": "qq-LIVE-07-observation-13"
+          },
+          {
+            "id": "qq-LIVE-08-start-14",
+            "scope": "execution",
+            "action": "start",
+            "from": "untested",
+            "to": "running",
+            "actor": "Codex GPT-6",
+            "at": "2026-11-10T07:57:32.509Z",
+            "reason": "",
+            "caseId": "LIVE-08",
+            "environmentId": "qq",
+            "observationId": ""
+          },
+          {
+            "id": "result:qq-LIVE-08-observation-14",
+            "scope": "execution",
+            "action": "record",
+            "from": "running",
+            "to": "passed",
+            "actor": "Codex GPT-6",
+            "at": "2026-11-10T07:57:32.618Z",
+            "reason": "Native metadata read-back retained unread state for this one live sample; not a controlled concurrency test",
+            "caseId": "LIVE-08",
+            "environmentId": "qq",
+            "observationId": "qq-LIVE-08-observation-14"
+          },
+          {
+            "id": "feishu-LIVE-07-start-15",
+            "scope": "execution",
+            "action": "start",
+            "from": "untested",
+            "to": "running",
+            "actor": "Codex GPT-6",
+            "at": "2026-11-10T07:57:32.624Z",
+            "reason": "",
+            "caseId": "LIVE-07",
+            "environmentId": "feishu",
+            "observationId": ""
+          },
+          {
+            "id": "result:feishu-LIVE-07-observation-15",
+            "scope": "execution",
+            "action": "record",
+            "from": "running",
+            "to": "passed",
+            "actor": "Codex GPT-6",
+            "at": "2026-11-10T07:57:34.044Z",
+            "reason": "Native plain_text_full response requested; no client-side truncation represented as full semantic coverage",
+            "caseId": "LIVE-07",
+            "environmentId": "feishu",
+            "observationId": "feishu-LIVE-07-observation-15"
+          },
+          {
+            "id": "feishu-LIVE-08-start-16",
+            "scope": "execution",
+            "action": "start",
+            "from": "untested",
+            "to": "running",
+            "actor": "Codex GPT-6",
+            "at": "2026-11-10T07:57:34.048Z",
+            "reason": "",
+            "caseId": "LIVE-08",
+            "environmentId": "feishu",
+            "observationId": ""
+          },
+          {
+            "id": "result:feishu-LIVE-08-observation-16",
+            "scope": "execution",
+            "action": "record",
+            "from": "running",
+            "to": "passed",
+            "actor": "Codex GPT-6",
+            "at": "2026-11-10T07:57:34.733Z",
+            "reason": "Native metadata read-back retained unread state for this one live sample; not a controlled concurrency test",
+            "caseId": "LIVE-08",
+            "environmentId": "feishu",
+            "observationId": "feishu-LIVE-08-observation-16"
+          },
+          {
+            "id": "complete",
+            "scope": "round",
+            "action": "complete",
+            "from": "running",
+            "to": "completed",
+            "actor": "Codex GPT-6",
+            "at": "2026-11-10T07:57:34.739Z",
+            "reason": "All sixteen selected case/environment pairs have terminal records; missing coverage remains explicit"
+          }
+        ]
+      }
+    }
+  ],
+  "annotations": []
+}

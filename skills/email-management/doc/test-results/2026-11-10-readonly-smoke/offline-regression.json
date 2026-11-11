@@ -1,0 +1,11 @@
+{
+  "command": "bash tests/email-management.sh",
+  "source": "07ef7b1eedc4d82db56e84d8cc38215264332700",
+  "discovered": 32,
+  "passed": 32,
+  "failed": 0,
+  "duration_seconds": 1.466,
+  "exit_code": 0,
+  "scope": "Synthetic local account-helper regression, not live mailbox acceptance",
+  "raw_output": "Observed in current terminal execution; raw output not persisted separately"
+}

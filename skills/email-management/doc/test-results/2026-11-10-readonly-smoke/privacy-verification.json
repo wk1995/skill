@@ -1,0 +1,14 @@
+{
+  "scope": "Only current QQ/Feishu anonymized test definitions, observations, conclusions and aggregate check facts are authorized for publication.",
+  "projection": "Fixed schema and controlled notes; native facts projected only as booleans/counts. No raw responses are included.",
+  "checks": {
+    "real_email_literals_absent": true,
+    "known_private_identifiers_absent": true,
+    "local_paths_absent": true,
+    "native_profiles_and_user_ids_absent": true,
+    "check_values_are_booleans_or_counts": true,
+    "plan_equals_frozen_source_definition": true,
+    "initial_partial_observation_retained": true
+  },
+  "limits": "No credentials were read for this scan. Existing design documents retain synthetic .invalid examples. Exact-match and pattern checks supplement the whitelist and manual review; they do not authorize later private data publication."
+}

@@ -1,0 +1,329 @@
+{
+  "id": "email-connected-readonly-smoke",
+  "revision": 1,
+  "version": "0.1.0-dev",
+  "title": "已接入邮箱的受限只读功能测试",
+  "source": "07ef7b1eedc4d82db56e84d8cc38215264332700",
+  "build": "Skill source + existing native QQ MCP 0.1.1 / Feishu CLI 1.0.73; no CI package",
+  "pr": "",
+  "cases": [
+    {
+      "id": "LIVE-01",
+      "title": "账号身份与本机绑定一致",
+      "priority": "P0",
+      "types": [
+        "smoke",
+        "integration"
+      ],
+      "preconditions": "用户已确认 QQ 与飞书只读范围，每邮箱最多读取1封正文。源设计追踪：EM-AUTH-007；本用例是缩减后的实际样本检查，不能关闭原设计的完整用例。",
+      "steps": "读取当前后端身份，与本机选定账号比较；记录运行版本和读取权限。",
+      "expected": "真实账号匹配且读取可用；不打印或公开账号值。",
+      "dependsOn": [],
+      "next": {
+        "passed": {
+          "action": "done",
+          "reason": "本项观察完成，继续冻结范围内独立检查"
+        },
+        "failed": {
+          "action": "retry",
+          "caseId": "LIVE-01",
+          "reason": "保留失败，明确修复或恢复后再另行复测"
+        },
+        "partial": {
+          "action": "wait",
+          "reason": "证据不完整",
+          "resumeWhen": "补齐本项未验证证据并明确重测"
+        },
+        "blocked": {
+          "action": "wait",
+          "reason": "前提或样本不足",
+          "resumeWhen": "具备缺失样本或权限并明确重测"
+        },
+        "skipped": {
+          "action": "done",
+          "reason": "本项未执行，不代表通过"
+        }
+      }
+    },
+    {
+      "id": "LIVE-02",
+      "title": "文件夹可读取且存在收件箱",
+      "priority": "P1",
+      "types": [
+        "smoke",
+        "integration"
+      ],
+      "preconditions": "用户已确认 QQ 与飞书只读范围，每邮箱最多读取1封正文。源设计追踪：EM-PROV-001/008；本用例是缩减后的实际样本检查，不能关闭原设计的完整用例。",
+      "steps": "列出文件夹并解析收件箱角色，检查所选账号的有效文件夹。",
+      "expected": "返回结构有效且有可用收件箱；不公开自定义目录名称。",
+      "dependsOn": [
+        "LIVE-01"
+      ],
+      "next": {
+        "passed": {
+          "action": "done",
+          "reason": "本项观察完成，继续冻结范围内独立检查"
+        },
+        "failed": {
+          "action": "retry",
+          "caseId": "LIVE-02",
+          "reason": "保留失败，明确修复或恢复后再另行复测"
+        },
+        "partial": {
+          "action": "wait",
+          "reason": "证据不完整",
+          "resumeWhen": "补齐本项未验证证据并明确重测"
+        },
+        "blocked": {
+          "action": "wait",
+          "reason": "前提或样本不足",
+          "resumeWhen": "具备缺失样本或权限并明确重测"
+        },
+        "skipped": {
+          "action": "done",
+          "reason": "本项未执行，不代表通过"
+        }
+      }
+    },
+    {
+      "id": "LIVE-03",
+      "title": "受限邮件列表结构正确",
+      "priority": "P1",
+      "types": [
+        "smoke",
+        "integration"
+      ],
+      "preconditions": "用户已确认 QQ 与飞书只读范围，每邮箱最多读取1封正文。源设计追踪：EM-READ-001；本用例是缩减后的实际样本检查，不能关闭原设计的完整用例。",
+      "steps": "仅查询收件箱首页，页大小为3；核对消息引用、主题字段和去重。",
+      "expected": "最多返回3条有原生引用的摘要；内容仅存本机，不把错误当空结果。",
+      "dependsOn": [
+        "LIVE-02"
+      ],
+      "next": {
+        "passed": {
+          "action": "done",
+          "reason": "本项观察完成，继续冻结范围内独立检查"
+        },
+        "failed": {
+          "action": "retry",
+          "caseId": "LIVE-03",
+          "reason": "保留失败，明确修复或恢复后再另行复测"
+        },
+        "partial": {
+          "action": "wait",
+          "reason": "证据不完整",
+          "resumeWhen": "补齐本项未验证证据并明确重测"
+        },
+        "blocked": {
+          "action": "wait",
+          "reason": "前提或样本不足",
+          "resumeWhen": "具备缺失样本或权限并明确重测"
+        },
+        "skipped": {
+          "action": "done",
+          "reason": "本项未执行，不代表通过"
+        }
+      }
+    },
+    {
+      "id": "LIVE-04",
+      "title": "第二页保留条件并与首页不重叠",
+      "priority": "P1",
+      "types": [
+        "smoke",
+        "integration"
+      ],
+      "preconditions": "用户已确认 QQ 与飞书只读范围，每邮箱最多读取1封正文。源设计追踪：EM-READ-003；本用例是缩减后的实际样本检查，不能关闭原设计的完整用例。",
+      "steps": "使用首页返回游标请求第二页，保持账号、目录和页大小；比较原生引用。",
+      "expected": "确有下一页时第二页结构正确且与首页不重叠；无下一页则标记 blocked，不能声称已覆盖。",
+      "dependsOn": [
+        "LIVE-03"
+      ],
+      "next": {
+        "passed": {
+          "action": "done",
+          "reason": "本项观察完成，继续冻结范围内独立检查"
+        },
+        "failed": {
+          "action": "retry",
+          "caseId": "LIVE-04",
+          "reason": "保留失败，明确修复或恢复后再另行复测"
+        },
+        "partial": {
+          "action": "wait",
+          "reason": "证据不完整",
+          "resumeWhen": "补齐本项未验证证据并明确重测"
+        },
+        "blocked": {
+          "action": "wait",
+          "reason": "前提或样本不足",
+          "resumeWhen": "具备缺失样本或权限并明确重测"
+        },
+        "skipped": {
+          "action": "done",
+          "reason": "本项未执行，不代表通过"
+        }
+      }
+    },
+    {
+      "id": "LIVE-05",
+      "title": "未读筛选符合状态",
+      "priority": "P1",
+      "types": [
+        "smoke",
+        "integration"
+      ],
+      "preconditions": "用户已确认 QQ 与飞书只读范围，每邮箱最多读取1封正文。源设计追踪：EM-READ-001；本用例是缩减后的实际样本检查，不能关闭原设计的完整用例。",
+      "steps": "使用原生未读筛选查询最多3条；用可用标签或元数据验证筛选结果。",
+      "expected": "存在有效未读样本且状态符合筛选；缺样本或状态证据则 blocked/partial。",
+      "dependsOn": [
+        "LIVE-03"
+      ],
+      "next": {
+        "passed": {
+          "action": "done",
+          "reason": "本项观察完成，继续冻结范围内独立检查"
+        },
+        "failed": {
+          "action": "retry",
+          "caseId": "LIVE-05",
+          "reason": "保留失败，明确修复或恢复后再另行复测"
+        },
+        "partial": {
+          "action": "wait",
+          "reason": "证据不完整",
+          "resumeWhen": "补齐本项未验证证据并明确重测"
+        },
+        "blocked": {
+          "action": "wait",
+          "reason": "前提或样本不足",
+          "resumeWhen": "具备缺失样本或权限并明确重测"
+        },
+        "skipped": {
+          "action": "done",
+          "reason": "本项未执行，不代表通过"
+        }
+      }
+    },
+    {
+      "id": "LIVE-06",
+      "title": "关键词搜索返回已知样本",
+      "priority": "P1",
+      "types": [
+        "smoke",
+        "integration"
+      ],
+      "preconditions": "用户已确认 QQ 与飞书只读范围，每邮箱最多读取1封正文。源设计追踪：EM-READ-002；本用例是缩减后的实际样本检查，不能关闭原设计的完整用例。",
+      "steps": "从首页最近一封的主题提取最多32字符；在同一收件箱检索最多3条，并核对该消息引用。",
+      "expected": "已知目标出现在结果中；仅证明此单个正样本，不宣称完整搜索或中文边界覆盖。",
+      "dependsOn": [
+        "LIVE-03"
+      ],
+      "next": {
+        "passed": {
+          "action": "done",
+          "reason": "本项观察完成，继续冻结范围内独立检查"
+        },
+        "failed": {
+          "action": "retry",
+          "caseId": "LIVE-06",
+          "reason": "保留失败，明确修复或恢复后再另行复测"
+        },
+        "partial": {
+          "action": "wait",
+          "reason": "证据不完整",
+          "resumeWhen": "补齐本项未验证证据并明确重测"
+        },
+        "blocked": {
+          "action": "wait",
+          "reason": "前提或样本不足",
+          "resumeWhen": "具备缺失样本或权限并明确重测"
+        },
+        "skipped": {
+          "action": "done",
+          "reason": "本项未执行，不代表通过"
+        }
+      }
+    },
+    {
+      "id": "LIVE-07",
+      "title": "读取单封正文并保留来源",
+      "priority": "P1",
+      "types": [
+        "smoke",
+        "integration"
+      ],
+      "preconditions": "用户已确认 QQ 与飞书只读范围，每邮箱最多读取1封正文。源设计追踪：EM-READ-008；本用例是缩减后的实际样本检查，不能关闭原设计的完整用例。",
+      "steps": "优先选择一个未读样本，否则选择首页样本；仅读取一封正文，不请求附件、链接或回执。",
+      "expected": "引用或消息标识匹配选定样本，正文类型正确；明确返回是否截断，正文只留本机。",
+      "dependsOn": [
+        "LIVE-03"
+      ],
+      "next": {
+        "passed": {
+          "action": "done",
+          "reason": "本项观察完成，继续冻结范围内独立检查"
+        },
+        "failed": {
+          "action": "retry",
+          "caseId": "LIVE-07",
+          "reason": "保留失败，明确修复或恢复后再另行复测"
+        },
+        "partial": {
+          "action": "wait",
+          "reason": "证据不完整",
+          "resumeWhen": "补齐本项未验证证据并明确重测"
+        },
+        "blocked": {
+          "action": "wait",
+          "reason": "前提或样本不足",
+          "resumeWhen": "具备缺失样本或权限并明确重测"
+        },
+        "skipped": {
+          "action": "done",
+          "reason": "本项未执行，不代表通过"
+        }
+      }
+    },
+    {
+      "id": "LIVE-08",
+      "title": "读取前后未读状态保持",
+      "priority": "P0",
+      "types": [
+        "smoke",
+        "integration"
+      ],
+      "preconditions": "用户已确认 QQ 与飞书只读范围，每邮箱最多读取1封正文。源设计追踪：EM-READ-008；本用例是缩减后的实际样本检查，不能关闭原设计的完整用例。",
+      "steps": "对同一未读样本比较读取前后原生元数据/未读列表；不调用任何状态修改接口。",
+      "expected": "未读前后均成立；没有未读样本则 blocked，无可靠状态证据则 partial。",
+      "dependsOn": [
+        "LIVE-07"
+      ],
+      "next": {
+        "passed": {
+          "action": "done",
+          "reason": "本项观察完成，继续冻结范围内独立检查"
+        },
+        "failed": {
+          "action": "retry",
+          "caseId": "LIVE-08",
+          "reason": "保留失败，明确修复或恢复后再另行复测"
+        },
+        "partial": {
+          "action": "wait",
+          "reason": "证据不完整",
+          "resumeWhen": "补齐本项未验证证据并明确重测"
+        },
+        "blocked": {
+          "action": "wait",
+          "reason": "前提或样本不足",
+          "resumeWhen": "具备缺失样本或权限并明确重测"
+        },
+        "skipped": {
+          "action": "done",
+          "reason": "本项未执行，不代表通过"
+        }
+      }
+    }
+  ]
+}

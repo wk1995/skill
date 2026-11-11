@@ -1,0 +1,173 @@
+{
+  "format": "ci-package-test/conclusions",
+  "version": 1,
+  "archiveRevision": 43,
+  "rounds": [
+    {
+      "roundId": "connected-readonly-2026-11-10",
+      "planId": "email-connected-readonly-smoke",
+      "version": "0.1.0-dev",
+      "source": "07ef7b1eedc4d82db56e84d8cc38215264332700",
+      "build": "Skill source + existing native QQ MCP 0.1.1 / Feishu CLI 1.0.73; no CI package",
+      "pr": "",
+      "lifecycle": "completed",
+      "verdict": "passed",
+      "counts": {
+        "failed": 0,
+        "blocked": 0,
+        "partial": 0,
+        "running": 0,
+        "untested": 0,
+        "skipped": 0,
+        "passed": 16
+      },
+      "executions": [
+        {
+          "caseId": "LIVE-01",
+          "environmentId": "qq",
+          "phase": "passed",
+          "result": "passed",
+          "observationId": "qq-LIVE-01-observation-0",
+          "unresolvedFailureId": null,
+          "dependencyStale": false
+        },
+        {
+          "caseId": "LIVE-01",
+          "environmentId": "feishu",
+          "phase": "passed",
+          "result": "passed",
+          "observationId": "feishu-LIVE-01-observation-3",
+          "unresolvedFailureId": null,
+          "dependencyStale": false
+        },
+        {
+          "caseId": "LIVE-02",
+          "environmentId": "qq",
+          "phase": "passed",
+          "result": "passed",
+          "observationId": "qq-LIVE-02-observation-1",
+          "unresolvedFailureId": null,
+          "dependencyStale": false
+        },
+        {
+          "caseId": "LIVE-02",
+          "environmentId": "feishu",
+          "phase": "passed",
+          "result": "passed",
+          "observationId": "feishu-LIVE-02-observation-4",
+          "unresolvedFailureId": null,
+          "dependencyStale": false
+        },
+        {
+          "caseId": "LIVE-03",
+          "environmentId": "qq",
+          "phase": "passed",
+          "result": "passed",
+          "observationId": "qq-LIVE-03-observation-2",
+          "unresolvedFailureId": null,
+          "dependencyStale": false
+        },
+        {
+          "caseId": "LIVE-03",
+          "environmentId": "feishu",
+          "phase": "passed",
+          "result": "passed",
+          "observationId": "feishu-LIVE-03-observation-6",
+          "unresolvedFailureId": null,
+          "dependencyStale": false
+        },
+        {
+          "caseId": "LIVE-04",
+          "environmentId": "qq",
+          "phase": "passed",
+          "result": "passed",
+          "observationId": "qq-LIVE-04-observation-7",
+          "unresolvedFailureId": null,
+          "dependencyStale": false
+        },
+        {
+          "caseId": "LIVE-04",
+          "environmentId": "feishu",
+          "phase": "passed",
+          "result": "passed",
+          "observationId": "feishu-LIVE-04-observation-10",
+          "unresolvedFailureId": null,
+          "dependencyStale": false
+        },
+        {
+          "caseId": "LIVE-05",
+          "environmentId": "qq",
+          "phase": "passed",
+          "result": "passed",
+          "observationId": "qq-LIVE-05-observation-8",
+          "unresolvedFailureId": null,
+          "dependencyStale": false
+        },
+        {
+          "caseId": "LIVE-05",
+          "environmentId": "feishu",
+          "phase": "passed",
+          "result": "passed",
+          "observationId": "feishu-LIVE-05-observation-11",
+          "unresolvedFailureId": null,
+          "dependencyStale": false
+        },
+        {
+          "caseId": "LIVE-06",
+          "environmentId": "qq",
+          "phase": "passed",
+          "result": "passed",
+          "observationId": "qq-LIVE-06-observation-9",
+          "unresolvedFailureId": null,
+          "dependencyStale": false
+        },
+        {
+          "caseId": "LIVE-06",
+          "environmentId": "feishu",
+          "phase": "passed",
+          "result": "passed",
+          "observationId": "feishu-LIVE-06-observation-12",
+          "unresolvedFailureId": null,
+          "dependencyStale": false
+        },
+        {
+          "caseId": "LIVE-07",
+          "environmentId": "qq",
+          "phase": "passed",
+          "result": "passed",
+          "observationId": "qq-LIVE-07-observation-13",
+          "unresolvedFailureId": null,
+          "dependencyStale": false
+        },
+        {
+          "caseId": "LIVE-07",
+          "environmentId": "feishu",
+          "phase": "passed",
+          "result": "passed",
+          "observationId": "feishu-LIVE-07-observation-15",
+          "unresolvedFailureId": null,
+          "dependencyStale": false
+        },
+        {
+          "caseId": "LIVE-08",
+          "environmentId": "qq",
+          "phase": "passed",
+          "result": "passed",
+          "observationId": "qq-LIVE-08-observation-14",
+          "unresolvedFailureId": null,
+          "dependencyStale": false
+        },
+        {
+          "caseId": "LIVE-08",
+          "environmentId": "feishu",
+          "phase": "passed",
+          "result": "passed",
+          "observationId": "feishu-LIVE-08-observation-16",
+          "unresolvedFailureId": null,
+          "dependencyStale": false
+        }
+      ],
+      "meaning": "Derived from recorded evidence only; incomplete, skipped or missing coverage is not a pass. This is not release approval."
+    }
+  ]
+}

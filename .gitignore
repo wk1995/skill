@@ -5,3 +5,8 @@
 dist/
 __pycache__/
 *.py[cod]
+
+# Email account/runtime data belongs outside Git; ignore accidental local copies.
+.email-management/
+email-management.local.toml
+email-management.local.json
