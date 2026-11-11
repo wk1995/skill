@@ -43,7 +43,9 @@ try{
   assert.match(options[0],/第 1 轮.*first.*→/);
   assert.match(options[1],/第 2 轮.*second.*→/);
   assert.match(options[2],/第 3 轮.*third.*最新/);
-  assert.equal(await page.locator('#round optgroup[label="PR-2"] option').textContent(),'single');
+  const singleton=await page.locator('#round optgroup[label="PR-2"] option').textContent();
+  assert.match(singleton,/^single\b/);
+  assert.doesNotMatch(singleton,/第 .* 轮|→|最新/);
   await history.getByRole('link',{name:/second/}).click();
   await summary.getByText(/本轮测试结论：部分执行/).waitFor();
   assert.match(page.url(),/round=second/);

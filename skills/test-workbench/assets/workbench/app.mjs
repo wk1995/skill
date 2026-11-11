@@ -1,10 +1,10 @@
+import {groupRoundHistory, historyVerdict} from './round-history.mjs';
 import {visibleCases,visibleRecords,statistics} from './view-data.mjs';
 import * as model from './model.mjs';
 import {testConclusions} from './conclusions.mjs';
 import {openWorkspace,read,update,initializeSource,commitSource} from './store.mjs';
 import {markTarget, selectedTarget, renderComposer, renderThreads} from './annotation-ui.mjs';
 import {renderFlow, renderTestLocation} from './flow-ui.mjs';
-import {groupRoundHistory, historyVerdict} from './round-history.mjs';
 const $ = id => document.getElementById(id);
 const labels = {smoke:'冒烟',functional:'功能',performance:'性能',compatibility:'兼容性',stability:'稳定性',security:'安全',usability:'易用性','install-upgrade':'安装升级',integration:'集成',passed:'通过',failed:'失败',partial:'部分执行',blocked:'阻塞',untested:'待测',running:'测试中',skipped:'跳过',draft:'草稿',ready:'就绪',completed:'已结束',prepare:'标记就绪',begin:'开始本轮',complete:'结束本轮',reopen:'重新打开'};
 const el = (tag, text, className) => { const node = document.createElement(tag); if (text != null) node.textContent = text; if (className) node.className = className; return node; };
