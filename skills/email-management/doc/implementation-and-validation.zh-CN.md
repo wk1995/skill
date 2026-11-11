@@ -67,3 +67,9 @@ QQ 和飞书完成了限定样本的只读验证，当前结果共 16 项通过�
 | 私有数据不进入产物 / `agent_build.py` 所有 adapter | 选定源码及 adapter 输入扫描 → 首次输出目录和暂存创建 | `bash tests/agent-builds.sh` 在临时项目的源码及 adapter 中覆盖三个保留名称的根层和嵌套位置。原 head 会复制合成文件。修复后拒绝，保留已有产物和源文件，清理输入后重建及重复重建通过 | 文件名只能拦截已知形态，任意改名的副本仍需在发布前检查 |
 | 可移植运行 / 四种实际分发产物 | 每个产物的私有路径和索引校验与 portable core 相同 | Codex、WorkBuddy、WorkBuddy AI、DeepSeek Harness 的实际副本均在仓库外清空 PATH 和 PYTHONPATH 后运行 33 项测试，且产物中无已知的真实账号标识 | 本轮原生运行环境为 macOS，Linux 以 PR 检查为准 |
 | 飞书能力与验证记录一致 / 后端说明和双语 README | 文档一致性检查 | 飞书参考页链接 1.0.73 只读证据；与匿名报告的身份、搜索和正文覆盖一致；双语目录检查通过 | QQ/飞书的既有只读证据仅用于所记载样本，本轮未访问真实邮件 |
+
+### CI 回归
+
+Ubuntu 和 macOS 在 provenance 工作流中运行邮箱回归，并从四种实际构建产物各运行一次。产物测试在仓库外清空 PATH 和 PYTHONPATH，使用合成账号。CI 还核对飞书参考页与双语指南是否指向同一份匿名报告。Ubuntu 同时测试构建对根层和嵌套本机数据名称的拒绝，以及提交隐私门禁的正反例。
+
+`skill-catalog` 在生成目录前检查涉及邮箱 Skill 的 PR。检查使用事件的 base/head 和完整历史，覆盖 PR 新增提交的原始作者及提交者字段，包括已回退的改动和合并提交。GitHub noreply 身份通过，失败只报告提交数及字段数。在本机可用 `python3 scripts/email_pr_privacy.py --base origin/main --head HEAD` 预检。提交身份规则与真实邮箱账号、凭据及运行时存储独立。[GitHub noreply 地址格式](https://docs.github.com/en/account-and-profile/reference/email-addresses-reference#your-noreply-email-address)

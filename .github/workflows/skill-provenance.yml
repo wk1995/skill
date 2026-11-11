@@ -37,3 +37,12 @@ jobs:
 
       - name: Check all four finding families
         run: bash tests/skill-provenance.sh
+
+      - name: Test the email Skill and its distributed artifacts
+        run: bash tests/email-management.sh --artifacts
+
+      - name: Test local email input rejection and PR privacy policy
+        if: matrix.os == 'ubuntu-latest'
+        run: |
+          bash tests/agent-builds.sh
+          bash tests/email-pr-privacy.sh
