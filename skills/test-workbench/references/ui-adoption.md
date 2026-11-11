@@ -15,6 +15,8 @@ Keep the version/plan/round, selected environment, persistence status and curren
 
 On a typical desktop viewport, verify how far users must scroll to reach the current case and its start/skip controls. At narrow widths let toolbars wrap, keep controls reachable and wide graphs/tables internally scrollable. Do not remove source identity, failure/skip distinctions, blockers or save feedback merely to reduce height. Keep dependency/outcome edge legends explicit when the project uses a different line style.
 
+For a plan used in several rounds, group executions by the frozen change reference (use exact tested source when no change reference exists). Order each group by the instant in its zoned timestamp, with stable ID order for ties. Number multi-round groups from oldest to newest, mark the latest round and the one being viewed, and make each round individually linkable. Show the latest round's own conclusion, tested source and frozen scope even while viewing an older round. Distinguish incomplete, missing and stale evidence. An earlier position in the timeline does not establish a retest baseline, and a focused pass applies only to the cases and environments actually frozen for that round.
+
 ## Verification
 
 Use disposable data, not real test results:
@@ -24,3 +26,4 @@ Use disposable data, not real test results:
 3. Add case and record annotations; filter, reply, resolve/reopen and navigate back to the exact record. Reload/import/export and verify thread identity/snapshots, with no changed outcome.
 4. Export with an unsaved observation draft; verify confirmed file data and save revision are unchanged, the draft is excluded, and actionable guidance respects lifecycle/dependency guards. Check old snapshots are read-only and do not inherit current execution context.
 5. Inspect desktop and narrow layouts plus disabled/error states. Report actual implementation and browser verification separately from documentation or fixture-only tests.
+6. Load three rounds of one change (including same-day rounds with different sources) and a separate single-round change. Open the oldest deep link, verify numbering, newest verdict and frozen coverage, then open another historical conclusion. Remove or invalidate the latest evidence in a disposable fixture and confirm its latest status changes without replacing older conclusions or deep links.

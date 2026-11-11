@@ -1,3 +1,4 @@
+import {groupRoundHistory, historyVerdict} from './round-history.mjs';
 import {visibleCases,visibleRecords,statistics} from './view-data.mjs';
 import * as model from './model.mjs';
 import {testConclusions} from './conclusions.mjs';
@@ -86,6 +87,7 @@ function render() {
     if(/^https?:\/\//i.test(value)) {const a=el('a',value);a.href=value;a.target='_blank';a.rel='noopener noreferrer';p.append(a);} else p.append(document.createTextNode(value||'未提供'));
     $('identity').append(p);
   }
+  renderRoundHistory(round, plan);
   renderWorkflow(round);$('workflow').hidden=view!=='cases';
   $('round-setup').hidden=view!=='cases';$('environment-setup').hidden=view!=='cases';
   updateRoundPreview();
@@ -185,6 +187,41 @@ function renderEditor(detail,plan,item) {
     if(data.get('testLocation').trim())edited.testLocation=JSON.parse(data.get('testLocation'));else delete edited.testLocation;
     save(state=>model.editCase(state,plan.id,edited),()=>drafts.delete(key));}catch(error){message(error.message,true);}};
   panel.append(form);detail.append(panel);
+}
+function renderRoundHistory(current, plan) {
+  const panel=$('round-history'),picker=$('round');
+  panel.replaceChildren();
+  panel.hidden=!plan||Boolean(linkError);
+  if(panel.hidden)return;
+  const groups=groupRoundHistory(model.roundsFor(state,plan.id));
+  if(!groups.length){panel.hidden=true;return;}
+  const options=new Map([...picker.options].map(item=>[item.value,item]));
+  picker.replaceChildren(options.get(''));
+  for(const group of groups){
+    const category=el('optgroup');category.label=group.label;
+    for(const [index,round] of group.rounds.entries()){
+      const item=options.get(round.id);
+      if(group.rounds.length>1)item.textContent=`第 ${index+1} 轮 · ${item.textContent} ${round===group.latest?'· 最新':'→'}`;
+      category.append(item);
+    }
+    picker.append(category);
+  }
+  picker.value=current?.id??'';
+  const group=groups.find(item=>item.rounds.includes(current));
+  if(!group){panel.hidden=true;return;}
+  const latest=group.latest,report=testConclusions({...state,rounds:[latest]}).rounds[0];
+  panel.append(el('h3','同一变更的测试历程'),el('p',`最新轮次：${historyVerdict(report)} · 实测源码：${latest.source}`),
+    el('p',`覆盖：${latest.cases.map(item=>item.id).join(', ')} · ${latest.environments.length} 个环境`));
+  const list=el('ol');
+  for(const round of group.rounds){
+    const row=el('li'),link=el('a',`${round.name} · ${round.createdAt}`);
+    link.href='#'+new URLSearchParams({plan:plan.id,round:round.id,view:'summary'});
+    if(round===current){link.setAttribute('aria-current','true');row.append(link,' · 正在查看');}
+    else row.append(link);
+    if(round===latest)row.append(' · 最新');
+    list.append(row);
+  }
+  panel.append(list);
 }
 function renderWorkflow(round) {
   const panel=$('workflow');panel.replaceChildren();

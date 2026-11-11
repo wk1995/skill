@@ -2,7 +2,7 @@
 
 ## [Unreleased]
 
-- No unreleased changes.
+- Show chronological test history per change, with round links and the latest round's own verdict, tested source and coverage.
 
 ## [0.0.7] - 2026-11-10
 
