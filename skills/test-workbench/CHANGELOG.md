@@ -2,7 +2,7 @@
 
 ## [Unreleased]
 
-- No unreleased changes.
+- Add an example handoff that keeps code integration, original-path retest and candidate-specific release acceptance independent.
 
 ## [0.0.7] - 2026-11-10
 
