@@ -1,0 +1,346 @@
+{
+  "schemaVersion": 1,
+  "revision": 11,
+  "plans": [
+    {
+      "id": "EXAMPLE-PLAN",
+      "revision": 0,
+      "version": "example-product-1",
+      "title": "FORMAT EXAMPLE ONLY — not product evidence",
+      "source": "example-source-sha",
+      "build": "",
+      "pr": "",
+      "cases": [
+        {
+          "id": "LOGIN01",
+          "title": "Sign in with a valid fixture account",
+          "priority": "P0",
+          "types": [
+            "smoke",
+            "functional"
+          ],
+          "preconditions": "Disposable fixture account and service available",
+          "steps": "Enter fixture credentials and select Sign in",
+          "expected": "Home screen shows the fixture account",
+          "dependsOn": [],
+          "next": {
+            "passed": {
+              "action": "test",
+              "caseId": "PROFILE01",
+              "reason": "Check account details after login"
+            },
+            "failed": {
+              "action": "retry",
+              "caseId": "LOGIN01",
+              "reason": "Verify the fix while retaining this failure"
+            },
+            "partial": {
+              "action": "retry",
+              "caseId": "LOGIN01",
+              "reason": "Complete remaining checks"
+            },
+            "blocked": {
+              "action": "wait",
+              "reason": "Prerequisite unavailable",
+              "resumeWhen": "Fixture service and account are available"
+            },
+            "skipped": {
+              "action": "done",
+              "reason": "Explicitly excluded from this fixture round"
+            }
+          }
+        },
+        {
+          "id": "PROFILE01",
+          "title": "View the signed-in account profile",
+          "priority": "P1",
+          "types": [
+            "functional"
+          ],
+          "preconditions": "Logged in in this round/environment",
+          "steps": "Open Profile and inspect the fixture account details",
+          "expected": "Account details match the fixture",
+          "dependsOn": [
+            "LOGIN01"
+          ],
+          "next": {
+            "passed": {
+              "action": "done",
+              "reason": "This branch is covered"
+            },
+            "failed": {
+              "action": "retry",
+              "caseId": "PROFILE01",
+              "reason": "Verify the fix while retaining this failure"
+            },
+            "partial": {
+              "action": "retry",
+              "caseId": "PROFILE01",
+              "reason": "Complete remaining checks"
+            },
+            "blocked": {
+              "action": "wait",
+              "reason": "Prerequisite unavailable",
+              "resumeWhen": "Fixture service and account are available"
+            },
+            "skipped": {
+              "action": "done",
+              "reason": "Explicitly excluded from this fixture round"
+            }
+          }
+        }
+      ]
+    }
+  ],
+  "environments": [
+    {
+      "id": "EXAMPLE-ENV",
+      "label": "Disposable fixture browser",
+      "kind": "browser",
+      "configuration": "Example only; no real product/device was tested"
+    }
+  ],
+  "rounds": [
+    {
+      "id": "EXAMPLE-ROUND",
+      "name": "FORMAT EXAMPLE ONLY",
+      "planId": "EXAMPLE-PLAN",
+      "version": "example-product-1",
+      "source": "example-source-sha",
+      "build": "",
+      "pr": "",
+      "createdAt": "2026-10-23T09:00:00Z",
+      "cases": [
+        {
+          "id": "LOGIN01",
+          "title": "Sign in with a valid fixture account",
+          "priority": "P0",
+          "types": [
+            "smoke",
+            "functional"
+          ],
+          "preconditions": "Disposable fixture account and service available",
+          "steps": "Enter fixture credentials and select Sign in",
+          "expected": "Home screen shows the fixture account",
+          "dependsOn": [],
+          "next": {
+            "passed": {
+              "action": "test",
+              "caseId": "PROFILE01",
+              "reason": "Check account details after login"
+            },
+            "failed": {
+              "action": "retry",
+              "caseId": "LOGIN01",
+              "reason": "Verify the fix while retaining this failure"
+            },
+            "partial": {
+              "action": "retry",
+              "caseId": "LOGIN01",
+              "reason": "Complete remaining checks"
+            },
+            "blocked": {
+              "action": "wait",
+              "reason": "Prerequisite unavailable",
+              "resumeWhen": "Fixture service and account are available"
+            },
+            "skipped": {
+              "action": "done",
+              "reason": "Explicitly excluded from this fixture round"
+            }
+          },
+          "selectionReasons": [
+            "smoke",
+            "change",
+            "conditional-next",
+            "dependency"
+          ]
+        },
+        {
+          "id": "PROFILE01",
+          "title": "View the signed-in account profile",
+          "priority": "P1",
+          "types": [
+            "functional"
+          ],
+          "preconditions": "Logged in in this round/environment",
+          "steps": "Open Profile and inspect the fixture account details",
+          "expected": "Account details match the fixture",
+          "dependsOn": [
+            "LOGIN01"
+          ],
+          "next": {
+            "passed": {
+              "action": "done",
+              "reason": "This branch is covered"
+            },
+            "failed": {
+              "action": "retry",
+              "caseId": "PROFILE01",
+              "reason": "Verify the fix while retaining this failure"
+            },
+            "partial": {
+              "action": "retry",
+              "caseId": "PROFILE01",
+              "reason": "Complete remaining checks"
+            },
+            "blocked": {
+              "action": "wait",
+              "reason": "Prerequisite unavailable",
+              "resumeWhen": "Fixture service and account are available"
+            },
+            "skipped": {
+              "action": "done",
+              "reason": "Explicitly excluded from this fixture round"
+            }
+          },
+          "selectionReasons": [
+            "change",
+            "conditional-next"
+          ]
+        }
+      ],
+      "environments": [
+        {
+          "id": "EXAMPLE-ENV",
+          "label": "Disposable fixture browser",
+          "kind": "browser",
+          "configuration": "Example only; no real product/device was tested"
+        }
+      ],
+      "observations": [
+        {
+          "id": "EXAMPLE-LOGIN-PASS",
+          "caseId": "LOGIN01",
+          "environmentId": "EXAMPLE-ENV",
+          "environment": {
+            "id": "EXAMPLE-ENV",
+            "label": "Disposable fixture browser",
+            "kind": "browser",
+            "configuration": "Example only; no real product/device was tested"
+          },
+          "status": "passed",
+          "executedAt": "2026-10-23T09:00:00Z",
+          "recordedAt": "2026-10-23T09:00:00Z",
+          "tester": "Example operator",
+          "notes": "FORMAT EXAMPLE ONLY — not a product-test result",
+          "evidence": ""
+        },
+        {
+          "id": "EXAMPLE-PROFILE-FAIL",
+          "caseId": "PROFILE01",
+          "environmentId": "EXAMPLE-ENV",
+          "environment": {
+            "id": "EXAMPLE-ENV",
+            "label": "Disposable fixture browser",
+            "kind": "browser",
+            "configuration": "Example only; no real product/device was tested"
+          },
+          "status": "failed",
+          "executedAt": "2026-10-23T09:00:00Z",
+          "recordedAt": "2026-10-23T09:00:00Z",
+          "tester": "Example operator",
+          "notes": "FORMAT EXAMPLE ONLY: fixture profile differs; no actual issue was created",
+          "evidence": ""
+        }
+      ],
+      "workflow": {
+        "version": 1,
+        "events": [
+          {
+            "id": "example-prepare",
+            "scope": "round",
+            "action": "prepare",
+            "from": "draft",
+            "to": "ready",
+            "actor": "Example operator",
+            "at": "2026-10-23T09:00:00Z",
+            "reason": ""
+          },
+          {
+            "id": "example-begin",
+            "scope": "round",
+            "action": "begin",
+            "from": "ready",
+            "to": "running",
+            "actor": "Example operator",
+            "at": "2026-10-23T09:00:00Z",
+            "reason": ""
+          },
+          {
+            "id": "example-start-login",
+            "scope": "execution",
+            "action": "start",
+            "from": "untested",
+            "to": "running",
+            "actor": "Example operator",
+            "at": "2026-10-23T09:00:00Z",
+            "reason": "",
+            "caseId": "LOGIN01",
+            "environmentId": "EXAMPLE-ENV",
+            "observationId": ""
+          },
+          {
+            "id": "result:EXAMPLE-LOGIN-PASS",
+            "scope": "execution",
+            "action": "record",
+            "from": "running",
+            "to": "passed",
+            "actor": "Example operator",
+            "at": "2026-10-23T09:00:00Z",
+            "reason": "FORMAT EXAMPLE ONLY — not a product-test result",
+            "caseId": "LOGIN01",
+            "environmentId": "EXAMPLE-ENV",
+            "observationId": "EXAMPLE-LOGIN-PASS"
+          },
+          {
+            "id": "example-start-profile",
+            "scope": "execution",
+            "action": "start",
+            "from": "untested",
+            "to": "running",
+            "actor": "Example operator",
+            "at": "2026-10-23T09:00:00Z",
+            "reason": "",
+            "caseId": "PROFILE01",
+            "environmentId": "EXAMPLE-ENV",
+            "observationId": ""
+          },
+          {
+            "id": "result:EXAMPLE-PROFILE-FAIL",
+            "scope": "execution",
+            "action": "record",
+            "from": "running",
+            "to": "failed",
+            "actor": "Example operator",
+            "at": "2026-10-23T09:00:00Z",
+            "reason": "FORMAT EXAMPLE ONLY: fixture profile differs; no actual issue was created",
+            "caseId": "PROFILE01",
+            "environmentId": "EXAMPLE-ENV",
+            "observationId": "EXAMPLE-PROFILE-FAIL"
+          },
+          {
+            "id": "example-complete",
+            "scope": "round",
+            "action": "complete",
+            "from": "running",
+            "to": "completed",
+            "actor": "Example operator",
+            "at": "2026-10-23T09:00:00Z",
+            "reason": ""
+          }
+        ]
+      },
+      "issueLinks": [
+        {
+          "id": "EXAMPLE-LINK",
+          "observationId": "EXAMPLE-PROFILE-FAIL",
+          "url": "https://github.com/example/example/issues/123",
+          "actor": "Example operator",
+          "createdAt": "2026-10-23T09:00:00Z"
+        }
+      ]
+    }
+  ],
+  "annotations": []
+}

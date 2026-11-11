@@ -69,7 +69,8 @@ document the result before choosing a level. Do not default to MAJOR to be safe.
 - For one release, aggregate pending changes and use the highest required level
   once. Three fixes plus one compatible feature mean at least
   `1.2.3 -> 1.3.0`. Do not bump once per commit.
-- A new experimental component starts at `0.1.0`; a component with an explicitly
+- A new experimental component starts at `0.1.0` by default; an explicitly
+  requested initial `0.0.1` is also supported. A component with an explicitly
   established stable contract may start at `1.0.0`.
 - This repository also protects documented compatibility during `0.x.x`:
   a fix is `0.2.3 -> 0.2.4`, a compatible feature is `0.2.3 -> 0.3.0`, and an
@@ -186,7 +187,7 @@ evidence; they also do not count as duplicate or previously released entries.
 | `feature` | MINOR + 1, PATCH = 0 | None |
 | `breaking` | MAJOR + 1, MINOR = PATCH = 0, including `0.x.x -> 1.0.0` | `Breaking-Change` (old/new behavior and affected consumers), `Migration` (steps) |
 | `stable` | Only `0.x.x -> 1.0.0` | `Stable-Contract`, `Readiness` |
-| `initial` | New component at `0.1.0` or `1.0.0` | For `1.0.0`: `Stable-Contract`, `Readiness` |
+| `initial` | New component at `0.0.1`, `0.1.0` or `1.0.0` | For `1.0.0`: `Stable-Contract`, `Readiness` |
 
 A release declared as `fix` cannot change `1.2.3` to `2.0.0`. Downgrades, skipped
 numbers, missing resets, duplicate or reused release headings, and missing
@@ -204,3 +205,7 @@ change is real, and it does not enforce immutability of all historical content.
 Those decisions remain review requirements. Legacy/external sync parsing and
 standalone build parsing retain their compatibility; the strict release-format
 boundary introduced here is the repository CI validator.
+
+## First Merge With Development History
+
+A new component may first enter the default branch at a later version only when its current dated release entry explicitly declares `Initial-Version: 0.0.1` (or `0.1.0` / `1.0.0`). This records development history, not previously published releases. The owning changelog must contain the complete newest-first history from the current version down to that initial version. CI validates every entry independently: unique canonical version/date, non-future chronological dates, nonempty declarations, legal initial release, same-level increments and required breaking/stable evidence. Adapter and artifact histories remain separate. Without this declaration the original three initial values remain mandatory; an invalid/missing chain fails rather than falling back. Existing default-branch components still compare against their recorded base version, and this exception never permits downgrades or rewriting a published release.

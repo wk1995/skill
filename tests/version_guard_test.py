@@ -402,15 +402,104 @@ class VersionGuardTests(unittest.TestCase):
         shutil.rmtree(self.root / "platforms")
         self.git("commit", "-qam", "[codex] Empty component baseline")
         baseline = self.git("rev-parse", "HEAD")
-        for value in ("0.1.0", "1.0.0", "0.0.1"):
-            with self.subTest(version=value):
-                self.git("reset", "--hard", baseline)
-                self.git("checkout", self.base, "--", "skills", "platforms")
-                for kind in ("skill", "adapter", "artifact"):
-                    self.set_version(kind, value)
-                    self.add_release(kind, value, "initial", "- Stable-Contract: Supported inputs.\n- Readiness: Workflows tested.\n")
+        for kind in ("skill", "adapter", "artifact"):
+            for value in ("0.0.1", "0.1.0", "1.0.0", "0.0.0", "0.0.2", "0.2.0"):
+                with self.subTest(kind=kind, version=value):
+                    self.git("reset", "--hard", baseline)
+                    self.git("checkout", self.base, "--", "skills", "platforms")
+                    for owner in ("skill", "adapter", "artifact"):
+                        version = value if owner == kind else "0.1.0"
+                        self.set_version(owner, version)
+                        self.add_release(owner, version, "initial", "- Stable-Contract: Supported inputs.\n- Readiness: Workflows tested.\n")
+                    self.commit()
+                    expected = None if value in {"0.0.1", "0.1.0", "1.0.0"} else "new components require"
+                    for mode in ("pr", "push"):
+                        self.run_guard(expected, base=baseline, mode=mode)
+                        self.run_guard(expected, base=baseline, mode=mode)
+
+    def test_first_merge_history_requires_explicit_validated_owner_chain(self):
+        for kind in ("skill", "adapter", "artifact"):
+            with self.subTest(kind=kind):
+                self.reset()
+                owner = self.root / ("skills" if kind == "skill" else "platforms")
+                shutil.rmtree(owner)
+                baseline = self.commit()
+                self.git("checkout", self.base, "--", str(owner.relative_to(self.root)))
+                log = (self.skill if kind == "skill" else self.adapter).with_name("CHANGELOG.md")
+                log.write_text("# Changelog\n\n## [Unreleased]\n\n")
+                for field in (("skill",) if kind == "skill" else ("adapter", "artifact")):
+                    value = "0.0.1" if field == kind else "0.1.0"
+                    self.set_version(field, value)
+                    self.add_release(field, value, "initial")
+                self.set_version(kind, "0.0.3")
+                self.add_release(kind, "0.0.2", "fix")
+                self.add_release(kind, "0.0.3", "fix", "- Initial-Version: 0.0.1\n")
+                valid = log.read_text()
                 self.commit()
-                self.run_guard(None if value != "0.0.1" else "new components require", base=baseline)
+                for mode in ("pr", "push"):
+                    self.run_guard(base=baseline, mode=mode)
+                    self.run_guard(base=baseline, mode=mode)
+                prefix = "artifact " if kind == "artifact" else ""
+                edits = [
+                    (lambda text: text.replace("- Initial-Version: 0.0.1", "- Initial-Version: 0.0.9"), "Initial-Version"),
+                    (lambda text: text.replace("- Initial-Version: 0.0.1", "- Initial-Version: 0.0.1\n- Initial-Version: 0.0.1"), "Initial-Version"),
+                    (lambda text: text.replace(f"## [{prefix}0.0.2]", f"## [{prefix}0.2.0]"), "does not match"),
+                    (lambda text: text.replace(f"## [{prefix}0.0.2] - 2026-01-02", f"## [{prefix}0.0.2] - 2026-01-03"), "chronological"),
+                    (lambda text: text.replace(f"## [{prefix}0.0.2] - 2026-01-02", f"## [{prefix}0.0.2] - 2999-01-01"), "future"),
+                    (lambda text: text.replace("- Initial-Version: 0.0.1", ""), "new components require"),
+                ]
+                for edit, expected in edits:
+                    with self.subTest(kind=kind, rejection=expected):
+                        log.write_text(edit(valid))
+                        self.commit()
+                        for mode in ("pr", "push"):
+                            self.run_guard(expected, base=baseline, mode=mode)
+                log.write_text(valid)
+                self.commit()
+                for mode in ("pr", "push"):
+                    self.run_guard(base=baseline, mode=mode)
+
+    def test_small_initial_requires_release_evidence(self):
+        for kind in ("skill", "adapter", "artifact"):
+            with self.subTest(kind=kind):
+                self.reset()
+                owner = self.root / ("skills" if kind == "skill" else "platforms")
+                shutil.rmtree(owner)
+                baseline = self.commit()
+                self.git("checkout", self.base, "--", str(owner.relative_to(self.root)))
+                # Keep a sibling valid so it cannot mask the selected field's failure.
+                for field in (("skill",) if kind == "skill" else ("adapter", "artifact")):
+                    value = "0.0.1" if field == kind else "0.1.0"
+                    self.set_version(field, value)
+                    if field != kind:
+                        self.add_release(field, value, "initial")
+                self.commit()
+                for mode in ("pr", "push"):
+                    self.run_guard("require one new release entry", base=baseline, mode=mode)
+                self.add_release(kind, "0.0.1", "fix")
+                self.commit()
+                for mode in ("pr", "push"):
+                    self.run_guard("new components require", base=baseline, mode=mode)
+                log = (self.skill if kind == "skill" else self.adapter).with_name("CHANGELOG.md")
+                log.write_text(log.read_text().replace("- Change-Type: fix", "- Change-Type: initial"))
+                self.commit()
+                for mode in ("pr", "push"):
+                    self.run_guard(base=baseline, mode=mode)
+                    self.run_guard(base=baseline, mode=mode)
+
+    def test_followup_releases_after_small_initial(self):
+        for kind in ("skill", "adapter", "artifact"):
+            for value, change_type in (("0.0.2", "fix"), ("0.1.0", "feature")):
+                with self.subTest(kind=kind, version=value):
+                    self.reset()
+                    self.set_version(kind, "0.0.1")
+                    self.add_release(kind, "0.0.1", "initial")
+                    baseline = self.commit()
+                    self.set_version(kind, value)
+                    self.add_release(kind, value, change_type)
+                    self.commit()
+                    for mode in ("pr", "push"):
+                        self.run_guard(base=baseline, mode=mode)
 
     def test_numeric_parts_do_not_carry_at_nine(self):
         for kind in ("skill", "adapter", "artifact"):
