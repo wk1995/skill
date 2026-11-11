@@ -2,7 +2,7 @@
 
 ## [Unreleased]
 
-- No unreleased changes.
+- Define shared next-round preparation context and acceptance checks for webpage, WebMCP and API integrations.
 
 ## [0.0.7] - 2026-11-10
 

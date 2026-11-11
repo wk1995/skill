@@ -46,6 +46,22 @@ Keep read-only tools distinct from mutations. Upload success means bytes are sto
 
 Verify unavailable-registry fallback, registration failure cleanup, stale/wrong-round/environment rejection, single/batch consistency and upload without result creation. Never use a real product record merely to test the integration.
 
+### Shared read-only preparation
+
+Route the webpage dialog, the registered preparation tool (inside or outside the dialog), and the project API to the same preparation resolver. Resolve the authoritative workspace and repository, plan, target PR identity with exact base/head, selected round, and archive/plan revisions. Pass the workbench selection to the tool even when the dialog is closed. Request-level overrides use the same rules at every entry point. Return the effective comparison base and its provenance, failed cases, unfinished cases, and the same preview ID for equivalent inputs. Report preparation as pending when the target or comparison cannot be verified.
+
+| Baseline mode | Resolver behavior |
+| --- | --- |
+| Automatic | Prefer the selected round if it belongs to the target repository, plan, version and change. Otherwise apply the project's documented compatible-round selection rule or use the verified PR base if no applicable round exists. Return the reason for the choice. |
+| Explicit round | Require the given round and a readable saved revision compatible with the target. Use its tested source. Reject a missing, incompatible or inaccessible explicit request. |
+| Explicit PR base | Use the verified PR base and no inherited round or round results. Preserve this explicit choice until the operator changes it. |
+
+When the target PR changes, clear an inherited round from the prior target and resolve automatic mode anew. If an explicit round override becomes incompatible, clear its effective baseline and require a new explicit choice. Carry a compatible explicit selection across entry points. Opening or closing the dialog alone must not choose or reset a baseline. Resolve a historical view only against its pinned snapshot and label the response read-only. If the snapshot cannot supply the target or baseline, return an unavailable result with its identity. Do not substitute data from the current workspace or permit historical preview IDs to confirm a live write.
+
+Bind the preview ID to the source identity, target PR/base/head, baseline mode and effective round/tested source and save revision, plan/definition revision, candidate IDs, requested scope, and live versus historical context. Use a canonical representation for equality. Confirmation must re-resolve with fresh authoritative data and reject if any bound input changed, before handing the confirmed IDs to the shared freeze/write guard. A preview prepares candidate information only. It does not execute cases, create rounds or persist state.
+
+Use the [disposable adapter acceptance fixture](../tests/preparation-adapter.test.mjs) as a starting point for the project's real resolver, dialog, API and browser tool registration checks. It uses a substitute registry and two simulated PRs. Check equivalent requests with the dialog open and closed, exact matching failed/unfinished lists, explicit overrides, target changes, unavailable or pinned historical snapshots, and rejection after target, baseline or saved revision changes. Keep the starter's declared change selection separate from live PR/WebMCP support.
+
 ## PR difference preparation
 
 Use a project GitHub adapter to read the actual PR base/head and compare the previous tested source with the proposed head; use PR base for a first round without a tested baseline. Verify repository and version scope. Preserve the source/build actually installed independently of the current PR head.
