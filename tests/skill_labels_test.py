@@ -196,6 +196,13 @@ class SkillLabelTests(unittest.TestCase):
         )
         return path
 
+    def init_repo(self) -> None:
+        self.git("init", "-q", "-b", "main")
+        self.git("config", "user.name", "Label Test")
+        self.git("config", "user.email", "labels@example.invalid")
+        self.git("config", "commit.gpgsign", "false")
+        self.git("config", "core.hooksPath", os.devnull)
+
     def git(self, *args: str) -> None:
         subprocess.run(["git", *args], cwd=self.root, check=True, capture_output=True, text=True)
 
@@ -260,10 +267,7 @@ class SkillLabelTests(unittest.TestCase):
 
     def test_base_detects_rename(self) -> None:
         self.write_skill("old-name", "kept-identity")
-        self.git("init", "-q", "-b", "main")
-        self.git("config", "user.name", "Label Test")
-        self.git("config", "user.email", "labels@example.invalid")
-        self.git("config", "commit.gpgsign", "false")
+        self.init_repo()
         self.git("add", "-A")
         self.git("commit", "-qm", "add old-name")
         (self.root / "skills" / "old-name").rename(self.root / "skills" / "new-name")
@@ -285,10 +289,7 @@ class SkillLabelTests(unittest.TestCase):
 
     def test_base_that_is_not_a_predecessor_skips_rename_detection(self) -> None:
         self.write_skill("old-name", "kept-identity")
-        self.git("init", "-q", "-b", "main")
-        self.git("config", "user.name", "Label Test")
-        self.git("config", "user.email", "labels@example.invalid")
-        self.git("config", "commit.gpgsign", "false")
+        self.init_repo()
         self.git("add", "-A")
         self.git("commit", "-qm", "add old-name")
         self.git("checkout", "-q", "-b", "side")
@@ -320,10 +321,7 @@ class SkillLabelTests(unittest.TestCase):
 
     def test_prune_never_deletes_a_rename_source(self) -> None:
         self.write_skill("old-name", "kept-identity")
-        self.git("init", "-q", "-b", "main")
-        self.git("config", "user.name", "Label Test")
-        self.git("config", "user.email", "labels@example.invalid")
-        self.git("config", "commit.gpgsign", "false")
+        self.init_repo()
         self.git("add", "-A")
         self.git("commit", "-qm", "add old-name")
         (self.root / "skills" / "old-name").rename(self.root / "skills" / "new-name")

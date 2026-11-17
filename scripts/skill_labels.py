@@ -92,11 +92,6 @@ def load_skill(name: str, content: str, origin: str) -> Skill:
         SKILL_NAME.fullmatch(sync_id) is not None,
         f"{origin}: metadata.sync_id must use lowercase letters, digits, and hyphens",
     )
-    require(
-        len(name) <= MAX_LABEL_NAME,
-        f"{origin}: Skill name is {len(name)} characters, "
-        f"but GitHub rejects label names longer than {MAX_LABEL_NAME}",
-    )
     return Skill(name, sync_id)
 
 
@@ -106,6 +101,13 @@ def load_skills(root: Path) -> dict[str, Skill]:
     for path in sorted((root / "skills").glob("*/SKILL.md")):
         name = path.parent.name
         origin = path.relative_to(root).as_posix()
+        # Only a current Skill needs a usable label name; a historical name read
+        # from --base only locates an existing label.
+        require(
+            len(name) <= MAX_LABEL_NAME,
+            f"{origin}: Skill name is {len(name)} characters, "
+            f"but GitHub rejects label names longer than {MAX_LABEL_NAME}",
+        )
         skill = load_skill(name, path.read_text(encoding="utf-8"), origin)
         require(
             skill.sync_id not in owners,
