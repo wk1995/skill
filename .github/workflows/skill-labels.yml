@@ -1,0 +1,103 @@
+name: Skill issue labels
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'skills/**'
+      - 'scripts/skill_labels.py'
+      - '.github/workflows/skill-labels.yml'
+  workflow_dispatch:
+    inputs:
+      apply:
+        description: Apply the planned changes instead of printing them
+        type: boolean
+        default: false
+      prune:
+        description: Delete labels whose Skill no longer exists
+        type: boolean
+        default: false
+      normalize:
+        description: Rewrite color and description drift on managed labels
+        type: boolean
+        default: false
+      base:
+        description: Commit before the change, used to detect Skill renames
+        type: string
+        required: false
+
+permissions:
+  contents: read
+  issues: write
+
+concurrency:
+  group: skill-issue-labels
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    name: sync-skill-labels
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out the exact pushed revision
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Plan or apply label changes
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          EVENT_NAME: ${{ github.event_name }}
+          BEFORE_SHA: ${{ github.event.before }}
+          INPUT_APPLY: ${{ inputs.apply }}
+          INPUT_PRUNE: ${{ inputs.prune }}
+          INPUT_NORMALIZE: ${{ inputs.normalize }}
+          INPUT_BASE: ${{ inputs.base }}
+        run: |
+          set -euo pipefail
+          args=()
+
+          base="${INPUT_BASE:-}"
+          if [[ -z "$base" && "$EVENT_NAME" == "push" ]]; then
+            base="${BEFORE_SHA:-}"
+          fi
+          # A created branch, a force push, or a shallow clone leaves no readable
+          # predecessor; skip rename detection instead of failing the run.
+          if [[ -n "$base" ]]; then
+            if [[ "$base" =~ ^0+$ ]] || ! git cat-file -e "${base}^{commit}" 2>/dev/null; then
+              base=""
+            elif ! git merge-base --is-ancestor "$base" HEAD 2>/dev/null; then
+              base=""
+            fi
+          fi
+          if [[ -n "$base" ]]; then
+            args+=(--base "$base")
+          fi
+
+          # A merge to the default branch reconciles; a manual run stays read-only
+          # unless the operator asks for the changes.
+          if [[ "$EVENT_NAME" == "push" || "${INPUT_APPLY:-false}" == "true" ]]; then
+            args+=(--apply)
+          fi
+          if [[ "${INPUT_PRUNE:-false}" == "true" ]]; then
+            args+=(--prune)
+          fi
+          if [[ "${INPUT_NORMALIZE:-false}" == "true" ]]; then
+            args+=(--normalize)
+          fi
+
+          python3 scripts/skill_labels.py "${args[@]}" | tee "$RUNNER_TEMP/skill-labels.txt"
+
+      - name: Publish the plan
+        if: always()
+        run: |
+          {
+            echo '### Skill issue labels'
+            echo ''
+            echo '```text'
+            cat "$RUNNER_TEMP/skill-labels.txt" 2>/dev/null || echo 'no plan was produced'
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"

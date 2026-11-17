@@ -79,6 +79,27 @@ The `skill-catalog` GitHub Actions check validates every Skill and both generate
 
 `agent-builds/` is the boundary for per-Skill Agent overrides. A platform subdirectory is optional and must match an adapter under `platforms/<agent>/`; for example, Codex UI metadata belongs at `agent-builds/codex/agents/openai.yaml`. If a Skill needs no override yet, retain the otherwise-empty directory with `.gitkeep`. Optional core directories such as `scripts/`, `references/`, `assets/`, `src/`, and `tests/` should be added only when the Skill needs them.
 
+## Skill Issue Labels
+
+Every Skill owns exactly one issue label whose name is its directory name, with
+the description `Issues related to the <name> Skill.` and color `1D76DB`. The
+`skill-labels` workflow reconciles the label set with `skills/` on every push to
+the default branch; do not create or rename these labels by hand.
+
+Renaming a Skill must rename its label, never delete and recreate it: deleting a
+label removes it from every issue and pull request that carries it, while a
+rename keeps the association. `metadata.sync_id` must stay unchanged across the
+rename so the workflow can classify the change as a rename. A removed Skill
+leaves its label in place as an orphan; deleting it is a separate, explicit
+`--prune` decision.
+
+```bash
+python3 scripts/skill_labels.py --repository <owner/name> --check
+```
+
+See [docs/skill-issue-labels.md](docs/skill-issue-labels.md) for the label
+contract, the rename evidence, and repair procedures.
+
 ## Agent Adapter Rules
 
 - Put defaults shared by every Skill for one Agent in `platforms/<agent>/`, not in each Skill.
