@@ -490,6 +490,42 @@ class RepoSyncCliTests(unittest.TestCase):
         self.assertIn("main", branches)
         self.assertIn("worktree-topic", branches)
 
+    def test_custom_default_branch_is_protected_from_prune(self) -> None:
+        self.fx.create_remote_branch("production")
+        self.fx.git_run(self.fx.origin, "symbolic-ref", "HEAD", "refs/heads/production")
+        self.fx.create_remote_branch("feature", file="feature.txt", content="feature\n")
+        self.fx.switch(self.fx.a, "production")
+        self.fx.git_run(self.fx.a, "merge", "--quiet", "--no-ff", "feature", "-m", "merge feature")
+        self.fx.push(self.fx.a, "production")
+        self.fx.switch(self.fx.a, "main")
+
+        snapshot = self.fx.tool_json(self.fx.b, "audit")
+        self.assertEqual(snapshot["repo"]["default_branch"], "production")
+        production = next(
+            item for item in snapshot["remote_branches"] if item["name"] == "production"
+        )
+        self.assertTrue(production["protected"])
+        feature = next(item for item in snapshot["remote_branches"] if item["name"] == "feature")
+        self.assertTrue(feature["cleanup_candidate"])
+
+        result = self.fx.tool(self.fx.b, "prune", "--target", "remote", "--apply", "--json")
+        self.fx.assert_exit(result, 0)
+        self.assertEqual([item["name"] for item in json.loads(result.stdout)["deleted"]], ["feature"])
+        self.assertIn("production", self.fx.remote_heads())
+
+        explicit = self.fx.tool(
+            self.fx.b,
+            "prune",
+            "--target",
+            "remote",
+            "--branch",
+            "production",
+            "--allow-unmerged",
+            "--apply",
+        )
+        self.fx.assert_exit(explicit, 2)
+        self.assertIn("production", self.fx.remote_heads())
+
     def test_unmerged_branch_requires_explicit_selection_and_flag(self) -> None:
         self.fx.create_remote_branch("unmerged", file="u.txt", content="u\n")
         self.fx.fetch(self.fx.b)
@@ -738,6 +774,8 @@ class RepoSyncUnitTests(unittest.TestCase):
         self.assertTrue(module.is_protected("hotfix/urgent", "main", []))
         self.assertTrue(module.is_protected("develop", "main", []))
         self.assertTrue(module.is_protected("gh-pages", "main", []))
+        self.assertTrue(module.is_protected("production", "production", []))
+        self.assertFalse(module.is_protected("production", "main", []))
         self.assertTrue(module.is_protected("feature/x", "main", ["feature/*"]))
         self.assertFalse(module.is_protected("feature/x", "main", []))
 

@@ -82,10 +82,10 @@ add or conflict with content, the branch is left untouched.
 
 ### What is never deleted
 
-Protected branches (`main`, `master`, `develop`, `trunk`, `release/*`,
-`hotfix/*`, `gh-pages`, the detected default branch, and extra `--protect` globs), the
-current branch, branches checked out in any worktree, and branches with an open
-pull request when `--check-prs` is used. Unmerged branches cannot be deleted in
+Protected branches (the detected default branch, `main`, `master`,
+`develop`, `trunk`, `release/*`, `hotfix/*`, `gh-pages`, and extra `--protect`
+globs), the current branch, branches checked out in any worktree, and branches
+with an open pull request when `--check-prs` is used. Unmerged branches cannot be deleted in
 bulk: `--allow-unmerged` requires an explicit `--branch` name.
 
 Remote deletion is lease-checked against the audited tip. If another device
