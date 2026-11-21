@@ -203,6 +203,56 @@ class RepoSyncCliTests(unittest.TestCase):
         self.fx.assert_exit(second, 0)
         self.assertEqual(json.loads(second.stdout)["actions"], [])
 
+    def test_non_current_branch_fast_forwards_without_checkout(self) -> None:
+        self.fx.create_remote_branch("topic")
+        self.fx.fetch(self.fx.b)
+        self.fx.branch(self.fx.b, "topic", "origin/topic")
+        self.fx.switch(self.fx.a, "topic")
+        self.fx.write(self.fx.a, "next.txt", "next\n")
+        self.fx.git_run(self.fx.a, "add", "next.txt")
+        self.fx.commit(self.fx.a, "next")
+        self.fx.push(self.fx.a, "topic")
+        self.fx.switch(self.fx.a, "main")
+        head_before = self.fx.sha(self.fx.b, "HEAD")
+
+        result = self.fx.tool(self.fx.b, "sync", "--apply", "--json")
+        self.fx.assert_exit(result, 0)
+        payload = json.loads(result.stdout)
+        self.assertEqual([item["branch"] for item in payload["actions"]], ["topic"])
+        self.assertEqual(payload["actions"][0]["method"], "update-ref")
+        self.assertEqual(self.fx.sha(self.fx.b, "topic"), self.fx.remote_heads()["topic"])
+        self.assertEqual(self.fx.sha(self.fx.b, "HEAD"), head_before)
+
+    def test_sync_skips_branch_checked_out_in_another_worktree(self) -> None:
+        self.fx.create_remote_branch("topic")
+        self.fx.fetch(self.fx.b)
+        self.fx.branch(self.fx.b, "topic", "origin/topic")
+        worktree_path = self.fx.root / "wt-sync"
+        self.fx.git_run(
+            self.fx.b, "worktree", "add", "--quiet", str(worktree_path), "topic"
+        )
+        self.addCleanup(
+            lambda: self.fx.git_run(
+                self.fx.b, "worktree", "remove", "--force", str(worktree_path), check=False
+            )
+        )
+        before = self.fx.sha(self.fx.b, "topic")
+
+        self.fx.switch(self.fx.a, "topic")
+        self.fx.write(self.fx.a, "remote.txt", "remote\n")
+        self.fx.git_run(self.fx.a, "add", "remote.txt")
+        self.fx.commit(self.fx.a, "remote")
+        self.fx.push(self.fx.a, "topic")
+        self.fx.switch(self.fx.a, "main")
+
+        result = self.fx.tool(self.fx.b, "sync", "--apply", "--json")
+        self.fx.assert_exit(result, 0)
+        actions = json.loads(result.stdout)["actions"]
+        self.assertEqual(len(actions), 1)
+        self.assertEqual(actions[0]["status"], "skipped")
+        self.assertIn("checked out in", actions[0]["reason"])
+        self.assertEqual(self.fx.sha(self.fx.b, "topic"), before)
+
     def test_diverged_branch_is_not_rewritten_without_flag(self) -> None:
         self.fx.create_remote_branch("topic")
         self.fx.fetch(self.fx.b)
@@ -345,6 +395,10 @@ class RepoSyncCliTests(unittest.TestCase):
         self.assertEqual(
             self.fx.sha(self.fx.b, f"refs/repo-sync/archive/squashed/{topic_sha}"), topic_sha
         )
+        tracking = self.fx.git_run(
+            self.fx.b, "show-ref", "--verify", "--quiet", "refs/remotes/origin/squashed", check=False
+        )
+        self.assertNotEqual(tracking.returncode, 0)
         again = self.fx.tool(self.fx.b, "prune", "--target", "remote", "--apply", "--json")
         self.fx.assert_exit(again, 0)
         self.assertEqual(json.loads(again.stdout)["deleted"], [])

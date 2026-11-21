@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+- Delete the matching remote-tracking ref after a successful remote branch deletion, so the clone does not keep a stale ref for a branch removed in the same run.
+
 ## [0.1.0] - 2026-11-21
 
 - Change-Type: initial

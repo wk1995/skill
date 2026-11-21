@@ -1359,6 +1359,9 @@ def delete_remote_branch(git: Git, remote: str, name: str, sha: str) -> None:
         raise GitError(f"could not verify deletion of {remote}/{name}: {remaining.stderr.strip()}")
     if remaining.stdout.strip():
         raise GitError(f"remote branch {name} still exists after deletion")
+    # The branch is gone remotely; drop its local tracking ref so the same clone
+    # does not keep reporting a branch it just deleted.
+    git.run("update-ref", "-d", f"refs/remotes/{remote}/{name}", check=False)
 
 
 def apply_prune_plan(
