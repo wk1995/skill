@@ -3,6 +3,9 @@
 ## [Unreleased]
 
 - Delete the matching remote-tracking ref after a successful remote branch deletion, so the clone does not keep a stale ref for a branch removed in the same run.
+- Keep the detected repository default branch protected when `--default-branch` supplies a different merge base; `audit` now reports both as `repo.detected_default_branch` and `repo.default_branch`.
+- Protect the current branch and branches checked out in any worktree from remote-target pruning as well, matching the documented rule that already applied to local deletion.
+- Report a rebase that failed before starting as "nothing to abort" instead of asking the user to resolve a rebase that never began.
 
 ## [0.1.0] - 2026-11-21
 

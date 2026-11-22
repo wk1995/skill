@@ -62,7 +62,7 @@ Cleanup candidates (merged, unprotected, not checked out)
 
 ### 哪些分支永远不会被删除
 
-受保护分支（检测到的仓库默认分支、`main`、`master`、`develop`、`trunk`、`release/*`、`hotfix/*`、`gh-pages`，以及额外的 `--protect` glob）、当前分支、任何工作树中已检出的分支，以及使用 `--check-prs` 时存在开放 PR 的分支。未合并分支不能批量删除：`--allow-unmerged` 必须配合明确的 `--branch` 名称。
+受保护分支（检测到的仓库默认分支、`main`、`master`、`develop`、`trunk`、`release/*`、`hotfix/*`、`gh-pages`，以及额外的 `--protect` glob）、当前分支、任何工作树中已检出的分支，以及使用 `--check-prs` 时存在开放 PR 的分支。本地删除与远端删除使用同一套保护；`--default-branch` 只改变合并判定的基准，不会解除远端真实默认分支的保护。未合并分支不能批量删除：`--allow-unmerged` 必须配合明确的 `--branch` 名称。
 
 删除远端分支时会对审计到的顶端加租约。若另一台设备在审计后向该分支推送，删除会被拒绝，而不是把新工作删掉。
 

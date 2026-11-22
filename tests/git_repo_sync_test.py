@@ -376,6 +376,36 @@ class RepoSyncCliTests(unittest.TestCase):
             self.fx.sha(self.fx.b, f"refs/repo-sync/archive/topic/{old_sha}"), old_sha
         )
 
+    def test_rebase_blocked_before_start_leaves_branch_intact(self) -> None:
+        self.fx.create_remote_branch("topic")
+        self.fx.fetch(self.fx.b)
+        self.fx.branch(self.fx.b, "topic", "origin/topic")
+        self.fx.switch(self.fx.b, "topic")
+        self.fx.write(self.fx.b, "local.txt", "local\n")
+        self.fx.git_run(self.fx.b, "add", "local.txt")
+        old_sha = self.fx.commit(self.fx.b, "local work")
+
+        self.fx.switch(self.fx.a, "topic")
+        self.fx.write(self.fx.a, "extra.txt", "remote adds this file\n")
+        self.fx.git_run(self.fx.a, "add", "extra.txt")
+        self.fx.commit(self.fx.a, "remote adds extra")
+        self.fx.push(self.fx.a, "topic")
+
+        # An untracked file at the same path makes git refuse before rebasing.
+        self.fx.write(self.fx.b, "extra.txt", "untracked local copy\n")
+
+        result = self.fx.tool(self.fx.b, "sync", "--apply", "--rebase-current")
+        self.fx.assert_exit(result, 2)
+        self.assertEqual(self.fx.sha(self.fx.b, "topic"), old_sha)
+        self.assertFalse((self.fx.b / ".git/rebase-merge").exists())
+        self.assertFalse((self.fx.b / ".git/rebase-apply").exists())
+        combined = result.stdout + result.stderr
+        self.assertNotIn("resolve the rebase", combined)
+        self.assertIn("nothing to abort", combined)
+        self.assertEqual(
+            (self.fx.b / "extra.txt").read_text(encoding="utf-8"), "untracked local copy\n"
+        )
+
     def test_squash_merged_remote_branch_is_deleted_with_archive(self) -> None:
         self.fx.create_remote_branch("squashed", file="squashed.txt", content="squashed\n")
         topic_sha = self.fx.sha(self.fx.a, "squashed")
@@ -525,6 +555,59 @@ class RepoSyncCliTests(unittest.TestCase):
         )
         self.fx.assert_exit(explicit, 2)
         self.assertIn("production", self.fx.remote_heads())
+
+    def test_default_branch_override_keeps_detected_default_protected(self) -> None:
+        self.fx.create_remote_branch("production")
+        self.fx.git_run(self.fx.origin, "symbolic-ref", "HEAD", "refs/heads/production")
+        self.fx.create_remote_branch("feature", file="feature.txt", content="feature\n")
+        self.fx.switch(self.fx.a, "production")
+        self.fx.git_run(self.fx.a, "merge", "--quiet", "--no-ff", "feature", "-m", "merge feature")
+        self.fx.push(self.fx.a, "production")
+        self.fx.git_run(self.fx.a, "push", "--quiet", "origin", "production:main")
+        self.fx.switch(self.fx.a, "main")
+
+        snapshot = self.fx.tool_json(self.fx.b, "audit", "--default-branch", "main")
+        self.assertEqual(snapshot["repo"]["default_branch"], "main")
+        self.assertEqual(snapshot["repo"]["detected_default_branch"], "production")
+        production = next(
+            item for item in snapshot["remote_branches"] if item["name"] == "production"
+        )
+        self.assertTrue(production["protected"])
+
+        result = self.fx.tool(
+            self.fx.b, "prune", "--target", "remote", "--default-branch", "main", "--apply", "--json"
+        )
+        self.fx.assert_exit(result, 0)
+        deleted = [item["name"] for item in json.loads(result.stdout)["deleted"]]
+        self.assertEqual(deleted, ["feature"])
+        self.assertIn("production", self.fx.remote_heads())
+
+    def test_remote_prune_protects_current_and_checked_out_branches(self) -> None:
+        self.fx.create_remote_branch("topic", file="t.txt", content="t\n")
+        self.fx.create_remote_branch("held", file="h.txt", content="h\n")
+        self.fx.switch(self.fx.a, "main")
+        self.fx.git_run(self.fx.a, "merge", "--quiet", "--no-ff", "topic", "-m", "merge topic")
+        self.fx.git_run(self.fx.a, "merge", "--quiet", "--no-ff", "held", "-m", "merge held")
+        self.fx.push(self.fx.a, "main")
+        self.fx.fetch(self.fx.b)
+        self.fx.branch(self.fx.b, "topic", "origin/topic")
+        self.fx.branch(self.fx.b, "held", "origin/held")
+        self.fx.switch(self.fx.b, "topic")
+
+        worktree_path = self.fx.root / "remote-wt"
+        self.fx.git_run(self.fx.b, "worktree", "add", "--quiet", str(worktree_path), "held")
+        self.addCleanup(
+            lambda: self.fx.git_run(
+                self.fx.b, "worktree", "remove", "--force", str(worktree_path), check=False
+            )
+        )
+
+        result = self.fx.tool(self.fx.b, "prune", "--target", "remote", "--apply", "--json")
+        self.fx.assert_exit(result, 0)
+        self.assertEqual(json.loads(result.stdout)["deleted"], [])
+        heads = self.fx.remote_heads()
+        self.assertIn("topic", heads)
+        self.assertIn("held", heads)
 
     def test_unmerged_branch_requires_explicit_selection_and_flag(self) -> None:
         self.fx.create_remote_branch("unmerged", file="u.txt", content="u\n")

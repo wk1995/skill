@@ -48,7 +48,9 @@ unmerged branch can only be removed when the user names it and passes
 1. Resolve the repository, remote, and default branch. The default is `origin`
    and is detected from the remote symref, local `origin/HEAD`, or `main`/
    `master`/`trunk`; pass `--remote` or `--default-branch` when detection is
-   ambiguous.
+   ambiguous. `--default-branch` changes which branch merge containment is
+   measured against; the branch the remote actually serves as its default stays
+   protected either way.
 2. Run a read-only audit before proposing changes:
 
    ```bash
@@ -93,7 +95,8 @@ unmerged branch can only be removed when the user names it and passes
   an explicitly named branch with `--allow-unmerged` bypasses the content proof.
 - Never delete the default branch, `main`, `master`, `develop`, `trunk`,
   `release/*`, `hotfix/*`, `gh-pages`, a branch matched by `--protect`, the
-  current branch, or a branch checked out in any worktree.
+  current branch, or a branch checked out in any worktree. This holds for
+  `--target local`, `--target remote`, and `--target all` alike.
 - Bulk deletion of unmerged branches is impossible. `--allow-unmerged` requires
   one or more explicit `--branch` names and is intended for an abandoned branch
   the user has confirmed can be removed.

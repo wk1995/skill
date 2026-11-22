@@ -212,19 +212,14 @@ def remote_default_branch(git: Git, remote: str) -> str | None:
     return None
 
 
-def resolve_default_branch(
+def detect_default_branch(
     git: Git,
     remote: str,
-    override: str | None,
     heads: dict[str, str],
     *,
     allow_network: bool,
-) -> str:
-    if override:
-        if override not in heads:
-            raise GitError(f"--default-branch {override!r} is not a branch of {remote}")
-        return override
-
+) -> str | None:
+    """Detect the repository default branch without applying an override."""
     if allow_network:
         candidate = remote_default_branch(git, remote)
         if candidate and candidate in heads:
@@ -244,7 +239,30 @@ def resolve_default_branch(
             return candidate
     if len(heads) == 1:
         return next(iter(heads))
-    raise GitError("cannot determine the default branch; pass --default-branch <name>")
+    return None
+
+
+def resolve_default_branch(
+    git: Git,
+    remote: str,
+    override: str | None,
+    heads: dict[str, str],
+    *,
+    allow_network: bool,
+) -> tuple[str, str | None]:
+    """Return the effective merge base and the detected repository default.
+
+    An override replaces the merge base but never hides what the remote serves
+    as its default, which must stay protected.
+    """
+    detected = detect_default_branch(git, remote, heads, allow_network=allow_network)
+    if override:
+        if override not in heads:
+            raise GitError(f"--default-branch {override!r} is not a branch of {remote}")
+        return override, detected
+    if detected is None:
+        raise GitError("cannot determine the default branch; pass --default-branch <name>")
+    return detected, detected
 
 
 def local_branches(git: Git) -> list[dict[str, Any]]:
@@ -594,13 +612,21 @@ def build_snapshot(
             raise GitError(f"remote {repo.remote!r} has no branches")
 
     stale_tracking = [] if offline else sorted(set(after) - set(heads))
-    default_branch = resolve_default_branch(
+    default_branch, detected_default = resolve_default_branch(
         git,
         repo.remote,
         default_branch_override,
         heads,
         allow_network=not offline,
     )
+    # An override changes the merge base, never the protection set: the branch
+    # the remote actually serves as its default stays protected.
+    protected_defaults = [default_branch]
+    if detected_default and detected_default not in protected_defaults:
+        protected_defaults.append(detected_default)
+    protected_extra = list(protected_extra) + [
+        name for name in protected_defaults if name != default_branch
+    ]
     default_sha = heads.get(default_branch) or after.get(default_branch)
     if not default_sha:
         raise GitError(f"default branch {default_branch!r} is not available")
@@ -735,9 +761,17 @@ def build_snapshot(
         age = age_days(timestamp)
         protected = is_protected(name, default_branch, protected_extra)
         open_prs = pr_map.get(name, [])
+        checked_out_path = worktree_map.get(name)
+        if checked_out_path and same_path(checked_out_path, repo.path):
+            checked_out_path = None
+        is_current = name == current_branch
         blockers: list[str] = []
         if protected:
             blockers.append("protected branch")
+        if is_current:
+            blockers.append("current branch")
+        if checked_out_path:
+            blockers.append(f"checked out in {checked_out_path}")
         if not available:
             blockers.append("commit is not available locally; fetch the branch first")
         if not merged:
@@ -757,6 +791,8 @@ def build_snapshot(
                 "merge_state": merge_state,
                 "merged": merged,
                 "protected": protected,
+                "current": is_current,
+                "checked_out": checked_out_path,
                 "open_prs": open_prs,
                 "commit_time": timestamp,
                 "commit_date": iso_date(timestamp),
@@ -818,6 +854,7 @@ def build_snapshot(
             "remote": repo.remote,
             "default_branch": default_branch,
             "default_sha": default_sha,
+            "detected_default_branch": detected_default,
             "protected_patterns": list(DEFAULT_PROTECTED_PATTERNS) + [default_branch] + list(protected_extra),
             **facts,
         },
@@ -926,6 +963,10 @@ def render_audit(snapshot: dict[str, Any]) -> str:
         flags = []
         if record["protected"]:
             flags.append("protected")
+        if record.get("current"):
+            flags.append("current")
+        if record.get("checked_out"):
+            flags.append("worktree")
         if record["open_prs"]:
             flags.append("PR " + ",".join(f"#{number}" for number in record["open_prs"]))
         suffix = f"  [{', '.join(flags)}]" if flags else ""
@@ -1156,6 +1197,14 @@ def apply_sync_actions(
                     aborted = git.run("rebase", "--abort", check=False)
                     detail = one_line(rebase.stderr or rebase.stdout)
                     if aborted.returncode != 0:
+                        if operation_in_progress(git) is None:
+                            # The commonest cause is a checkout that never started,
+                            # so --abort has nothing to undo. Telling the user to
+                            # resolve a rebase invites destructive guesswork.
+                            raise GitError(
+                                "rebase failed and left no rebase in progress; nothing to abort: "
+                                + detail
+                            )
                         raise GitError(
                             "rebase failed and --abort also failed; resolve the rebase before retrying: "
                             + detail
