@@ -6,6 +6,7 @@
 - Keep the detected repository default branch protected when `--default-branch` supplies a different merge base; `audit` now reports both as `repo.detected_default_branch` and `repo.default_branch`.
 - Protect the current branch and branches checked out in any worktree from remote-target pruning as well, matching the documented rule that already applied to local deletion.
 - Report a rebase that failed before starting as "nothing to abort" instead of asking the user to resolve a rebase that never began.
+- Document the untracked-file rule precisely: an untracked file never blocks the `update-ref` fast-forward of a non-current branch, while on the current branch git refuses the fast-forward when it would overwrite that file, leaving the branch and the file untouched with exit 2.
 
 ## [0.1.0] - 2026-11-21
 

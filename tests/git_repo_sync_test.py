@@ -350,6 +350,26 @@ class RepoSyncCliTests(unittest.TestCase):
         self.assertEqual(self.fx.sha(self.fx.b, "main"), self.fx.remote_heads()["main"])
         self.assertEqual((self.fx.b / "scratch.txt").read_text(encoding="utf-8"), "keep\n")
 
+    def test_untracked_file_that_blocks_fast_forward_is_preserved(self) -> None:
+        """An untracked file on the fast-forward path cannot be preserved silently.
+
+        Git refuses the merge when the upstream commit adds the same path, so the
+        documented rule is that the run fails with the file and the tip intact,
+        not that the fast-forward succeeds.
+        """
+        old_sha = self.fx.sha(self.fx.b, "main")
+        self.fx.write(self.fx.a, "clash.txt", "upstream\n")
+        self.fx.git_run(self.fx.a, "add", "clash.txt")
+        self.fx.commit(self.fx.a, "upstream adds clash.txt")
+        self.fx.push(self.fx.a, "main")
+        self.fx.write(self.fx.b, "clash.txt", "mine\n")
+
+        result = self.fx.tool(self.fx.b, "sync", "--apply")
+        self.fx.assert_exit(result, 2)
+        self.assertEqual(self.fx.sha(self.fx.b, "main"), old_sha)
+        self.assertEqual((self.fx.b / "clash.txt").read_text(encoding="utf-8"), "mine\n")
+        self.assertIn("FAILED", result.stdout)
+
     def test_rewritten_upstream_is_detected_and_reset(self) -> None:
         self.fx.create_remote_branch("topic", file="topic.txt", content="topic\n")
         self.fx.fetch(self.fx.b)

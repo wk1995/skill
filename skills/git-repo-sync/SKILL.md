@@ -106,8 +106,11 @@ unmerged branch can only be removed when the user names it and passes
   `git push --force-with-lease=refs/heads/<branch>:<sha> --delete`. A remote
   branch that moved after the audit must be rejected, not deleted.
 - A tracked worktree change blocks updating the current branch. Untracked files
-  do not block a fast-forward and are preserved. Never stash, reset, or discard
-  user changes automatically.
+  never block an `update-ref` fast-forward of a non-current branch and are
+  preserved. On the current branch they are preserved too, but git refuses the
+  fast-forward when it would have to overwrite one; the branch and the file are
+  then left untouched and the run exits 2. Never stash, reset, or discard user
+  changes automatically.
 - A merge, rebase, cherry-pick, revert, or bisect in progress blocks every
   mutation. Run `audit` only.
 - A shallow clone blocks cleanup unless `--allow-shallow` is given. A branch
