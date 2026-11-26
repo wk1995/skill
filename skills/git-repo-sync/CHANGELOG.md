@@ -7,6 +7,8 @@
 - Protect the current branch and branches checked out in any worktree from remote-target pruning as well, matching the documented rule that already applied to local deletion.
 - Report a rebase that failed before starting as "nothing to abort" instead of asking the user to resolve a rebase that never began.
 - Document the untracked-file rule precisely: an untracked file never blocks the `update-ref` fast-forward of a non-current branch, while on the current branch git refuses the fast-forward when it would overwrite that file, leaving the branch and the file untouched with exit 2.
+- Classify a branch with no common ancestor with the default branch as `unrelated` instead of aborting the run, so one orphan branch such as `gh-pages`, or a depth-limited shallow clone, no longer makes every command fail with exit 1. `audit --json` gains that value in `merge_state`; consumers that enumerate the previous five states must treat an unknown state as unmerged. Such a branch is reported as unmerged, is never bulk-deleted, and still requires `--branch` with `--allow-unmerged`. This also makes the documented `--allow-shallow` override usable.
+- State the exit codes precisely: a bulk prune that only skips branches, including branches held by an open pull request, exits 0, and exit 2 for blocked branches is specific to `sync --apply`.
 
 ## [0.1.0] - 2026-11-21
 

@@ -35,6 +35,7 @@ IN_PROGRESS_MARKERS = (
     ("BISECT_LOG", "bisect"),
 )
 SHA_RE = re.compile(r"^[0-9a-f]{40,64}$")
+UNRELATED_BLOCKER = "unmerged content: no common ancestor with the default branch"
 
 
 class GitError(RuntimeError):
@@ -401,8 +402,8 @@ class MergeChecker:
     """Decide whether merging a branch into the default branch is a no-op.
 
     Tree equality also detects squash merges and cherry-picked content that
-    ``git branch --merged`` misses. A conflict or unsupported Git is reported
-    as unmerged, so cleanup fails closed.
+    ``git branch --merged`` misses. A conflict, an unrelated history, or an
+    unsupported Git is reported as unmerged, so cleanup fails closed.
     """
 
     def __init__(self, git: Git, target_sha: str) -> None:
@@ -418,6 +419,22 @@ class MergeChecker:
             self._supported = "--write-tree" in (result.stdout + result.stderr)
         return self._supported
 
+    def has_merge_base(self, sha: str) -> bool:
+        """Whether the branch and the default branch share any history.
+
+        Tested before ``merge-tree`` because that command exits 128 for unrelated
+        histories, which cannot be told apart from a genuine Git failure by exit
+        status alone. Matching translated stderr would be locale dependent, while
+        ``merge-base`` answers the question directly.
+        """
+        base = self.git.run("merge-base", self.target_sha, sha, check=False)
+        if base.returncode == 0:
+            return True
+        if base.returncode == 1:
+            return False
+        detail = (base.stderr or base.stdout).strip()
+        raise GitError(f"git merge-base failed: {detail or 'unknown error'}")
+
     def classify(self, sha: str) -> str:
         if sha in self._cache:
             return self._cache[sha]
@@ -428,6 +445,13 @@ class MergeChecker:
             raise GitError("git merge-base --is-ancestor failed")
         elif not self.supports_write_tree():
             state = "unavailable"
+        elif not self.has_merge_base(sha):
+            # An orphan branch such as gh-pages shares no history with the
+            # default branch, so `git merge-tree` refuses the merge with
+            # "refusing to merge unrelated histories". Content can never be
+            # contained in the default branch in that case, so report the branch
+            # as unmerged instead of aborting every command in the repository.
+            state = "unrelated"
         else:
             merged = self.git.run("merge-tree", "--write-tree", self.target_sha, sha, check=False)
             if merged.returncode == 0:
@@ -715,6 +739,8 @@ def build_snapshot(
         if not merged:
             if merge_state == "conflict":
                 blockers.append("merging into the default branch conflicts")
+            elif merge_state == "unrelated":
+                blockers.append(UNRELATED_BLOCKER)
             elif merge_state == "unavailable":
                 blockers.append("merge detection unavailable; branch is treated as unmerged")
             else:
@@ -777,6 +803,8 @@ def build_snapshot(
         if not merged:
             if merge_state == "conflict":
                 blockers.append("merging into the default branch conflicts")
+            elif merge_state == "unrelated":
+                blockers.append(UNRELATED_BLOCKER)
             elif merge_state == "unavailable":
                 blockers.append("merge detection unavailable; branch is treated as unmerged")
             else:
@@ -906,6 +934,7 @@ def merge_label(record: dict[str, Any]) -> str:
         "noop": "merged (squash)",
         "changes": "unmerged",
         "conflict": "conflict",
+        "unrelated": "unrelated history",
         "unavailable": "unknown",
     }.get(state, state)
 
@@ -1341,6 +1370,7 @@ def build_prune_plan(snapshot: dict[str, Any], args: argparse.Namespace) -> list
                     "unmerged content",
                     "merging into the default branch conflicts",
                     "merge detection unavailable; branch is treated as unmerged",
+                    UNRELATED_BLOCKER,
                 }
             ]
         elif not record["merged"] and "unmerged content" not in blockers and not any(

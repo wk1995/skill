@@ -78,7 +78,10 @@ the complete state model, safety boundaries, command flags, and exit codes.
 GitHub. The tool checks whether merging a branch into the freshly fetched
 default branch would change the tree. If the result is identical, the branch has
 nothing left to contribute and is safe to archive and delete. If merging would
-add or conflict with content, the branch is left untouched.
+add or conflict with content, the branch is left untouched. A branch with no
+common ancestor with the default branch, such as an orphan `gh-pages`, cannot be
+merged at all; it is reported as unmerged and left untouched instead of aborting
+the audit.
 
 ### What is never deleted
 

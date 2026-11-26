@@ -166,6 +166,21 @@ class Fixture:
     def fetch(self, repo: Path) -> None:
         self.git_run(repo, "fetch", "--quiet", "origin")
 
+    def orphan_branch(self, repo: Path, name: str, *, file: str = "index.html") -> str:
+        """Create a branch with no history in common with the default branch."""
+        self.git_run(repo, "switch", "--quiet", "--orphan", name)
+        for entry in repo.iterdir():
+            if entry.name == ".git":
+                continue
+            if entry.is_dir():
+                shutil.rmtree(entry)
+            else:
+                entry.unlink()
+        self.write(repo, file, "site\n")
+        self.git_run(repo, "add", file)
+        self.commit(repo, f"{name} root")
+        return self.sha(repo, name)
+
 
 class RepoSyncCliTests(unittest.TestCase):
     def setUp(self) -> None:
@@ -369,6 +384,115 @@ class RepoSyncCliTests(unittest.TestCase):
         self.assertEqual(self.fx.sha(self.fx.b, "main"), old_sha)
         self.assertEqual((self.fx.b / "clash.txt").read_text(encoding="utf-8"), "mine\n")
         self.assertIn("FAILED", result.stdout)
+
+    def test_unrelated_history_branch_keeps_audit_usable(self) -> None:
+        """An orphan branch such as gh-pages must not abort every command.
+
+        ``git merge-tree`` exits 128 for unrelated histories, and that status
+        cannot be told apart from a real failure. The branch is unmerged by
+        definition, so it is reported as such while the rest of the audit keeps
+        working for both the local and the remote record.
+        """
+        self.fx.orphan_branch(self.fx.a, "gh-pages")
+        self.fx.push(self.fx.a, "gh-pages")
+        self.fx.git_run(self.fx.a, "switch", "--quiet", "main")
+        self.fx.orphan_branch(self.fx.b, "notes")
+        self.fx.git_run(self.fx.b, "switch", "--quiet", "main")
+        self.fx.fetch(self.fx.b)
+
+        result = self.fx.tool(self.fx.b, "audit", "--json")
+        self.fx.assert_exit(result, 0)
+        snapshot = json.loads(result.stdout)
+        local = {item["name"]: item for item in snapshot["local_branches"]}
+        remote = {item["name"]: item for item in snapshot["remote_branches"]}
+        for record in (local["notes"], remote["gh-pages"]):
+            self.assertEqual(record["merge_state"], "unrelated")
+            self.assertFalse(record["merged"])
+        self.assertIn("no common ancestor", " ".join(remote["gh-pages"]["blockers"]))
+        self.assertEqual(module.merge_label({"merge_state": "unrelated"}), "unrelated history")
+        self.assertEqual(snapshot["repo"]["default_branch"], "main")
+
+    def test_unrelated_history_branch_is_never_bulk_deleted(self) -> None:
+        self.fx.orphan_branch(self.fx.a, "site")
+        self.fx.push(self.fx.a, "site")
+        self.fx.git_run(self.fx.a, "switch", "--quiet", "main")
+        self.fx.fetch(self.fx.b)
+
+        result = self.fx.tool(self.fx.b, "prune", "--target", "remote", "--apply")
+        self.fx.assert_exit(result, 0)
+        self.assertIn("site", self.fx.remote_heads())
+        self.assertNotIn("repo-sync/archive/site/", result.stdout)
+
+        # A selector that does not require merge containment must still skip it.
+        stale = self.fx.tool(
+            self.fx.b, "prune", "--target", "remote", "--stale-days", "0", "--apply"
+        )
+        self.fx.assert_exit(stale, 0)
+        self.assertIn("site", self.fx.remote_heads())
+        self.assertIn("no common ancestor", stale.stdout)
+        self.assertNotIn("repo-sync/archive/site/", stale.stdout)
+
+    def test_unrelated_history_branch_requires_name_and_allow_unmerged(self) -> None:
+        self.fx.orphan_branch(self.fx.a, "site")
+        self.fx.push(self.fx.a, "site")
+        self.fx.git_run(self.fx.a, "switch", "--quiet", "main")
+        self.fx.fetch(self.fx.b)
+
+        named = self.fx.tool(
+            self.fx.b, "prune", "--target", "remote", "--branch", "site", "--apply"
+        )
+        self.fx.assert_exit(named, 2)
+        self.assertIn("site", self.fx.remote_heads())
+
+        forced = self.fx.tool(
+            self.fx.b,
+            "prune",
+            "--target",
+            "remote",
+            "--branch",
+            "site",
+            "--allow-unmerged",
+            "--apply",
+        )
+        self.fx.assert_exit(forced, 0)
+        self.assertNotIn("site", self.fx.remote_heads())
+        self.assertIn("repo-sync/archive/site/", forced.stdout)
+
+    def test_shallow_clone_cleanup_survives_unrelated_histories(self) -> None:
+        """--allow-shallow must reach a decision, not crash on grafted histories.
+
+        A depth-1 clone of two branches looks like two unrelated histories, so
+        the documented override used to fail with exit 1 before classifying any
+        branch. It now reports the branch as unmerged and leaves it alone.
+        """
+        self.fx.create_remote_branch("topic", file="topic.txt", content="topic\n")
+        target = self.fx.root / "shallow"
+        subprocess.run(
+            [
+                GIT,
+                "clone",
+                "--quiet",
+                "--depth",
+                "1",
+                "--no-single-branch",
+                self.fx.origin.as_uri(),
+                str(target),
+            ],
+            env=self.fx.env,
+            check=True,
+            capture_output=True,
+        )
+        self.fx.git_run(target, "config", "user.name", "Repo Sync Test")
+        self.fx.git_run(target, "config", "user.email", "repo-sync@example.invalid")
+        self.assertEqual(self.fx.git_run(target, "rev-parse", "--is-shallow-repository").stdout.strip(), "true")
+
+        refused = self.fx.tool(target, "prune", "--target", "remote", "--apply")
+        self.fx.assert_exit(refused, 2)
+        self.assertIn("shallow", refused.stderr)
+
+        allowed = self.fx.tool(target, "prune", "--target", "remote", "--apply", "--allow-shallow")
+        self.fx.assert_exit(allowed, 0)
+        self.assertIn("topic", self.fx.remote_heads())
 
     def test_rewritten_upstream_is_detected_and_reset(self) -> None:
         self.fx.create_remote_branch("topic", file="topic.txt", content="topic\n")

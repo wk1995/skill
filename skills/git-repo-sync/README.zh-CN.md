@@ -58,7 +58,7 @@ Cleanup candidates (merged, unprotected, not checked out)
 
 ### 为什么用 merge-tree 判断
 
-`git branch --merged` 看不到 squash 合并和 cherry-pick，而 GitHub 上这两种做法很常见。本工具会先抓取远端，再判断“把这个分支合并进默认分支是否会改变目录树”。结果相同，说明该分支已经没有可贡献的内容，可以归档后删除；会新增内容或产生冲突的分支则保持不动。
+`git branch --merged` 看不到 squash 合并和 cherry-pick，而 GitHub 上这两种做法很常见。本工具会先抓取远端，再判断“把这个分支合并进默认分支是否会改变目录树”。结果相同，说明该分支已经没有可贡献的内容，可以归档后删除；会新增内容或产生冲突的分支则保持不动。与默认分支没有共同祖先的分支（例如 orphan 的 `gh-pages`）根本无法合并，会被标记为未合并并保持不动，而不会让整个审计失败。
 
 ### 哪些分支永远不会被删除
 

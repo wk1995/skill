@@ -115,6 +115,10 @@ unmerged branch can only be removed when the user names it and passes
   mutation. Run `audit` only.
 - A shallow clone blocks cleanup unless `--allow-shallow` is given. A branch
   whose commit is missing locally is never deleted.
+- A branch with no common ancestor with the default branch, such as an orphan
+  `gh-pages` or a branch in a depth-limited shallow clone, is reported as
+  `unrelated` and treated as unmerged. It never blocks `audit`, and it is only
+  deleted when it is named with `--branch` and `--allow-unmerged`.
 - `--check-prs` is fail closed: if `gh` is missing, unauthenticated, or returns
   an error, no deletion happens.
 - Never delete a branch that has an open pull request when `--check-prs` was
@@ -144,6 +148,7 @@ Merge classification is separate from tracking status:
 | `noop` | Merging would reproduce the default tree; covers squash merges and cherry-picks. |
 | `changes` | Merging would add content; the branch is unmerged. |
 | `conflict` | Merging conflicts; never deleted automatically. |
+| `unrelated` | No common ancestor with the default branch, such as an orphan `gh-pages`; treated as unmerged. |
 | `unavailable` | The merge check cannot run; treated as unmerged. |
 
 ## Commands
@@ -201,8 +206,8 @@ python3 <skill-dir>/scripts/repo_sync.py prune --target local --branch experimen
   unmerged deletion; add `--allow-unmerged` for that.
 - `--strict` makes a dry run exit 2 when it has deletion candidates.
 - Exit 2 after `--apply` means an explicitly named branch was skipped or a
-  deletion failed. A bulk plan that only skips the current or a checked-out
-  branch still exits 0.
+  deletion failed. A bulk plan that only skips branches still exits 0; the skip
+  reasons, including `open pull request`, are in the output.
 
 ### archive and restore
 
@@ -246,9 +251,11 @@ Exit codes:
 - **0**: completed with nothing requiring attention.
 - **1**: could not run (not a Git worktree, no remote, missing commit, fetch
   failure, invalid archive reference).
-- **2**: a safety rule refused the request, a branch remains blocked, or an
-  explicitly selected branch was skipped. Nothing was partially deleted without
-  being reported.
+- **2**: a safety rule refused the request; `prune` skipped an explicitly named
+  branch, could not resolve a name, or failed to delete; or `sync --apply` left
+  a branch blocked or failed. A bulk plan that only skips branches, including
+  branches held by an open pull request, still exits 0. Nothing was partially
+  deleted without being reported.
 
 ## Limitations
 
