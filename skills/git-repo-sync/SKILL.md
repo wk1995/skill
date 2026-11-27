@@ -106,6 +106,19 @@ unmerged branch can only be removed when the user names it and passes
   it is. A worktree whose directory was removed is a stale record: it neither
   blocks the branch nor has anything to detach, so `git worktree prune` cleans
   it up separately.
+- Checkouts can be chosen one by one, by branch name or by path, when a
+  repository has several of them. `--keep-worktree <selector>` keeps a checkout
+  that would otherwise be released; `--delete-worktree <selector>` is a
+  whitelist, so every checkout it does not name is kept with the reason `not
+  selected by --delete-worktree`. A selector that matches no worktree is refused
+  (exit 2) rather than ignored, and naming the same worktree in both flags is
+  refused too. Neither flag lifts the uncommitted-work or stash rule, and
+  neither makes an unmerged branch deletable.
+- A checkout is only removed from disk when the user asks for it:
+  `--remove-worktree-dir` together with `--delete-worktree` removes the directory
+  after the branch is deleted. It never forces: modified or untracked files make
+  the removal fail, the branch survives, and the run exits 2. Without the flag the
+  checkout stays where it is and is merely detached.
 - Bulk deletion of unmerged branches is impossible. `--allow-unmerged` requires
   one or more explicit `--branch` names and is intended for an abandoned branch
   the user has confirmed can be removed.
@@ -172,6 +185,7 @@ python3 <skill-dir>/scripts/repo_sync.py audit --repo . --stale-days 90 --check-
 ```
 
 - `--stale-days N` marks branches whose tip commit is at least `N` days old.
+- `--keep-worktree <selector>` previews what `prune --keep-worktree` would hold.
 - `--strict` exits 2 when findings exist, without changing anything.
 - `--offline` uses existing refs and skips network access; treat the result as a
   snapshot of the last fetch.
@@ -204,6 +218,8 @@ python3 <skill-dir>/scripts/repo_sync.py prune --target remote --apply --check-p
 python3 <skill-dir>/scripts/repo_sync.py prune --target all --stale-days 180 --apply
 python3 <skill-dir>/scripts/repo_sync.py prune --target local --gone --apply
 python3 <skill-dir>/scripts/repo_sync.py prune --target local --branch experiment --allow-unmerged --apply
+python3 <skill-dir>/scripts/repo_sync.py prune --target local --delete-worktree /src/app-wt --apply
+python3 <skill-dir>/scripts/repo_sync.py prune --target local --keep-worktree review-wt --apply
 ```
 
 - Default target is `local`; default selector is `--merged`. The default branch
@@ -214,10 +230,18 @@ python3 <skill-dir>/scripts/repo_sync.py prune --target local --branch experimen
   are reported as skipped; they are never bulk-deleted.
 - `--branch` names an exact branch. Naming a branch does not authorize an
   unmerged deletion; add `--allow-unmerged` for that.
+- `--keep-worktree` and `--delete-worktree` take a branch name or a checkout
+  path. Use `--delete-worktree` to release only some of several checkouts, and
+  `--keep-worktree` to protect one. Both are repeatable, and an unmatched
+  selector is refused.
+- `--remove-worktree-dir` removes the named checkout after its branch is deleted;
+  without it the checkout is kept and only detached.
 - `--strict` makes a dry run exit 2 when it has deletion candidates.
 - Exit 2 after `--apply` means an explicitly named branch was skipped or a
   deletion failed. A bulk plan that only skips branches still exits 0; the skip
-  reasons, including `open pull request`, are in the output.
+  reasons, including `open pull request`, are in the output. Naming a worktree
+  with `--delete-worktree --remove-worktree-dir` counts as explicit: if that
+  checkout is not removed, the run exits 2.
 
 ### archive and restore
 

@@ -776,6 +776,196 @@ class RepoSyncCliTests(unittest.TestCase):
         branches = self.fx.git_run(self.fx.b, "branch", "--format=%(refname:short)").stdout.split()
         self.assertNotIn("held", branches)
 
+    def prepare_worktrees(self, names: list[str]) -> dict[str, Path]:
+        """One merged branch per name, each checked out in its own worktree."""
+        for name in names:
+            self.fx.create_remote_branch(name, file=f"{name}.txt", content=f"{name}\n")
+            self.fx.git_run(self.fx.a, "merge", "--quiet", "--no-ff", name, "-m", f"merge {name}")
+        self.fx.push(self.fx.a, "main")
+        self.fx.fetch(self.fx.b)
+        paths: dict[str, Path] = {}
+        for name in names:
+            self.fx.branch(self.fx.b, name, f"origin/{name}")
+            path = self.fx.root / f"wt-{name}"
+            self.fx.git_run(self.fx.b, "worktree", "add", "--quiet", str(path), name)
+            self.addCleanup(
+                lambda target=path: self.fx.git_run(
+                    self.fx.b, "worktree", "remove", "--force", str(target), check=False
+                )
+            )
+            paths[name] = path
+        return paths
+
+    def test_delete_worktree_selector_releases_only_named_checkouts(self) -> None:
+        paths = self.prepare_worktrees(["alpha", "beta", "gamma"])
+
+        result = self.fx.tool(
+            self.fx.b,
+            "prune",
+            "--target",
+            "local",
+            "--apply",
+            "--delete-worktree",
+            str(paths["beta"]),
+            "--json",
+        )
+        self.fx.assert_exit(result, 0)
+        payload = json.loads(result.stdout)
+        self.assertEqual([item["name"] for item in payload["deleted"]], ["beta"])
+        skipped = {item["name"]: " ".join(item["blockers"]) for item in payload["skipped"]}
+        for name in ("alpha", "gamma"):
+            self.assertIn("not selected by --delete-worktree", skipped[name])
+        branches = self.fx.git_run(self.fx.b, "branch", "--format=%(refname:short)").stdout.split()
+        self.assertIn("alpha", branches)
+        self.assertIn("gamma", branches)
+        self.assertNotIn("beta", branches)
+        # The checkouts nobody named keep following their own branches.
+        for name in ("alpha", "gamma"):
+            self.assertEqual(
+                self.fx.git_run(paths[name], "symbolic-ref", "--short", "HEAD").stdout.strip(), name
+            )
+        # The released one is detached at the archived tip, not left unborn.
+        self.assertEqual(
+            self.fx.git_run(paths["beta"], "symbolic-ref", "-q", "HEAD", check=False).returncode, 1
+        )
+        self.assertEqual((paths["beta"] / "beta.txt").read_text(encoding="utf-8"), "beta\n")
+
+    def test_delete_worktree_selector_holds_remote_branches_too(self) -> None:
+        self.prepare_worktrees(["alpha", "beta"])
+
+        result = self.fx.tool(
+            self.fx.b, "prune", "--target", "all", "--apply", "--delete-worktree", "alpha", "--json"
+        )
+        self.fx.assert_exit(result, 0)
+        payload = json.loads(result.stdout)
+        self.assertEqual(
+            sorted((item["target"], item["name"]) for item in payload["deleted"]),
+            [("local", "alpha"), ("remote", "alpha")],
+        )
+        skipped = {(item["target"], item["name"]): item for item in payload["skipped"]}
+        for target in ("local", "remote"):
+            self.assertIn(
+                "not selected by --delete-worktree",
+                " ".join(skipped[(target, "beta")]["blockers"]),
+            )
+        self.assertIn("beta", self.fx.remote_heads())
+
+    def test_keep_worktree_selector_holds_a_clean_checkout(self) -> None:
+        paths = self.prepare_worktrees(["alpha", "beta"])
+
+        audit = self.fx.tool(self.fx.b, "audit", "--keep-worktree", "alpha", "--json")
+        self.fx.assert_exit(audit, 0)
+        kept = {
+            item["name"]: " ".join(item["blockers"])
+            for item in json.loads(audit.stdout)["local_branches"]
+        }
+        self.assertIn("kept by --keep-worktree", kept["alpha"])
+        self.assertEqual(kept["beta"], "")
+
+        result = self.fx.tool(
+            self.fx.b, "prune", "--target", "local", "--apply", "--keep-worktree", "alpha", "--json"
+        )
+        self.fx.assert_exit(result, 0)
+        payload = json.loads(result.stdout)
+        self.assertEqual([item["name"] for item in payload["deleted"]], ["beta"])
+        blocked = {item["name"]: " ".join(item["blockers"]) for item in payload["skipped"]}
+        self.assertIn("kept by --keep-worktree", blocked["alpha"])
+        branches = self.fx.git_run(self.fx.b, "branch", "--format=%(refname:short)").stdout.split()
+        self.assertIn("alpha", branches)
+        self.assertNotIn("beta", branches)
+        self.assertEqual(
+            self.fx.git_run(paths["alpha"], "symbolic-ref", "--short", "HEAD").stdout.strip(), "alpha"
+        )
+
+    def test_remove_worktree_dir_removes_only_the_named_checkout(self) -> None:
+        paths = self.prepare_worktrees(["alpha", "beta"])
+
+        result = self.fx.tool(
+            self.fx.b,
+            "prune",
+            "--target",
+            "local",
+            "--apply",
+            "--delete-worktree",
+            "alpha",
+            "--remove-worktree-dir",
+        )
+        self.fx.assert_exit(result, 0)
+        # Git reports the checkout path with forward slashes even on Windows.
+        self.assertIn(f"worktree removed at {paths['alpha'].as_posix()}", result.stdout)
+        self.assertFalse(paths["alpha"].exists())
+        self.assertTrue(paths["beta"].exists())
+        branches = self.fx.git_run(self.fx.b, "branch", "--format=%(refname:short)").stdout.split()
+        self.assertNotIn("alpha", branches)
+        self.assertIn("beta", branches)
+
+    def test_remove_worktree_dir_refuses_untracked_files(self) -> None:
+        paths = self.prepare_worktrees(["alpha"])
+        self.fx.write(paths["alpha"], "notes.txt", "keep me\n")
+
+        result = self.fx.tool(
+            self.fx.b,
+            "prune",
+            "--target",
+            "local",
+            "--apply",
+            "--delete-worktree",
+            "alpha",
+            "--remove-worktree-dir",
+        )
+        self.fx.assert_exit(result, 2)
+        # Refused while planning, before anything is archived or deleted.
+        self.assertIn("SKIP", result.stdout)
+        self.assertIn("untracked file", result.stdout)
+        self.assertNotIn("DELETED", result.stdout)
+        # Neither the checkout nor the branch is removed when the directory refuses.
+        self.assertEqual((paths["alpha"] / "notes.txt").read_text(encoding="utf-8"), "keep me\n")
+        branches = self.fx.git_run(self.fx.b, "branch", "--format=%(refname:short)").stdout.split()
+        self.assertIn("alpha", branches)
+
+    def test_unmatched_worktree_selector_is_refused(self) -> None:
+        self.prepare_worktrees(["alpha"])
+
+        for option in ("--delete-worktree", "--keep-worktree"):
+            result = self.fx.tool(
+                self.fx.b, "prune", "--target", "local", "--apply", option, "ghost"
+            )
+            self.fx.assert_exit(result, 2)
+            self.assertIn("matched no worktree", result.stderr)
+        branches = self.fx.git_run(self.fx.b, "branch", "--format=%(refname:short)").stdout.split()
+        self.assertIn("alpha", branches)
+
+    def test_worktree_selector_flags_are_validated(self) -> None:
+        paths = self.prepare_worktrees(["alpha"])
+
+        conflict = self.fx.tool(
+            self.fx.b,
+            "prune",
+            "--keep-worktree",
+            "alpha",
+            "--delete-worktree",
+            str(paths["alpha"]),
+            "--apply",
+        )
+        self.fx.assert_exit(conflict, 2)
+        self.assertIn("same worktree", conflict.stderr)
+
+        missing = self.fx.tool(self.fx.b, "prune", "--remove-worktree-dir", "--apply")
+        self.fx.assert_exit(missing, 2)
+        self.assertIn("--delete-worktree", missing.stderr)
+
+        remote = self.fx.tool(
+            self.fx.b,
+            "prune",
+            "--target",
+            "remote",
+            "--delete-worktree",
+            "alpha",
+            "--remove-worktree-dir",
+        )
+        self.fx.assert_exit(remote, 2)
+        self.assertIn("local branches", remote.stderr)
+
     def test_custom_default_branch_is_protected_from_prune(self) -> None:
         self.fx.create_remote_branch("production")
         self.fx.git_run(self.fx.origin, "symbolic-ref", "HEAD", "refs/heads/production")

@@ -393,18 +393,65 @@ def worktree_hold_reason(worktree: dict[str, Any], stashes: int) -> str | None:
     return None
 
 
+def worktree_key(path: str) -> str:
+    """Identity of a checkout, tolerant of case and of relative spellings."""
+    return os.path.normcase(os.path.realpath(path))
+
+
+def match_worktrees(
+    selectors: Sequence[str], worktrees: Sequence[dict[str, Any]], option: str
+) -> set[str]:
+    """Resolve worktree selectors, given as a branch name or a checkout path.
+
+    An unmatched selector is a refusal rather than a silent no-op: a typo in
+    ``--keep-worktree`` would otherwise release the checkout the user meant to
+    protect, and a typo in ``--delete-worktree`` would silently do nothing.
+    """
+    known = [item for item in worktrees if item.get("path") and item.get("branch")]
+    selected: set[str] = set()
+    missing: list[str] = []
+    for selector in selectors:
+        hits = [
+            item
+            for item in known
+            if item.get("branch") == selector or same_path(item["path"], selector)
+        ]
+        if not hits:
+            missing.append(selector)
+            continue
+        selected.update(worktree_key(item["path"]) for item in hits)
+    if missing:
+        raise Refusal(
+            f"{option} matched no worktree with a branch checked out: "
+            f"{', '.join(sorted(missing))}"
+        )
+    return selected
+
+
 def worktree_context(
-    worktree_map: dict[str, dict[str, Any]], name: str, repo_path: str, stashes: int
+    worktree_map: dict[str, dict[str, Any]],
+    name: str,
+    repo_path: str,
+    stashes: int,
+    keep: set[str],
+    delete: set[str] | None,
 ) -> tuple[str | None, str | None]:
     """The other checkout of ``name``, and why it holds the branch if it does.
 
     The checkout this command runs from is not "another worktree", so it never
-    counts as a holder.
+    counts as a holder. ``delete`` is the explicit whitelist: when it is given,
+    every checkout it does not name is kept, which is how a repository with
+    several worktrees releases only the ones the user chose.
     """
     holder = worktree_map.get(name)
     if not holder or same_path(holder["path"], repo_path):
         return None, None
-    return holder["path"], worktree_hold_reason(holder, stashes)
+    path = holder["path"]
+    if worktree_key(path) in keep:
+        return path, f"checked out in {path} (kept by --keep-worktree)"
+    if delete is not None and worktree_key(path) not in delete:
+        return path, f"checked out in {path} (not selected by --delete-worktree)"
+    return path, worktree_hold_reason(holder, stashes)
 
 
 def operation_in_progress(git: Git) -> str | None:
@@ -660,9 +707,24 @@ def build_snapshot(
     check_prs: bool,
     protected_extra: Sequence[str],
     default_branch_override: str | None = None,
+    worktree_keep: Sequence[str] = (),
+    worktree_delete: Sequence[str] | None = None,
 ) -> dict[str, Any]:
     git = repo.git
     facts = base_facts(git)
+    keep_paths = match_worktrees(worktree_keep, facts["worktrees"], "--keep-worktree")
+    delete_paths = (
+        match_worktrees(worktree_delete, facts["worktrees"], "--delete-worktree")
+        if worktree_delete is not None
+        else None
+    )
+    if keep_paths and delete_paths and keep_paths & delete_paths:
+        raise Refusal("--keep-worktree and --delete-worktree name the same worktree")
+    spelling = {
+        worktree_key(item["path"]): item["path"]
+        for item in facts["worktrees"]
+        if item.get("path")
+    }
     before = tracking_refs(git, repo.remote)
     fetch_info: dict[str, Any] = {"performed": False, "updated": [], "pruned": []}
     if not offline:
@@ -779,7 +841,7 @@ def build_snapshot(
         age = age_days(timestamp)
         protected = is_protected(name, default_branch, protected_extra)
         checked_out_path, worktree_hold = worktree_context(
-            worktree_map, name, repo.path, facts["stashes"]
+            worktree_map, name, repo.path, facts["stashes"], keep_paths, delete_paths
         )
         is_current = name == current_branch
         blockers: list[str] = []
@@ -841,7 +903,7 @@ def build_snapshot(
         protected = is_protected(name, default_branch, protected_extra)
         open_prs = pr_map.get(name, [])
         checked_out_path, worktree_hold = worktree_context(
-            worktree_map, name, repo.path, facts["stashes"]
+            worktree_map, name, repo.path, facts["stashes"], keep_paths, delete_paths
         )
         is_current = name == current_branch
         blockers: list[str] = []
@@ -941,6 +1003,15 @@ def build_snapshot(
         },
         "fetch": fetch_info,
         "stale_tracking": stale_tracking,
+        "worktree_selection": {
+            # Report the checkout paths as git spells them, not the internal key.
+            "keep": sorted(spelling[key] for key in keep_paths if key in spelling),
+            "delete": (
+                None
+                if delete_paths is None
+                else sorted(spelling[key] for key in delete_paths if key in spelling)
+            ),
+        },
         "open_prs": {"checked": check_prs, "count": sum(len(v) for v in pr_map.values())},
         "local_branches": local_records,
         "remote_branches": remote_records,
@@ -1401,6 +1472,16 @@ def build_prune_plan(snapshot: dict[str, Any], args: argparse.Namespace) -> list
     records = prune_records(snapshot, args.target)
     names = {record["name"] for record in records}
     plan: list[dict[str, Any]] = []
+    remove_dirs = bool(getattr(args, "remove_worktree_dir", False))
+    selected_paths = snapshot["worktree_selection"]["delete"]
+    delete_keys = (
+        None if selected_paths is None else {worktree_key(path) for path in selected_paths}
+    )
+    worktrees_by_key = {
+        worktree_key(item["path"]): item
+        for item in snapshot["repo"]["worktrees"]
+        if item.get("path")
+    }
 
     for record in records:
         name = record["name"]
@@ -1435,6 +1516,32 @@ def build_prune_plan(snapshot: dict[str, Any], args: argparse.Namespace) -> list
         ):
             blockers.append("unmerged content")
 
+        # A clean worktree is only a checkout; deleting the branch it holds
+        # detaches that worktree at the archived tip instead of leaving it with an
+        # unborn HEAD. A remote deletion leaves the checkout alone.
+        held_worktree = (
+            record["checked_out"]
+            if record["target"] == "local" and record.get("checked_out")
+            else None
+        )
+        # Removing the checkout itself is a second, deliberate step: only offered
+        # for a local delete, and only for a worktree the user named.
+        remove_checkout = bool(
+            remove_dirs
+            and held_worktree
+            and delete_keys is not None
+            and worktree_key(held_worktree) in delete_keys
+        )
+        if remove_checkout:
+            # `git worktree remove` refuses untracked files and is never forced, so
+            # report that at planning time instead of failing halfway through.
+            stats = worktrees_by_key.get(worktree_key(held_worktree)) or {}
+            untracked = int((stats.get("dirty") or {}).get("untracked") or 0)
+            if untracked:
+                blockers.append(
+                    f"worktree at {held_worktree} has {untracked} untracked file(s); "
+                    "remove them or drop --remove-worktree-dir"
+                )
         plan.append(
             {
                 "target": record["target"],
@@ -1446,14 +1553,8 @@ def build_prune_plan(snapshot: dict[str, Any], args: argparse.Namespace) -> list
                 "blockers": blockers,
                 "action": "delete" if not blockers else "skip",
                 "archive_ref": record.get("archive_ref") or archive_ref(name, record["sha"]),
-                # A clean worktree is only a checkout; deleting the branch it holds
-                # detaches that worktree at the archived tip instead of leaving it
-                # with an unborn HEAD. A remote deletion leaves the checkout alone.
-                "worktree": (
-                    record["checked_out"]
-                    if record["target"] == "local" and record.get("checked_out")
-                    else None
-                ),
+                "worktree": held_worktree,
+                "remove_worktree_dir": remove_checkout,
             }
         )
 
@@ -1501,6 +1602,25 @@ def detach_worktree(path: str, sha: str) -> bool:
 def reattach_worktree(path: str, name: str) -> None:
     """Best-effort rollback of :func:`detach_worktree` after a failed delete."""
     Git(Path(path)).run("symbolic-ref", "HEAD", f"refs/heads/{name}", check=False)
+
+
+def remove_worktree(git: Git, path: str) -> None:
+    """Remove a linked checkout, refusing rather than forcing when it is not clean.
+
+    ``git worktree remove`` already refuses a checkout with modified or untracked
+    files, and it is deliberately run without ``--force``: the tool never deletes
+    user files, it reports the refusal instead.
+    """
+    if not path or not Path(path).is_dir():
+        # Only a stale record is left. Pruning drops the record, no file is touched.
+        git.run("worktree", "prune", check=False)
+        return
+    result = git.run("worktree", "remove", path, check=False)
+    if result.returncode != 0:
+        detail = one_line(result.stderr or result.stdout)
+        raise GitError(f"could not remove the worktree at {path}: {detail or 'unknown error'}")
+    if Path(path).exists():
+        raise GitError(f"worktree at {path} still exists after removal")
 
 
 def delete_local_branch(git: Git, name: str, sha: str, worktree: str | None = None) -> str | None:
@@ -1571,9 +1691,21 @@ def apply_prune_plan(
             ref = archive_tip(repo.git, item["name"], item["sha"])
             item["archive_ref"] = ref
             if item["target"] == "local":
-                item["detached_worktree"] = delete_local_branch(
-                    repo.git, item["name"], item["sha"], item.get("worktree")
-                )
+                checkout = item.get("worktree")
+                if item.get("remove_worktree_dir") and checkout:
+                    # Drop the checkout first: the branch is then checked out
+                    # nowhere, so no detach is needed, and a refusal (dirty or
+                    # untracked files) leaves the branch in place instead of
+                    # leaving a half-done state behind.
+                    remove_worktree(repo.git, checkout)
+                    item["removed_worktree"] = checkout
+                    item["detached_worktree"] = delete_local_branch(
+                        repo.git, item["name"], item["sha"]
+                    )
+                else:
+                    item["detached_worktree"] = delete_local_branch(
+                        repo.git, item["name"], item["sha"], checkout
+                    )
             else:
                 delete_remote_branch(repo.git, remote, item["name"], item["sha"])
             item["action"] = "deleted"
@@ -1597,13 +1729,21 @@ def render_prune(result: dict[str, Any], plan: list[dict[str, Any]]) -> str:
     for item in plan:
         if item["action"] == "delete":
             state = "merged" if item["merged"] else "unmerged (explicit)"
+            fate = "removed" if item.get("remove_worktree_dir") else "detached"
+            suffix = (
+                f"; worktree will be {fate} at {item['worktree']}" if item.get("worktree") else ""
+            )
             lines.append(
                 f"  DELETE  {item['target']:<6} {item['name']:<{width}}  "
-                f"{state}; archive {item['archive_ref']}"
+                f"{state}; archive {item['archive_ref']}{suffix}"
             )
         elif item["action"] == "deleted":
-            detached = item.get("detached_worktree")
-            suffix = f"; worktree detached at {detached}" if detached else ""
+            if item.get("removed_worktree"):
+                suffix = f"; worktree removed at {item['removed_worktree']}"
+            elif item.get("detached_worktree"):
+                suffix = f"; worktree detached at {item['detached_worktree']}"
+            else:
+                suffix = ""
             lines.append(
                 f"  DELETED {item['target']:<6} {item['name']:<{width}}  "
                 f"archive {item['archive_ref']}{suffix}"
@@ -1611,8 +1751,16 @@ def render_prune(result: dict[str, Any], plan: list[dict[str, Any]]) -> str:
         elif item["action"] == "failed":
             lines.append(f"  FAILED  {item['target']:<6} {item['name']:<{width}}  {item['error']}")
         else:
+            # An explicit request to remove a checkout must not disappear silently
+            # just because the branch is blocked.
+            kept = (
+                f"; worktree kept at {item['worktree']}"
+                if item.get("remove_worktree_dir")
+                else ""
+            )
             lines.append(
-                f"  SKIP    {item['target']:<6} {item['name']:<{width}}  {'; '.join(item['blockers'])}"
+                f"  SKIP    {item['target']:<6} {item['name']:<{width}}  "
+                f"{'; '.join(item['blockers'])}{kept}"
             )
     if result.get("deleted"):
         lines.append("")
@@ -1649,6 +1797,7 @@ def cmd_audit(args: argparse.Namespace) -> int:
         check_prs=args.check_prs,
         protected_extra=args.protect,
         default_branch_override=args.default_branch,
+        worktree_keep=getattr(args, "keep_worktree", []),
     )
     if args.json:
         emit(json.dumps(snapshot, indent=2, ensure_ascii=False))
@@ -1666,6 +1815,10 @@ def cmd_prune(args: argparse.Namespace, parser: argparse.ArgumentParser) -> int:
         parser.error("--offline cannot delete remote branches")
     if args.stale_days is not None and args.stale_days < 0:
         parser.error("--stale-days must be zero or greater")
+    if args.remove_worktree_dir and not args.delete_worktree:
+        parser.error("--remove-worktree-dir requires one or more --delete-worktree selectors")
+    if args.remove_worktree_dir and args.target == "remote":
+        parser.error("--remove-worktree-dir applies to local branches; use --target local or all")
     stale_days = args.stale_days if args.stale_days is not None else 90
 
     repo = resolve_repository(args)
@@ -1687,6 +1840,8 @@ def cmd_prune(args: argparse.Namespace, parser: argparse.ArgumentParser) -> int:
         check_prs=args.check_prs,
         protected_extra=args.protect,
         default_branch_override=args.default_branch,
+        worktree_keep=args.keep_worktree,
+        worktree_delete=args.delete_worktree,
     )
     plan = build_prune_plan(snapshot, args)
     if args.apply and operation_in_progress(repo.git):
@@ -1703,6 +1858,10 @@ def cmd_prune(args: argparse.Namespace, parser: argparse.ArgumentParser) -> int:
     explicit = set(args.branch)
     explicit_skips = any(
         item["name"] in explicit and item["action"] in ("skip", "failed") for item in plan
+    ) or any(
+        # Naming a worktree and asking for its directory counts as explicit too.
+        item.get("remove_worktree_dir") and item["action"] in ("skip", "failed")
+        for item in plan
     )
     return 2 if result["failed"] or unknown or explicit_skips else 0
 
@@ -1797,6 +1956,12 @@ def main(argv: Sequence[str] | None = None) -> int:
     audit.add_argument("--stale-days", type=int, default=90, help="age in days for stale review (default: 90)")
     audit.add_argument("--check-prs", action="store_true", help="ask gh for open PRs; fails closed")
     audit.add_argument("--strict", action="store_true", help="exit 2 when findings exist")
+    audit.add_argument(
+        "--keep-worktree",
+        action="append",
+        default=[],
+        help="keep the branches of this worktree, by branch name or path (repeatable)",
+    )
 
     sync = subparsers.add_parser("sync", parents=[common], help="fast-forward safe branches")
     sync.add_argument("--apply", action="store_true", help="execute the plan (default: dry run)")
@@ -1823,6 +1988,24 @@ def main(argv: Sequence[str] | None = None) -> int:
         help="allow deleting explicitly named unmerged branches (requires --branch)",
     )
     prune.add_argument("--allow-shallow", action="store_true", help="allow cleanup in a shallow clone")
+    prune.add_argument(
+        "--keep-worktree",
+        action="append",
+        default=[],
+        help="keep the branches of this worktree, by branch name or path (repeatable)",
+    )
+    prune.add_argument(
+        "--delete-worktree",
+        action="append",
+        default=None,
+        metavar="SELECTOR",
+        help="only release the worktrees named here, by branch name or path (repeatable)",
+    )
+    prune.add_argument(
+        "--remove-worktree-dir",
+        action="store_true",
+        help="with --delete-worktree, remove the checkout after deleting its branch",
+    )
     prune.add_argument("--apply", action="store_true", help="execute the plan (default: dry run)")
     prune.add_argument("--check-prs", action="store_true", help="ask gh for open PRs; fails closed")
     prune.add_argument("--strict", action="store_true", help="exit 2 when a plan has candidates")

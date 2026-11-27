@@ -105,6 +105,15 @@ anything, so `--target remote` leaves the checkout exactly as it was. A worktree
 whose directory was removed is a stale record: it holds no branch back and there
 is nothing to detach, so `git worktree prune` clears it separately.
 
+With several checkouts, decide which ones may be released instead of taking all
+of them: `--keep-worktree <branch-or-path>` protects one that would otherwise be
+pruned, and `--delete-worktree <branch-or-path>` is a whitelist, so every checkout
+it does not name is kept with the reason `not selected by --delete-worktree`. Both
+are repeatable, an unmatched selector is refused, and neither lifts the
+uncommitted-work or stash rule. Adding `--remove-worktree-dir` deletes the named
+checkout's directory after its branch is gone; it never forces, so modified or
+untracked files make it refuse with a `SKIP` and exit 2 while the branch survives.
+
 Remote deletion is lease-checked against the audited tip. If another device
 pushes to that branch after the audit, the delete is rejected instead of
 removing the new work.
