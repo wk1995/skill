@@ -354,6 +354,59 @@ def dirty_counts(git: Git) -> tuple[int, int]:
     return tracked, untracked
 
 
+def worktree_dirty(path: str) -> dict[str, int]:
+    """Uncommitted counts for one linked worktree, read from its own index.
+
+    Each worktree has its own index, so the question has to be asked from inside
+    that directory. A worktree whose directory is gone has no uncommitted work.
+    """
+    if not path or not Path(path).is_dir():
+        return {"tracked": 0, "untracked": 0}
+    tracked, untracked = dirty_counts(Git(Path(path)))
+    return {"tracked": tracked, "untracked": untracked}
+
+
+def worktree_states(git: Git) -> list[dict[str, Any]]:
+    """Worktrees with the uncommitted state of each checkout.
+
+    A branch in a clean worktree is nothing more than a checkout, so the branch
+    itself is disposable. Uncommitted work is not, and neither is a stash that may
+    belong to that worktree, so both are recorded for the branch rules to read.
+    """
+    states: list[dict[str, Any]] = []
+    for item in worktrees(git):
+        if item.get("path") and item.get("branch"):
+            item = {**item, "dirty": worktree_dirty(item["path"])}
+        states.append(item)
+    return states
+
+
+def worktree_hold_reason(worktree: dict[str, Any], stashes: int) -> str | None:
+    """Why a branch checked out in a worktree must be kept, if it must."""
+    path = worktree.get("path")
+    dirty = worktree.get("dirty") or {}
+    tracked = int(dirty.get("tracked") or 0)
+    if tracked:
+        return f"checked out in {path} with {tracked} uncommitted change(s)"
+    if stashes:
+        return f"checked out in {path} with {stashes} stash(es) in the repository"
+    return None
+
+
+def worktree_context(
+    worktree_map: dict[str, dict[str, Any]], name: str, repo_path: str, stashes: int
+) -> tuple[str | None, str | None]:
+    """The other checkout of ``name``, and why it holds the branch if it does.
+
+    The checkout this command runs from is not "another worktree", so it never
+    counts as a holder.
+    """
+    holder = worktree_map.get(name)
+    if not holder or same_path(holder["path"], repo_path):
+        return None, None
+    return holder["path"], worktree_hold_reason(holder, stashes)
+
+
 def operation_in_progress(git: Git) -> str | None:
     git_dir = Path(git.out("rev-parse", "--absolute-git-dir"))
     for marker, label in IN_PROGRESS_MARKERS:
@@ -594,7 +647,7 @@ def base_facts(git: Git) -> dict[str, Any]:
         "in_progress": operation_in_progress(git),
         "stashes": stash_count(git),
         "shallow": is_true(git.out("rev-parse", "--is-shallow-repository")),
-        "worktrees": worktrees(git),
+        "worktrees": worktree_states(git),
     }
 
 
@@ -674,7 +727,7 @@ def build_snapshot(
         pr_map = open_pull_requests(git)
 
     worktree_map = {
-        item["branch"]: item["path"]
+        item["branch"]: item
         for item in facts["worktrees"]
         if item["branch"] and item["path"]
     }
@@ -725,17 +778,17 @@ def build_snapshot(
         timestamp = item["commit_time"]
         age = age_days(timestamp)
         protected = is_protected(name, default_branch, protected_extra)
-        checked_out_path = worktree_map.get(name)
-        if checked_out_path and same_path(checked_out_path, repo.path):
-            checked_out_path = None
+        checked_out_path, worktree_hold = worktree_context(
+            worktree_map, name, repo.path, facts["stashes"]
+        )
         is_current = name == current_branch
         blockers: list[str] = []
         if protected:
             blockers.append("protected branch")
         if is_current:
             blockers.append("current branch")
-        if checked_out_path:
-            blockers.append(f"checked out in {checked_out_path}")
+        if worktree_hold:
+            blockers.append(worktree_hold)
         if not merged:
             if merge_state == "conflict":
                 blockers.append("merging into the default branch conflicts")
@@ -787,17 +840,17 @@ def build_snapshot(
         age = age_days(timestamp)
         protected = is_protected(name, default_branch, protected_extra)
         open_prs = pr_map.get(name, [])
-        checked_out_path = worktree_map.get(name)
-        if checked_out_path and same_path(checked_out_path, repo.path):
-            checked_out_path = None
+        checked_out_path, worktree_hold = worktree_context(
+            worktree_map, name, repo.path, facts["stashes"]
+        )
         is_current = name == current_branch
         blockers: list[str] = []
         if protected:
             blockers.append("protected branch")
         if is_current:
             blockers.append("current branch")
-        if checked_out_path:
-            blockers.append(f"checked out in {checked_out_path}")
+        if worktree_hold:
+            blockers.append(worktree_hold)
         if not available:
             blockers.append("commit is not available locally; fetch the branch first")
         if not merged:
@@ -978,6 +1031,8 @@ def render_audit(snapshot: dict[str, Any]) -> str:
             flags.append("protected")
         if record["checked_out"]:
             flags.append("worktree")
+            if any(blocker.startswith("checked out in") for blocker in record["blockers"]):
+                flags.append("held")
         suffix = f"  [{', '.join(flags)}]" if flags else ""
         lines.append(
             f"  {record['name']:<{width}}  {status_label(record):<26} {merge_label(record):<16}{suffix}".rstrip()
@@ -996,6 +1051,8 @@ def render_audit(snapshot: dict[str, Any]) -> str:
             flags.append("current")
         if record.get("checked_out"):
             flags.append("worktree")
+            if any(blocker.startswith("checked out in") for blocker in record["blockers"]):
+                flags.append("held")
         if record["open_prs"]:
             flags.append("PR " + ",".join(f"#{number}" for number in record["open_prs"]))
         suffix = f"  [{', '.join(flags)}]" if flags else ""
@@ -1007,7 +1064,7 @@ def render_audit(snapshot: dict[str, Any]) -> str:
     review += [record["name"] for record in remotes if record["review_candidate"]]
     if local_cleanup or remote_cleanup:
         lines.append("")
-        lines.append("Cleanup candidates (merged, unprotected, not checked out)")
+        lines.append("Cleanup candidates (merged, unprotected, no uncommitted work)")
         for name in local_cleanup:
             lines.append(f"  local   {name}")
         for name in remote_cleanup:
@@ -1060,7 +1117,7 @@ def build_sync_actions(snapshot: dict[str, Any], args: argparse.Namespace) -> li
                     "kind": "skip",
                     "branch": name,
                     "status": "skipped",
-                    "reason": f"checked out in {record['checked_out']}",
+                    "reason": f"checked out in {record['checked_out']}; fast-forward it from that worktree",
                 }
             )
             continue
@@ -1389,6 +1446,14 @@ def build_prune_plan(snapshot: dict[str, Any], args: argparse.Namespace) -> list
                 "blockers": blockers,
                 "action": "delete" if not blockers else "skip",
                 "archive_ref": record.get("archive_ref") or archive_ref(name, record["sha"]),
+                # A clean worktree is only a checkout; deleting the branch it holds
+                # detaches that worktree at the archived tip instead of leaving it
+                # with an unborn HEAD. A remote deletion leaves the checkout alone.
+                "worktree": (
+                    record["checked_out"]
+                    if record["target"] == "local" and record.get("checked_out")
+                    else None
+                ),
             }
         )
 
@@ -1411,14 +1476,46 @@ def build_prune_plan(snapshot: dict[str, Any], args: argparse.Namespace) -> list
     return plan
 
 
-def delete_local_branch(git: Git, name: str, sha: str) -> None:
+def detach_worktree(path: str, sha: str) -> bool:
+    """Point a worktree HEAD straight at ``sha`` without touching its files.
+
+    ``git update-ref -d`` happily deletes a branch that a linked worktree has
+    checked out, which leaves that worktree with an unborn HEAD and every file
+    staged as new. Detaching first keeps the checkout usable.
+
+    Returns whether a checkout was detached; a worktree whose directory has been
+    removed has nothing to detach, and its leftover record is the user's to prune.
+    """
+    if not path or not Path(path).is_dir():
+        return False
+    probe = Git(Path(path))
+    result = probe.run("update-ref", "--no-deref", "HEAD", sha, check=False)
+    if result.returncode != 0:
+        detail = one_line(result.stderr or result.stdout)
+        raise GitError(f"could not detach the worktree at {path}: {detail or 'unknown error'}")
+    if probe.run("symbolic-ref", "-q", "HEAD", check=False).returncode == 0:
+        raise GitError(f"worktree at {path} still follows a branch after detaching HEAD")
+    return True
+
+
+def reattach_worktree(path: str, name: str) -> None:
+    """Best-effort rollback of :func:`detach_worktree` after a failed delete."""
+    Git(Path(path)).run("symbolic-ref", "HEAD", f"refs/heads/{name}", check=False)
+
+
+def delete_local_branch(git: Git, name: str, sha: str, worktree: str | None = None) -> str | None:
+    """Delete a local branch, returning the worktree path it was detached from."""
+    detached = worktree if worktree and detach_worktree(worktree, sha) else None
     result = git.run("update-ref", "-d", f"refs/heads/{name}", sha, check=False)
     if result.returncode != 0:
+        if detached:
+            reattach_worktree(detached, name)
         detail = one_line(result.stderr or result.stdout)
         raise GitError(f"branch {name} moved or could not be deleted: {detail}")
     if git.run("show-ref", "--verify", "--quiet", f"refs/heads/{name}", check=False).returncode == 0:
         raise GitError(f"branch {name} still exists after deletion")
     git.run("config", "--remove-section", f"branch.{name}", check=False)
+    return detached
 
 
 def delete_remote_branch(git: Git, remote: str, name: str, sha: str) -> None:
@@ -1474,7 +1571,9 @@ def apply_prune_plan(
             ref = archive_tip(repo.git, item["name"], item["sha"])
             item["archive_ref"] = ref
             if item["target"] == "local":
-                delete_local_branch(repo.git, item["name"], item["sha"])
+                item["detached_worktree"] = delete_local_branch(
+                    repo.git, item["name"], item["sha"], item.get("worktree")
+                )
             else:
                 delete_remote_branch(repo.git, remote, item["name"], item["sha"])
             item["action"] = "deleted"
@@ -1503,9 +1602,11 @@ def render_prune(result: dict[str, Any], plan: list[dict[str, Any]]) -> str:
                 f"{state}; archive {item['archive_ref']}"
             )
         elif item["action"] == "deleted":
+            detached = item.get("detached_worktree")
+            suffix = f"; worktree detached at {detached}" if detached else ""
             lines.append(
                 f"  DELETED {item['target']:<6} {item['name']:<{width}}  "
-                f"archive {item['archive_ref']}"
+                f"archive {item['archive_ref']}{suffix}"
             )
         elif item["action"] == "failed":
             lines.append(f"  FAILED  {item['target']:<6} {item['name']:<{width}}  {item['error']}")

@@ -94,9 +94,18 @@ unmerged branch can only be removed when the user names it and passes
   cherry-picks; a conflict or unavailable merge check counts as unmerged. Only
   an explicitly named branch with `--allow-unmerged` bypasses the content proof.
 - Never delete the default branch, `main`, `master`, `develop`, `trunk`,
-  `release/*`, `hotfix/*`, `gh-pages`, a branch matched by `--protect`, the
-  current branch, or a branch checked out in any worktree. This holds for
-  `--target local`, `--target remote`, and `--target all` alike.
+  `release/*`, `hotfix/*`, `gh-pages`, a branch matched by `--protect`, or the
+  current branch. This holds for `--target local`, `--target remote`, and
+  `--target all` alike.
+- A branch checked out in another worktree follows the same rules as any other
+  branch unless that worktree holds uncommitted work or the repository holds a
+  stash: both keep the branch and are reported as blocked, for every target. A
+  clean checkout is only a checkout, so the branch can be pruned. Only when the
+  local branch is deleted is that worktree detached at the archived tip, so it
+  never ends up with an unborn HEAD; `--target remote` leaves every checkout as
+  it is. A worktree whose directory was removed is a stale record: it neither
+  blocks the branch nor has anything to detach, so `git worktree prune` cleans
+  it up separately.
 - Bulk deletion of unmerged branches is impossible. `--allow-unmerged` requires
   one or more explicit `--branch` names and is intended for an abandoned branch
   the user has confirmed can be removed.
@@ -178,7 +187,8 @@ python3 <skill-dir>/scripts/repo_sync.py sync --apply --reset-rewritten
 
 - Fast-forwards the default branch first, then the other local branches.
 - Updates a non-current branch with an atomic compare-and-swap; a branch checked
-  out in another worktree is skipped.
+  out in another worktree is skipped, because moving its ref would desynchronize
+  that checkout. Fast-forward it from the worktree that has it.
 - `--rebase-current` replays the current branch on its upstream, aborts on
   conflict, and leaves the original branch restored. The old tip stays archived.
 - `--reset-rewritten` moves a non-current branch to upstream only when all its

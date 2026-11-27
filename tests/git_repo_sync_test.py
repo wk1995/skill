@@ -633,7 +633,7 @@ class RepoSyncCliTests(unittest.TestCase):
         self.fx.assert_exit(duplicate, 1)
         self.assertIn("already exists", duplicate.stderr)
 
-    def test_prune_protects_current_and_checked_out_branches(self) -> None:
+    def test_prune_protects_protected_and_current_but_releases_clean_worktree(self) -> None:
         self.fx.create_remote_branch("develop")
         self.fx.create_remote_branch("worktree-topic", file="w.txt", content="w\n")
         self.fx.switch(self.fx.a, "main")
@@ -652,17 +652,129 @@ class RepoSyncCliTests(unittest.TestCase):
                 self.fx.b, "worktree", "remove", "--force", str(worktree_path), check=False
             )
         )
+        tip = self.fx.sha(self.fx.b, "worktree-topic")
+
+        result = self.fx.tool(self.fx.b, "prune", "--target", "local", "--apply", "--json")
+        self.fx.assert_exit(result, 0)
+        payload = json.loads(result.stdout)
+        deleted = {item["name"]: item for item in payload["deleted"]}
+        self.assertEqual(sorted(deleted), ["worktree-topic"])
+        branches = self.fx.git_run(self.fx.b, "branch", "--format=%(refname:short)").stdout.split()
+        self.assertIn("main", branches)
+        self.assertIn("develop", branches)
+        self.assertNotIn("worktree-topic", branches)
+        # The clean checkout is detached at the archived tip, not left unborn.
+        self.assertEqual(
+            self.fx.git_run(worktree_path, "symbolic-ref", "-q", "HEAD", check=False).returncode, 1
+        )
+        self.assertEqual(self.fx.sha(worktree_path, "HEAD"), tip)
+        self.assertEqual((worktree_path / "w.txt").read_text(encoding="utf-8"), "w\n")
+
+    def test_worktree_with_uncommitted_changes_blocks_prune(self) -> None:
+        self.fx.create_remote_branch("held", file="h.txt", content="h\n")
+        self.fx.switch(self.fx.a, "main")
+        self.fx.git_run(self.fx.a, "merge", "--quiet", "--no-ff", "held", "-m", "merge held")
+        self.fx.push(self.fx.a, "main")
+        self.fx.fetch(self.fx.b)
+        self.fx.branch(self.fx.b, "held", "origin/held")
+
+        worktree_path = self.fx.root / "dirty-wt"
+        self.fx.git_run(self.fx.b, "worktree", "add", "--quiet", str(worktree_path), "held")
+        self.addCleanup(
+            lambda: self.fx.git_run(
+                self.fx.b, "worktree", "remove", "--force", str(worktree_path), check=False
+            )
+        )
+        self.fx.write(worktree_path, "h.txt", "uncommitted\n")
+
+        result = self.fx.tool(self.fx.b, "prune", "--target", "all", "--apply", "--json")
+        self.fx.assert_exit(result, 0)
+        payload = json.loads(result.stdout)
+        self.assertEqual(payload["deleted"], [])
+        skipped = {item["target"]: item for item in payload["skipped"]}
+        for target in ("local", "remote"):
+            self.assertIn("uncommitted change", " ".join(skipped[target]["blockers"]))
+        self.assertIn("held", self.fx.remote_heads())
+        branches = self.fx.git_run(self.fx.b, "branch", "--format=%(refname:short)").stdout.split()
+        self.assertIn("held", branches)
+        self.assertEqual((worktree_path / "h.txt").read_text(encoding="utf-8"), "uncommitted\n")
+
+    def test_repository_stash_blocks_prune_of_worktree_branch(self) -> None:
+        self.fx.create_remote_branch("held", file="h.txt", content="h\n")
+        self.fx.switch(self.fx.a, "main")
+        self.fx.git_run(self.fx.a, "merge", "--quiet", "--no-ff", "held", "-m", "merge held")
+        self.fx.push(self.fx.a, "main")
+        self.fx.fetch(self.fx.b)
+        self.fx.branch(self.fx.b, "held", "origin/held")
+
+        worktree_path = self.fx.root / "stash-wt"
+        self.fx.git_run(self.fx.b, "worktree", "add", "--quiet", str(worktree_path), "held")
+        self.addCleanup(
+            lambda: self.fx.git_run(
+                self.fx.b, "worktree", "remove", "--force", str(worktree_path), check=False
+            )
+        )
+        self.fx.write(self.fx.b, "f.txt", "stashed\n")
+        self.fx.git_run(self.fx.b, "stash", "push", "--quiet")
 
         result = self.fx.tool(self.fx.b, "prune", "--target", "local", "--apply", "--json")
         self.fx.assert_exit(result, 0)
         payload = json.loads(result.stdout)
         self.assertEqual(payload["deleted"], [])
-        skipped = {item["name"]: item["blockers"] for item in payload["skipped"]}
-        self.assertIn("worktree-topic", skipped)
-        self.assertTrue(any("checked out in" in blocker for blocker in skipped["worktree-topic"]))
+        blockers = payload["skipped"][0]["blockers"]
+        self.assertTrue(any("stash" in blocker for blocker in blockers))
         branches = self.fx.git_run(self.fx.b, "branch", "--format=%(refname:short)").stdout.split()
-        self.assertIn("main", branches)
-        self.assertIn("worktree-topic", branches)
+        self.assertIn("held", branches)
+
+    def test_untracked_files_do_not_hold_a_worktree_branch(self) -> None:
+        self.fx.create_remote_branch("held", file="h.txt", content="h\n")
+        self.fx.switch(self.fx.a, "main")
+        self.fx.git_run(self.fx.a, "merge", "--quiet", "--no-ff", "held", "-m", "merge held")
+        self.fx.push(self.fx.a, "main")
+        self.fx.fetch(self.fx.b)
+        self.fx.branch(self.fx.b, "held", "origin/held")
+
+        worktree_path = self.fx.root / "scratch-wt"
+        self.fx.git_run(self.fx.b, "worktree", "add", "--quiet", str(worktree_path), "held")
+        self.addCleanup(
+            lambda: self.fx.git_run(
+                self.fx.b, "worktree", "remove", "--force", str(worktree_path), check=False
+            )
+        )
+        self.fx.write(worktree_path, "scratch.txt", "notes\n")
+
+        result = self.fx.tool(self.fx.b, "prune", "--target", "local", "--apply")
+        self.fx.assert_exit(result, 0)
+        self.assertIn("DELETED", result.stdout)
+        branches = self.fx.git_run(self.fx.b, "branch", "--format=%(refname:short)").stdout.split()
+        self.assertNotIn("held", branches)
+        # Untracked files survive detachment.
+        self.assertEqual((worktree_path / "scratch.txt").read_text(encoding="utf-8"), "notes\n")
+
+    def test_removed_worktree_directory_still_allows_prune(self) -> None:
+        self.fx.create_remote_branch("held", file="h.txt", content="h\n")
+        self.fx.switch(self.fx.a, "main")
+        self.fx.git_run(self.fx.a, "merge", "--quiet", "--no-ff", "held", "-m", "merge held")
+        self.fx.push(self.fx.a, "main")
+        self.fx.fetch(self.fx.b)
+        self.fx.branch(self.fx.b, "held", "origin/held")
+
+        worktree_path = self.fx.root / "gone-wt"
+        self.fx.git_run(self.fx.b, "worktree", "add", "--quiet", str(worktree_path), "held")
+        # A checkout whose directory vanished is only a stale record: there is
+        # nothing to detach, and refusing to delete the branch would leave it
+        # prunable forever.
+        shutil.rmtree(worktree_path)
+        self.addCleanup(
+            lambda: self.fx.git_run(self.fx.b, "worktree", "prune", check=False)
+        )
+
+        result = self.fx.tool(self.fx.b, "prune", "--target", "local", "--apply")
+        self.fx.assert_exit(result, 0)
+        self.assertIn("DELETED", result.stdout)
+        self.assertNotIn("worktree detached", result.stdout)
+        branches = self.fx.git_run(self.fx.b, "branch", "--format=%(refname:short)").stdout.split()
+        self.assertNotIn("held", branches)
 
     def test_custom_default_branch_is_protected_from_prune(self) -> None:
         self.fx.create_remote_branch("production")
@@ -726,7 +838,7 @@ class RepoSyncCliTests(unittest.TestCase):
         self.assertEqual(deleted, ["feature"])
         self.assertIn("production", self.fx.remote_heads())
 
-    def test_remote_prune_protects_current_and_checked_out_branches(self) -> None:
+    def test_remote_prune_protects_current_and_releases_clean_worktree(self) -> None:
         self.fx.create_remote_branch("topic", file="t.txt", content="t\n")
         self.fx.create_remote_branch("held", file="h.txt", content="h\n")
         self.fx.switch(self.fx.a, "main")
@@ -748,10 +860,18 @@ class RepoSyncCliTests(unittest.TestCase):
 
         result = self.fx.tool(self.fx.b, "prune", "--target", "remote", "--apply", "--json")
         self.fx.assert_exit(result, 0)
-        self.assertEqual(json.loads(result.stdout)["deleted"], [])
+        deleted = [item["name"] for item in json.loads(result.stdout)["deleted"]]
+        self.assertEqual(deleted, ["held"])
         heads = self.fx.remote_heads()
         self.assertIn("topic", heads)
-        self.assertIn("held", heads)
+        self.assertNotIn("held", heads)
+        # Remote deletion is not a local one: the checkout keeps its branch.
+        branches = self.fx.git_run(self.fx.b, "branch", "--format=%(refname:short)").stdout.split()
+        self.assertIn("held", branches)
+        self.assertEqual(
+            self.fx.git_run(worktree_path, "symbolic-ref", "-q", "HEAD").stdout.strip(),
+            "refs/heads/held",
+        )
 
     def test_unmerged_branch_requires_explicit_selection_and_flag(self) -> None:
         self.fx.create_remote_branch("unmerged", file="u.txt", content="u\n")

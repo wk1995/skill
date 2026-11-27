@@ -64,7 +64,7 @@ Remote branches (7)
   feature/a     12d  merged (squash)
   feature/b      3d  unmerged
 
-Cleanup candidates (merged, unprotected, not checked out)
+Cleanup candidates (merged, unprotected, no uncommitted work)
   local   feature/a
   remote  feature/a
 ```
@@ -87,12 +87,23 @@ the audit.
 
 Protected branches (the detected default branch, `main`, `master`,
 `develop`, `trunk`, `release/*`, `hotfix/*`, `gh-pages`, and extra `--protect`
-globs), the current branch, branches checked out in any worktree, and branches
-with an open pull request when `--check-prs` is used. The same set applies to
-local and remote deletion; `--default-branch` changes what merge containment is
-measured against and never removes the protection of the branch the remote
-serves as its default. Unmerged branches cannot be deleted in bulk:
-`--allow-unmerged` requires an explicit `--branch` name.
+globs), the current branch, and branches with an open pull request when
+`--check-prs` is used. The same set applies to local and remote deletion;
+`--default-branch` changes what merge containment is measured against and never
+removes the protection of the branch the remote serves as its default. Unmerged
+branches cannot be deleted in bulk: `--allow-unmerged` requires an explicit
+`--branch` name.
+
+A branch checked out in another worktree is treated like any other branch,
+except that uncommitted work is never deleted out from under you: while that
+worktree has tracked changes, or while the repository holds a stash, the branch
+is reported as blocked and kept. A clean checkout is only a checkout, so its
+branch can be pruned; the worktree is then detached at the archived tip, which
+leaves every file in place. Untracked files are left alone and do not hold a
+branch back, because detaching never touches them. Only local deletion detaches
+anything, so `--target remote` leaves the checkout exactly as it was. A worktree
+whose directory was removed is a stale record: it holds no branch back and there
+is nothing to detach, so `git worktree prune` clears it separately.
 
 Remote deletion is lease-checked against the audited tip. If another device
 pushes to that branch after the audit, the delete is rejected instead of
